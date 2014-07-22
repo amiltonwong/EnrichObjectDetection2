@@ -1,17 +1,3 @@
-azs = 0:30:330; % azs = [azs , azs - 10, azs + 10];
-els = [0 20];
-fovs = [15 30 60];
-yaw = ismac * 180;
-nCellLimit = [150];
-lambda = [0.02];
-
-detectorName = sprintf('detectors_%d_%d_fovs_a_%d_e_%d_f_%d_honda.mat',...
-  nCellLimit, lambda, numel(azs), numel(els), numel(fovs));
-load(detectorName);
-templates = cellfun(@(x) x.whow, detectors,'UniformOutput',false);
-
-CLASS = 'car';
-TYPE = 'val';
 VOC_PATH = '/home/chrischoy/Dataset/VOCdevkit/';
 
 addpath('HoG');
@@ -22,9 +8,34 @@ addpath(VOC_PATH);
 addpath([VOC_PATH, 'VOCcode']);
 
 
+CLASS = 'bicycle';
+TYPE = 'val';
+
+azs = 0:30:330; % azs = [azs , azs - 10, azs + 10];
+els = [0 20];
+fovs = [25];
+yaws = ismac * 180 + [-30:30:30];
+n_cell_limit = [150];
+lambda = [0.02];
+visualize = true;
+
+model_file = 'Mesh/Bicycle/road_bike';
+model_name = strrep(model_file, '/', '_');
+
+detector_name = sprintf('%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
+    model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
+
+if exist(detector_name,'file')
+  load(detector_name);
+else
+  load('Statistics/sumGamma_N1_40_N2_40_sbin_4_nLevel_10_nImg_1601_napoli1_gamma.mat');
+  detectors = dwot_make_detectors_slow(mu, Gamma, [model_file '.3ds'], azs, els, yaws, fovs, n_cell_limit, lambda, visualize);
+  eval(sprintf(['save ' detector_name ' detectors']));
+end
+templates = cellfun(@(x) x.whow, detectors,'UniformOutput',false);
+
 VOCinit;
 param = get_default_params(6, 10, 70);
-
 
 % load dataset
 [gtids,t]=textread(sprintf(VOCopts.imgsetpath,[CLASS '_' TYPE]),'%s %d');
@@ -142,4 +153,4 @@ title(tit);
 axis([0 1 0 1]);
 set(gcf,'color','w');
 saveas(gcf,sprintf('Result/VOC_NCells_%d_lambda_%0.4f_azs_%d_els_%d_fovs_%d_honda_accord.png',...
-  nCellLimit,lambda,numel(azs),numel(els),numel(fovs)));
+  n_cell_limit,lambda,numel(azs),numel(els),numel(fovs)));

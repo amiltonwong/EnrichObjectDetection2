@@ -1,13 +1,13 @@
-function detectors = dwot_make_detectors_slow(Mu, Gamma, mesh_path, azs, els, yaws, fovs, n_cell_limit, lambda, visualize)
+function [detectors, detector_name]= dwot_make_detectors_slow(Mu, Gamma, mesh_path, azs, els, yaws, fovs, n_cell_limit, lambda, visualize)
 
 mesh_name = strrep(mesh_path, '/', '_');
 
-detectorName = sprintf('%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
+detector_name = sprintf('%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
     mesh_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
 
   
-if exist(detectorName,'file')
-  load(detectorName);
+if exist(detector_name,'file')
+  load(detector_name);
 else
   if exist('renderer','var')
     renderer.delete();
@@ -52,6 +52,7 @@ else
               imagesc(HOGpicture(HOGTemplate)); axis equal; axis tight;
               subplot(133);
               imagesc(HOGpicture(WHOTemplate)); axis equal; axis tight;
+              disp('press any button to continue');
               waitforbuttonpress;
             end
             i = i + 1;    
@@ -59,7 +60,6 @@ else
         end
       end
     end
-    eval(sprintf(['save ' detectorName ' detectors']));
   catch e
     disp(e.message);
   end
