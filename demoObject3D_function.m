@@ -101,10 +101,10 @@ for imgIdx = 1:(IMAGE_END_IDX - IMAGE_START_IDX + 1)
     end
     
     if visualize
-      padding = 100;
+      padding = 50;
       paddedIm = pad_image(im2double(im), padding, 1);
       resultIm = paddedIm;
-      NDrawBox = min(nDet,2);
+      NDrawBox = min(nDet,4);
       for bbsIdx = NDrawBox:-1:1
         % rectangle('position', bbsNMS(bbsIdx, 1:4) - [0 0 bbsNMS(bbsIdx, 1:2)] + [padding padding 0 0]);
         bnd = round(bbsNMS(bbsIdx, 1:4)) + padding;

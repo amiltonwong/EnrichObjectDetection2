@@ -119,11 +119,12 @@ for imgIdx=1:N_IMAGE
     end
     
     % if visualize
-    if 1
-      padding = 100;
-      paddedIm = uint8(pad_image(im, padding, 255));
-      
-      for bbsIdx = min(nDet,2):-1:1
+    if visualize
+      padding = 50;
+      paddedIm = pad_image(im2double(im), padding, 1);
+      resultIm = paddedIm;
+      NDrawBox = min(nDet,4);
+      for bbsIdx = NDrawBox:-1:1
         % rectangle('position', bbsNMS(bbsIdx, 1:4) - [0 0 bbsNMS(bbsIdx, 1:2)] + [padding padding 0 0]);
         bnd = round(bbsNMS(bbsIdx, 1:4)) + padding;
         szIm = size(paddedIm);
@@ -135,14 +136,37 @@ for imgIdx=1:N_IMAGE
             max(clip_bnd(2),1),...
             max(clip_bnd(3),1),...
             max(clip_bnd(4),1)];
+        % resizeRendering = imresize(detectors{bbsNMS(bbsIdx, 11)}.rendering, [bnd(4) - bnd(2) + 1, bnd(3) - bnd(1) + 1]);
         resizeRendering = imresize(detectors{bbsNMS(bbsIdx, 11)}.rendering, [bnd(4) - bnd(2) + 1, bnd(3) - bnd(1) + 1]);
         resizeRendering = resizeRendering(1:(clip_bnd(4) - clip_bnd(2) + 1), 1:(clip_bnd(3) - clip_bnd(1) + 1), :);
         bndIm = paddedIm( clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3), :);
-        blendIm = bndIm/2 + resizeRendering/2;
-        paddedIm(clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3),:) = blendIm;
+        blendIm = bndIm/2 + im2double(resizeRendering)/2;
+        resultIm(clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3),:) = blendIm;
       end
-      imagesc(paddedIm);
+      clf;
+      imagesc(resultIm);
+      
+      for bbsIdx = NDrawBox:-1:1
+        bnd = round(bbsNMS(bbsIdx, 1:4)) + padding;
+        szIm = size(paddedIm);
+        clip_bnd = [ min(bnd(1),szIm(2)),...
+            min(bnd(2), szIm(1)),...
+            min(bnd(3), szIm(2)),...
+            min(bnd(4), szIm(1))];
+        clip_bnd = [max(clip_bnd(1),1),...
+            max(clip_bnd(2),1),...
+            max(clip_bnd(3),1),...
+            max(clip_bnd(4),1)];
+        titler = {['score ' num2str( bbsNMS(bbsIdx,12))], ...
+          [' overlap ' num2str( bbsNMS(bbsIdx,9))],...
+          [' azimuth D/GT ' num2str( detectors{bbsNMS(bbsIdx,11)}.az) ' ' num2str(azGT)],...
+          [' azimuth ' num2str(bbsNMS(bbsIdx,10))]};
+
+        plot_bbox(clip_bnd,cell2mat(titler),[1 1 1]);
+      end
       drawnow;
+      disp('Press any button to continue');
+      waitforbuttonpress;
     end
       
     npos=npos+sum(~gt(imgIdx).diff);
