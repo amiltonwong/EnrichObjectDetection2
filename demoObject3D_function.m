@@ -1,26 +1,28 @@
-VOC_PATH = '/home/chrischoy/Dataset/VOCdevkit/';
-
+% VOC_PATH = '/home/chrischoy/Dataset/VOCdevkit/';
+clear;
 addpath('HoG');
 addpath('HoG/features');
 addpath('Util');
 addpath('../MatlabRenderer/');
-addpath(VOC_PATH);
-addpath([VOC_PATH, 'VOCcode']);
 
+IMAGE_PATH = '../PBR_MATLAB/OBJECT_3D/';
+IMAGE_START_IDX = 121;
+IMAGE_END_IDX = 240;
+N_IMAGE = IMAGE_END_IDX - IMAGE_START_IDX + 1;
 
-CLASS = 'bicycle';
-TYPE = 'val';
-
-azs = 0:30:330; % azs = [azs , azs - 10, azs + 10];
-els = [0 20];
-fovs = [25];
-yaws = ismac * 180 + [-30:30:30];
+azs = 0:45:315; % azs = [azs , azs - 10, azs + 10];
+els = [0 10 20];
+fovs = [15 30 60];
+yaws = ismac * 180;
 n_cell_limit = [150];
 lambda = [0.02];
-% visualize = true;
-visualize = false;
+visualize = true;
+% visualize = false;
+sbin = 6;
+nlevel = 10;
+detection_threshold = 100;
 
-model_file = 'Mesh/Bicycle/road_bike';
+model_file = 'Mesh/Car/Sedan/Honda-Accord-3';
 model_name = strrep(model_file, '/', '_');
 
 detector_name = sprintf('%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
@@ -38,40 +40,34 @@ else
 end
 
 templates = cellfun(@(x) x.whow, detectors,'UniformOutput',false);
-
-VOCinit;
-param = get_default_params(6, 10, 70);
-
-% load dataset
-[gtids,t]=textread(sprintf(VOCopts.imgsetpath,[CLASS '_' TYPE]),'%s %d');
-
-N_IMAGE = length(gtids);
+param = get_default_params(sbin, nlevel, detection_threshold);
 
 % extract ground truth objects
 npos = 0;
 tp = cell(1,N_IMAGE);
 fp = cell(1,N_IMAGE);
-% atp = cell(1,N_IMAGE);
-% afp = cell(1,N_IMAGE);
+atp = cell(1,N_IMAGE);
+afp = cell(1,N_IMAGE);
 detScore = cell(1,N_IMAGE);
 detectorId = cell(1,N_IMAGE);
 detIdx = 0;
 
 
-gt(length(gtids))=struct('BB',[],'diff',[],'det',[]);
-for imgIdx=1:N_IMAGE
+startTime = clock;
+for imgIdx = 1:(IMAGE_END_IDX - IMAGE_START_IDX + 1)
     imgTic = tic;
     % read annotation
-    recs(imgIdx)=PASreadrecord(sprintf(VOCopts.annopath,gtids{imgIdx}));
+    annotation = load([IMAGE_PATH '/Annotation/' sprintf('%04d',imgIdx + IMAGE_START_IDX - 1) '.mat']);
+    annotation = annotation.annotation;
+
+    azGT = annotation.view(1);
+    elGT = annotation.view(2);
     
-    clsinds = strmatch(CLASS,{recs(imgIdx).objects(:).class},'exact');
-    gt(imgIdx).BB=cat(1,recs(imgIdx).objects(clsinds).bbox)';
-    gt(imgIdx).diff=[recs(imgIdx).objects(clsinds).difficult];
-    gt(imgIdx).det=false(length(clsinds),1);
-    
-    im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
+    im = imread([IMAGE_PATH '/Images/' sprintf('%04d',imgIdx + IMAGE_START_IDX - 1) '.jpg']);
     [bbsNMS ]= dwot_detect( im, templates, param);
     
+    npos=npos+1;
+
     nDet = size(bbsNMS,1);
     tp{imgIdx} = zeros(1,nDet);
     fp{imgIdx} = zeros(1,nDet);
@@ -80,50 +76,36 @@ for imgIdx=1:N_IMAGE
     detectorId{imgIdx} = bbsNMS(:,11)';
     detScore{imgIdx} = bbsNMS(:,end)';
     
+    detected = false;
+    nDet = size(bbsNMS,1);
+    tp{imgIdx} = zeros(1,nDet);
+    fp{imgIdx} = zeros(1,nDet);
+    atp{imgIdx} = zeros(1,nDet);
+    afp{imgIdx} = zeros(1,nDet);
+    detectorId{imgIdx} = bbsNMS(:,11)';
+    detScore{imgIdx} = bbsNMS(:,end)';
+
     for bbsIdx = 1:nDet
-      ovmax=-inf;
-      
-      % search over all objects in the image
-      for j=1:size(gt(imgIdx).BB,2)
-          bbgt=gt(imgIdx).BB(:,j);
-          bi=[max(bbsNMS(1),bbgt(1)) ; max(bbsNMS(2),bbgt(2)) ; min(bbsNMS(3),bbgt(3)) ; min(bbsNMS(4),bbgt(4))];
-          iw=bi(3)-bi(1)+1;
-          ih=bi(4)-bi(2)+1;
-          if iw>0 && ih>0                
-              % compute overlap as area of intersection / area of union
-              ua=(bbsNMS(3)-bbsNMS(1)+1)*(bbsNMS(4)-bbsNMS(2)+1)+...
-                 (bbgt(3)-bbgt(1)+1)*(bbgt(4)-bbgt(2)+1)-...
-                 iw*ih;
-              ov=iw*ih/ua;
-              
-              if ov > ovmax
-                  ovmax = ov;
-                  jmax = j;
-              end
-          end
-      end
-      
-      % assign detection as true positive/don't care/false positive
-      if ovmax >= VOCopts.minoverlap
-          if ~gt(imgIdx).diff(jmax)
-              if ~gt(imgIdx).det(jmax)
-                  tp{imgIdx}(bbsIdx)=1;            % true positive
-                  gt(imgIdx).det(jmax)=true;
-              else
-                  fp{imgIdx}(bbsIdx)=1;            % false positive (multiple detection)
-              end
-          end
+      if bbsNMS(bbsIdx,9) > 0.5 && ~detected
+        tp{imgIdx}(bbsIdx) = 1;
+        detected = true;
+        if bbsNMS(bbsIdx,10) == 1
+          atp{imgIdx}(bbsIdx) = 1;
+        else
+          afp{imgIdx}(bbsIdx) = 1;
+        end
       else
-          fp{imgIdx}(bbsIdx)=1;                    % false positive
+        fp{imgIdx}(bbsIdx) = 1;
+        afp{imgIdx}(bbsIdx) = 1;
       end
     end
     
-    % if visualize
-    if 1
+    if visualize
       padding = 100;
-      paddedIm = uint8(pad_image(im, padding, 255));
-      
-      for bbsIdx = min(nDet,2):-1:1
+      paddedIm = pad_image(im2double(im), padding, 1);
+      resultIm = paddedIm;
+      NDrawBox = min(nDet,2);
+      for bbsIdx = NDrawBox:-1:1
         % rectangle('position', bbsNMS(bbsIdx, 1:4) - [0 0 bbsNMS(bbsIdx, 1:2)] + [padding padding 0 0]);
         bnd = round(bbsNMS(bbsIdx, 1:4)) + padding;
         szIm = size(paddedIm);
@@ -135,17 +117,39 @@ for imgIdx=1:N_IMAGE
             max(clip_bnd(2),1),...
             max(clip_bnd(3),1),...
             max(clip_bnd(4),1)];
+        % resizeRendering = imresize(detectors{bbsNMS(bbsIdx, 11)}.rendering, [bnd(4) - bnd(2) + 1, bnd(3) - bnd(1) + 1]);
         resizeRendering = imresize(detectors{bbsNMS(bbsIdx, 11)}.rendering, [bnd(4) - bnd(2) + 1, bnd(3) - bnd(1) + 1]);
         resizeRendering = resizeRendering(1:(clip_bnd(4) - clip_bnd(2) + 1), 1:(clip_bnd(3) - clip_bnd(1) + 1), :);
         bndIm = paddedIm( clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3), :);
-        blendIm = bndIm/2 + resizeRendering/2;
-        paddedIm(clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3),:) = blendIm;
+        blendIm = bndIm/2 + im2double(resizeRendering)/2;
+        resultIm(clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3),:) = blendIm;
       end
-      imagesc(paddedIm);
+      clf;
+      imagesc(resultIm);
+      
+      for bbsIdx = NDrawBox:-1:1
+        bnd = round(bbsNMS(bbsIdx, 1:4)) + padding;
+        szIm = size(paddedIm);
+        clip_bnd = [ min(bnd(1),szIm(2)),...
+            min(bnd(2), szIm(1)),...
+            min(bnd(3), szIm(2)),...
+            min(bnd(4), szIm(1))];
+        clip_bnd = [max(clip_bnd(1),1),...
+            max(clip_bnd(2),1),...
+            max(clip_bnd(3),1),...
+            max(clip_bnd(4),1)];
+        titler = {['score ' num2str( bbsNMS(bbsIdx,12))], ...
+          [' overlap ' num2str( bbsNMS(bbsIdx,9))],...
+          [' azimuth D/GT ' num2str( detectors{bbsNMS(bbsIdx,11)}.az) ' ' num2str(azGT)],...
+          [' azimuth ' num2str(bbsNMS(bbsIdx,10))]};
+
+        plot_bbox(clip_bnd,cell2mat(titler),[1 1 1]);
+      end
       drawnow;
+      disp('Press any button to continue');
+      waitforbuttonpress;
     end
       
-    npos=npos+sum(~gt(imgIdx).diff);
     fprintf('%d/%d time : %0.4f\n', imgIdx, N_IMAGE, toc(imgTic));
 end
 

@@ -27,7 +27,8 @@ for level = length(hog):-1:1
   rmsizes = cellfun(@(x) size(x), HM, 'UniformOutput',false);
   scale = scales(level);
   templateIdxes = find(cellfun(@(x) prod(x), rmsizes));
-
+  bbsTemplate = cell(nTemplates,1);
+  
   for templateIdx = templateIdxes
     [idx] = find(HM{templateIdx}(:) > param.detection_threshold);
     if isempty(idx)
@@ -55,24 +56,24 @@ for level = length(hog):-1:1
 
     bbs(:,11) = templateIdx;
     bbs(:,12) = HM{templateIdx}(idx);
-    bbsAll{level} = bbs;
+    bbsTemplate{templateIdx} = bbs;
     
-%     % if visualize
-%     if 0
-%       [score, Idx] = max(bbs(:,13));
-%       subplot(231); imagesc(detectors{exemplarIdx}.rendering); axis equal; axis tight;
-%       % subplot(232); imagesc(detectors{exemplarIdx}.hogpic); axis equal; axis tight; axis off;
-%       text(10,20,{['score ' num2str(bbs(Idx,13))], ['overlap ' num2str(bbs(Idx,9))],['azimuth ' num2str(bbs(Idx,10))]},'BackgroundColor',[.7 .9 .7]);
-%       subplot(233); imagesc(HM{exemplarIdx}); %caxis([100 200]); 
-%       colorbar; axis equal; axis tight; 
-%       subplot(234); imagesc(testDoubleIm); axis equal; % axis tight; axis off;
-%       rectangle('Position',bbs(Idx,1:4)-[0 0 bbs(Idx,1:2)]);
-%       % subplot(235); imagesc(HOGpic); axis equal; axis tight; axis off;
-%       % waitforbuttonpress;
-%       % pause(0.8);
-%     end
+    % if visualize
+    if 0
+      [score, Idx] = max(bbs(:,12));
+      % subplot(231); imagesc(templates{templateIdx}.rendering); axis equal; axis tight;
+      % subplot(232); imagesc(detectors{exemplarIdx}.hogpic); axis equal; axis tight; axis off;
+      text(10,20,{['score ' num2str(bbs(Idx,12))],['azimuth ' num2str(bbs(Idx,10))]},'BackgroundColor',[.7 .9 .7]);
+      subplot(233); imagesc(HM{templateIdx}); %caxis([100 200]); 
+      colorbar; axis equal; axis tight; 
+      subplot(234); imagesc(doubleIm); axis equal; % axis tight; axis off;
+      rectangle('Position',bbs(Idx,1:4)-[0 0 bbs(Idx,1:2)]);
+      % subplot(235); imagesc(HOGpic); axis equal; axis tight; axis off;
+      % waitforbuttonpress;
+      pause(0.8);
+    end
   end
+  bbsAll{level} = cell2mat(bbsTemplate);
 end
 
-bbsAll = cell2mat(bbsAll);
-bbsNMS = esvm_nms(bbsAll,0.5);
+bbsNMS = esvm_nms(cell2mat(bbsAll),0.5);

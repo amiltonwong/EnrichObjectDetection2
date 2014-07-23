@@ -40,6 +40,7 @@ else
             % detectors{i}.hogw = HOGTemplate;
             detectors{i}.az = azGT;
             detectors{i}.el = elGT;
+            detectors{i}.yaw = yawGT;
             detectors{i}.fov = fovGT;
             detectors{i}.rendering = im;
             detectors{i}.sz = size(WHOTemplate);

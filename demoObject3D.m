@@ -18,9 +18,9 @@ overlap = 0.5;
 param = get_default_params(sbin,nLevel);
 detectionThreshold = 100;
 
-azs = 0:30:330;
-% azs = [azs , azs - 10, azs + 10];
-els = [0 20];
+azs = 0:45:315;
+azs = [azs , azs - 10, azs + 10];
+els = [0 10 20];
 fovs = [15 30 60];
 % yaw = 180;
 yaw = 0;
@@ -33,7 +33,7 @@ IMAGE_START_IDX = 121;
 IMAGE_END_IDX = 240;
 
 % detectorName = sprintf('detectors_%d_%d_fovs_honda_new_statistics.mat',nCellLimit, lambda);
-detectorName = sprintf('detectors_%d_%d_fovs_a_%d_e_%d_f_%d_honda.mat',nCellLimit, lambda, numel(azs), numel(els), numel(fovs));
+detectorName = sprintf('detectors_%d_%0.4f_fovs_a_%d_e_%d_f_%d_honda.mat',nCellLimit, lambda, numel(azs), numel(els), numel(fovs));
 if exist(detectorName,'file')
   load(detectorName);
 else
@@ -192,6 +192,7 @@ for imageIdx = 1:(IMAGE_END_IDX - IMAGE_START_IDX + 1)
       end
     end
   end
+  bbsAll = cell2mat(bbsAll);
   bbsNMS = esvm_nms(bbsAll,0.5);
   
   % number of ground truth boxes
@@ -223,25 +224,74 @@ for imageIdx = 1:(IMAGE_END_IDX - IMAGE_START_IDX + 1)
   end
   
   if visualize
-    for bbsIdx = size(bbsNMS,1):-1:1
-      clf;
-      exemplarIdx = bbsNMS(bbsIdx,11);
-      subplot(121); imagesc(detectors{exemplarIdx}.rendering); axis equal; axis tight;
-
-      % subplot(222); imagesc(detectors{exemplarIdx}.hogpic); axis equal; axis tight; axis off;
-
-      text(10,20,{['score ' num2str( bbsNMS(bbsIdx,13))], ...
-        ['overlap ' num2str( bbsNMS(bbsIdx,9))],...
-        ['azimuth D/GT ' num2str( detectors{exemplarIdx}.az) ' ' num2str(azGT)],...
-        ['azimuth ' num2str(bbsNMS(bbsIdx,10))]},...
-        'BackgroundColor',[.7 .9 .7]);
-      
-      subplot(122); imagesc(testDoubleIm); axis equal; axis tight; axis off;
-      bbs = bbsNMS(bbsIdx,:);
-      rectangle('Position',bbs(1,1:4)-[0 0 bbs(1,1:2)]);
-      pause(0.5);
-      % waitforbuttonpress;
+  % if 1
+    padding = 100;
+    paddedIm = pad_image(testDoubleIm, padding, 1);
+    resultIm = paddedIm;
+    NDrawBox = min(nDet,2);
+    for bbsIdx = NDrawBox:-1:1
+      % rectangle('position', bbsNMS(bbsIdx, 1:4) - [0 0 bbsNMS(bbsIdx, 1:2)] + [padding padding 0 0]);
+      bnd = round(bbsNMS(bbsIdx, 1:4)) + padding;
+      szIm = size(paddedIm);
+      clip_bnd = [ min(bnd(1),szIm(2)),...
+          min(bnd(2), szIm(1)),...
+          min(bnd(3), szIm(2)),...
+          min(bnd(4), szIm(1))];
+      clip_bnd = [max(clip_bnd(1),1),...
+          max(clip_bnd(2),1),...
+          max(clip_bnd(3),1),...
+          max(clip_bnd(4),1)];
+      % resizeRendering = imresize(detectors{bbsNMS(bbsIdx, 11)}.rendering, [bnd(4) - bnd(2) + 1, bnd(3) - bnd(1) + 1]);
+      resizeRendering = imresize(detectors{bbsNMS(bbsIdx, 11)}.r, [bnd(4) - bnd(2) + 1, bnd(3) - bnd(1) + 1]);
+      resizeRendering = resizeRendering(1:(clip_bnd(4) - clip_bnd(2) + 1), 1:(clip_bnd(3) - clip_bnd(1) + 1), :);
+      bndIm = paddedIm( clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3), :);
+      blendIm = bndIm/2 + im2double(resizeRendering)/2;
+      resultIm(clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3),:) = blendIm;
     end
+    clf;
+    imagesc(resultIm);
+    
+    for bbsIdx = NDrawBox:-1:1
+      bnd = round(bbsNMS(bbsIdx, 1:4)) + padding;
+      szIm = size(paddedIm);
+      clip_bnd = [ min(bnd(1),szIm(2)),...
+          min(bnd(2), szIm(1)),...
+          min(bnd(3), szIm(2)),...
+          min(bnd(4), szIm(1))];
+      clip_bnd = [max(clip_bnd(1),1),...
+          max(clip_bnd(2),1),...
+          max(clip_bnd(3),1),...
+          max(clip_bnd(4),1)];
+      titler = {['score ' num2str( bbsNMS(bbsIdx,13))], ...
+        [' overlap ' num2str( bbsNMS(bbsIdx,9))],...
+        [' azimuth D/GT ' num2str( detectors{exemplarIdx}.az) ' ' num2str(azGT)],...
+        [' azimuth ' num2str(bbsNMS(bbsIdx,10))]};
+      
+      plot_bbox(clip_bnd,cell2mat(titler),[1 1 1]);
+    end
+    drawnow;
+    disp('Press any button to continue');
+    waitforbuttonpress;
+    
+%     for bbsIdx = size(bbsNMS,1):-1:1
+%       clf;
+%       exemplarIdx = bbsNMS(bbsIdx,11);
+%       subplot(121); imagesc(detectors{exemplarIdx}.rendering); axis equal; axis tight;
+% 
+%       % subplot(222); imagesc(detectors{exemplarIdx}.hogpic); axis equal; axis tight; axis off;
+% 
+%       text(10,20,{['score ' num2str( bbsNMS(bbsIdx,13))], ...
+%         ['overlap ' num2str( bbsNMS(bbsIdx,9))],...
+%         ['azimuth D/GT ' num2str( detectors{exemplarIdx}.az) ' ' num2str(azGT)],...
+%         ['azimuth ' num2str(bbsNMS(bbsIdx,10))]},...
+%         'BackgroundColor',[.7 .9 .7]);
+%       
+%       subplot(122); imagesc(testDoubleIm); axis equal; axis tight; axis off;
+%       bbs = bbsNMS(bbsIdx,:);
+%       rectangle('Position',bbs(1,1:4)-[0 0 bbs(1,1:2)]);
+%       pause(0.5);
+%       % waitforbuttonpress;
+%     end
   end
 
   fprintf('%d ',imageIdx);

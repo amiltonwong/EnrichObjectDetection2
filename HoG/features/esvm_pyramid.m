@@ -59,7 +59,7 @@ for i = 1:MAXLEVELS
   end
   
   scale(i) = scaler;
-  scaled = resize(im,scale(i));
+  scaled = resizeMex(im,scale(i));
   
   %if minimum dimensions is less than or equal to 5, exit
   if min([size(scaled,1) size(scaled,2)])<=MINDIMENSION
