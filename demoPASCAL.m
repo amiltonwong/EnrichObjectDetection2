@@ -17,8 +17,8 @@ fovs = [25];
 yaws = ismac * 180 + [-30:30:30];
 n_cell_limit = [150];
 lambda = [0.02];
-% visualize = true;
-visualize = false;
+visualize = true;
+% visualize = false;
 
 model_file = 'Mesh/Bicycle/road_bike';
 model_name = strrep(model_file, '/', '_');
@@ -86,12 +86,12 @@ for imgIdx=1:N_IMAGE
       % search over all objects in the image
       for j=1:size(gt(imgIdx).BB,2)
           bbgt=gt(imgIdx).BB(:,j);
-          bi=[max(bbsNMS(1),bbgt(1)) ; max(bbsNMS(2),bbgt(2)) ; min(bbsNMS(3),bbgt(3)) ; min(bbsNMS(4),bbgt(4))];
+          bi=[max(bbsNMS(bbsIdx,1),bbgt(1)) ; max(bbsNMS(bbsIdx,2),bbgt(2)) ; min(bbsNMS(bbsIdx,3),bbgt(3)) ; min(bbsNMS(bbsIdx,4),bbgt(4))];
           iw=bi(3)-bi(1)+1;
           ih=bi(4)-bi(2)+1;
           if iw>0 && ih>0                
               % compute overlap as area of intersection / area of union
-              ua=(bbsNMS(3)-bbsNMS(1)+1)*(bbsNMS(4)-bbsNMS(2)+1)+...
+              ua=(bbsNMS(bbsIdx,3)-bbsNMS(bbsIdx,1)+1)*(bbsNMS(bbsIdx,4)-bbsNMS(bbsIdx,2)+1)+...
                  (bbgt(3)-bbgt(1)+1)*(bbgt(4)-bbgt(2)+1)-...
                  iw*ih;
               ov=iw*ih/ua;
@@ -116,10 +116,12 @@ for imgIdx=1:N_IMAGE
       else
           fp{imgIdx}(bbsIdx)=1;                    % false positive
       end
+      
+      bbsNMS(bbsIdx, 9) = ovmax;
     end
     
     % if visualize
-    if visualize
+    if visualize && sum(~gt(imgIdx).diff)
       padding = 50;
       paddedIm = pad_image(im2double(im), padding, 1);
       resultIm = paddedIm;
@@ -158,9 +160,7 @@ for imgIdx=1:N_IMAGE
             max(clip_bnd(3),1),...
             max(clip_bnd(4),1)];
         titler = {['score ' num2str( bbsNMS(bbsIdx,12))], ...
-          [' overlap ' num2str( bbsNMS(bbsIdx,9))],...
-          [' azimuth D/GT ' num2str( detectors{bbsNMS(bbsIdx,11)}.az) ' ' num2str(azGT)],...
-          [' azimuth ' num2str(bbsNMS(bbsIdx,10))]};
+          [' overlap ' num2str( bbsNMS(bbsIdx,9))]};
 
         plot_bbox(clip_bnd,cell2mat(titler),[1 1 1]);
       end
