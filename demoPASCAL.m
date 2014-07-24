@@ -7,21 +7,26 @@ addpath('../MatlabRenderer/');
 addpath(VOC_PATH);
 addpath([VOC_PATH, 'VOCcode']);
 
-
 CLASS = 'bicycle';
 TYPE = 'val';
-
+mkdir('Result',[CLASS '_' TYPE]);
 azs = 0:30:330; % azs = [azs , azs - 10, azs + 10];
-els = [0 20];
+els = 0:15:45;
 fovs = [25];
-yaws = ismac * 180 + [-30:30:30];
+yaws = ismac * 180 + [-30:10:30];
 n_cell_limit = [150];
 lambda = [0.02];
-visualize = true;
+visualize_detection = true;
+visualize_detector = false;
 % visualize = false;
+
+sbin = 4;
+nlevel = 10;
+detection_threshold = 120;
 
 model_file = 'Mesh/Bicycle/road_bike';
 model_name = strrep(model_file, '/', '_');
+
 
 detector_name = sprintf('%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
     model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
@@ -30,7 +35,7 @@ if exist(detector_name,'file')
   load(detector_name);
 else
   load('Statistics/sumGamma_N1_40_N2_40_sbin_4_nLevel_10_nImg_1601_napoli1_gamma.mat');
-  detectors = dwot_make_detectors_slow(mu, Gamma, [model_file '.3ds'], azs, els, yaws, fovs, n_cell_limit, lambda, visualize);
+  detectors = dwot_make_detectors_slow(mu, Gamma, [model_file '.3ds'], azs, els, yaws, fovs, n_cell_limit, lambda, visualize_detector);
   if sum(cellfun(@(x) isempty(x), detectors))
     error('Detector Not Completed');
   end
@@ -38,9 +43,9 @@ else
 end
 
 templates = cellfun(@(x) x.whow, detectors,'UniformOutput',false);
+param = get_default_params(sbin, nlevel, detection_threshold);
 
 VOCinit;
-param = get_default_params(6, 10, 70);
 
 % load dataset
 [gtids,t]=textread(sprintf(VOCopts.imgsetpath,[CLASS '_' TYPE]),'%s %d');
@@ -69,6 +74,10 @@ for imgIdx=1:N_IMAGE
     gt(imgIdx).diff=[recs(imgIdx).objects(clsinds).difficult];
     gt(imgIdx).det=false(length(clsinds),1);
     
+%     if isempty(clsinds)
+%       continue;
+%     end
+    
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
     [bbsNMS ]= dwot_detect( im, templates, param);
     
@@ -77,8 +86,13 @@ for imgIdx=1:N_IMAGE
     fp{imgIdx} = zeros(1,nDet);
 %     atp{imgIdx} = zeros(1,nDet);
 %     afp{imgIdx} = zeros(1,nDet);
-    detectorId{imgIdx} = bbsNMS(:,11)';
-    detScore{imgIdx} = bbsNMS(:,end)';
+    if nDet > 0
+      detectorId{imgIdx} = bbsNMS(:,11)';
+      detScore{imgIdx} = bbsNMS(:,end)';
+    else
+      detectorId{imgIdx} = [];
+      detScore{imgIdx} = [];
+    end
     
     for bbsIdx = 1:nDet
       ovmax=-inf;
@@ -121,8 +135,8 @@ for imgIdx=1:N_IMAGE
     end
     
     % if visualize
-    if visualize && sum(~gt(imgIdx).diff)
-      padding = 50;
+    if visualize_detection && sum(~gt(imgIdx).diff)
+      padding = 25;
       paddedIm = pad_image(im2double(im), padding, 1);
       resultIm = paddedIm;
       NDrawBox = min(nDet,4);
@@ -142,7 +156,7 @@ for imgIdx=1:N_IMAGE
         resizeRendering = imresize(detectors{bbsNMS(bbsIdx, 11)}.rendering, [bnd(4) - bnd(2) + 1, bnd(3) - bnd(1) + 1]);
         resizeRendering = resizeRendering(1:(clip_bnd(4) - clip_bnd(2) + 1), 1:(clip_bnd(3) - clip_bnd(1) + 1), :);
         bndIm = paddedIm( clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3), :);
-        blendIm = bndIm/2 + im2double(resizeRendering)/2;
+        blendIm = bndIm/3 + im2double(resizeRendering)/3 + resultIm( clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3), :)/3;
         resultIm(clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3),:) = blendIm;
       end
       clf;
@@ -166,7 +180,12 @@ for imgIdx=1:N_IMAGE
       end
       drawnow;
       disp('Press any button to continue');
-      waitforbuttonpress;
+      
+      save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.jpg',...
+        CLASS,TYPE,model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
+      print('-djpeg','-r100',['Result/' CLASS '_' TYPE '/' save_name])
+      
+      % waitforbuttonpress;
     end
       
     npos=npos+sum(~gt(imgIdx).diff);
@@ -194,10 +213,11 @@ precision = tpSort./(fpSort + tpSort);
 
 % arecall = atpSort/npos;
 % aprecision = atpSort./(afpSort + atpSort);
-
 ap = VOCap(recall', precision');
 % aa = VOCap(arecall', aprecision');
 fprintf('AP = %.4f\n', ap);
+
+clf;
 plot(recall, precision, 'r', 'LineWidth',3);
 % hold on;
 % plot(arecall, aprecision, 'g', 'LineWidth',3);
@@ -209,5 +229,7 @@ tit = sprintf('Average Precision = %.1f', 100*ap);
 title(tit);
 axis([0 1 0 1]);
 set(gcf,'color','w');
-saveas(gcf,sprintf('Result/VOC_NCells_%d_lambda_%0.4f_azs_%d_els_%d_fovs_%d_honda_accord.png',...
-  n_cell_limit,lambda,numel(azs),numel(els),numel(fovs)));
+save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.jpg',...
+        CLASS, TYPE, model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
+
+print('-djpeg','-r100',['Result/' CLASS '_' TYPE '/' save_name])

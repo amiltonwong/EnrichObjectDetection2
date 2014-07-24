@@ -1,9 +1,13 @@
-function [ WHOTemplate, HOGTemplate ] = WHOTemplateDecomp( im, Mu, Gamma, nCellLimit, lambda, padding)
+function [ WHOTemplate, HOGTemplate ] = WHOTemplateDecomp( im, Mu, Gamma, nCellLimit, lambda, padding, hog_cell_threshold)
 %WHOTEMPLATEDECOMP Summary of this function goes here
 %   Detailed explanation goes here
 % Nrow = N1
 
-if nargin == 5
+if nargin < 7
+  hog_cell_threshold = 10^-4;
+end
+
+if nargin < 6
   padding = 50;
 end
 
@@ -65,8 +69,12 @@ end
 
 muSwapDim = zeros(1,1,HOGDim);
 muSwapDim(1,1,:) = Mu;
-backgroundWs = repmat(muSwapDim,[wHeight,wWidth,1]);
-centeredWs = HOGTemplate - backgroundWs;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+nonEmptyCells = (sum(HOGTemplate,3) > hog_cell_threshold);
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+centeredWs = bsxfun(@times,bsxfun(@minus,HOGTemplate,muSwapDim),nonEmptyCells);
 centeredWs = permute(centeredWs,[3 1 2]); % [HOGDim, Nrow, Ncol] = HOGDim, N1, N2
 
 sigInvCenteredWs = R\(R'\centeredWs(:));
