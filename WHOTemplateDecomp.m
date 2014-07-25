@@ -79,5 +79,6 @@ centeredWs = permute(centeredWs,[3 1 2]); % [HOGDim, Nrow, Ncol] = HOGDim, N1, N
 sigInvCenteredWs = R\(R'\centeredWs(:));
 sigInvCenteredWs = reshape(sigInvCenteredWs,[HOGDim, wHeight, wWidth]);
 WHOTemplate = permute(sigInvCenteredWs,[2,3,1]);
+WHOTemplate = bsxfun(@times,WHOTemplate,nonEmptyCells);
 
 end
