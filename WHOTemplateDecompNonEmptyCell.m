@@ -4,7 +4,7 @@ function [ WHOTemplate, HOGTemplate ] = WHOTemplateDecompNonEmptyCell( im, Mu, G
 % Nrow = N1
 
 if nargin < 7
-  hog_cell_threshold = 10^0;
+  hog_cell_threshold = 1.5 * 10^0;
 end
 
 if nargin < 6
@@ -24,7 +24,7 @@ paddedIm(end-padding+1 : end, :, :) = 1;
 bbox = [1 1 size(im,2) size(im,1)] + padding;
 
 % TODO replace it
-HOGTemplate = esvm_initialize_goalsize_exemplar_ncell(paddedIm, bbox, nCellLimit);
+HOGTemplate = dwot_initialize_template(paddedIm, bbox, nCellLimit);
 
 %%%%%%%% WHO conversion using matrix decomposition
 
@@ -82,8 +82,6 @@ nonEmptyHOG = permHOG(onlyNonEmptyIdx);
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 % nonEmptyCells = (sum(HOGTemplate,3) > hog_cell_threshold);
 % centeredWs = bsxfun(@times,bsxfun(@minus,HOGTemplate,muSwapDim),nonEmptyCells);
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 
 sigInvCenteredWs = R\(R'\nonEmptyHOG);

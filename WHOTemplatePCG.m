@@ -24,7 +24,7 @@ paddedIm(end-padding+1 : end, :, :) = 1;
 bbox = [1 1 size(im,2) size(im,1)] + padding;
 
 % TODO replace it
-HOGTemplate = esvm_initialize_goalsize_exemplar_ncell(paddedIm, bbox, nCellLimit);
+HOGTemplate = dwot_initialize_template(paddedIm, bbox, nCellLimit);
 
 %%%%%%%% WHO conversion using matrix decomposition
 
