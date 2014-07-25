@@ -1,4 +1,4 @@
-function model = esvm_initialize_goalsize_exemplar_ncell(I, bbox, ncell)
+function curfeats = esvm_initialize_goalsize_exemplar_ncell(I, bbox, ncell)
 %% Initialize the exemplar (or scene) such that the representation
 % which tries to choose a region which overlaps best with the given
 % bbox and contains roughly init_params.goal_ncells cells, with a
@@ -11,11 +11,8 @@ function model = esvm_initialize_goalsize_exemplar_ncell(I, bbox, ncell)
 % available under the terms of the MIT license (see COPYING file).
 % Project homepage: https://github.com/quantombone/exemplarsvm
 
-
-init_params.sbin = 8;
-init_params.hg_size = [8 8];
-init_params.features = @features_pedro;
-
+sbin = 8;
+init_params.sbin = sbin;
 init_params.MAXNCELL = ncell;
 
 %Expand the bbox to have some minimum and maximum aspect ratio
@@ -25,40 +22,67 @@ bbox = max(bbox,1);
 bbox([1 3]) = min(size(I,2),bbox([1 3]));
 bbox([2 4]) = min(size(I,1),bbox([2 4]));
 
+bboxWidth = bbox(4) - bbox(2);
+bboxHeight = bbox(3) - bbox(1);
+
 %Create a blank image with the exemplar inside
 Ibox = zeros(size(I,1), size(I,2));    
-
 Ibox(bbox(2):bbox(4), bbox(1):bbox(3)) = 1;
 
-%% NOTE: why was I padding this at some point and now I'm not???
-%% ANSWER: doing the pad will create artifical gradients
-% ARTPAD = 0;
-% I_real_pad = pad_image(I, ARTPAD);
-I_real_pad = I;
-
 %Get the hog feature pyramid for the entire image
-clear params;
-params.detect_levels_per_octave = 10;
-params.init_params = init_params;
-[f_real,scales] = esvm_pyramid(I_real_pad, params);
+interval = 10;
 
+%Hardcoded maximum number of levels in the pyramid
+MAXLEVELS = 200;
+
+%Get the levels per octave from the parameters
+sc = 2 ^(1/interval);
+
+scale = zeros(1,MAXLEVELS);
+feat = {};
+
+
+for i = 1:MAXLEVELS
+  scaler = 1 / sc^(i-1);
+    
+  if ceil(bboxWidth * scaler / sbin) * ceil(bboxHeight * scaler / sbin) >= 1.2 * ncell
+    continue;
+  end
+  
+  if floor(bboxWidth * scaler / sbin) * floor(bboxHeight * scaler / sbin) < 0.5 * ncell
+    break;
+  end
+  
+  scale(i) = scaler;
+  scaled = resizeMex(I,scale(i));
+  
+  feat{i} = features_pedro(scaled,sbin);
+
+  %if we get zero size feature, backtrack one, and dont produce any
+  %more levels
+  if numel(feat{i}) == 0
+    feat = feat(1:i-1);
+    scale = scale(1:i-1);
+    break;
+  end
+
+  %recover lost bin!!!
+  feat{i} = padarray(feat{i}, [1 1 0], 0);
+end
+featIdx = find(cellfun(@(x) ~isempty(x), feat));
+feat = feat(featIdx);
+scale = scale(featIdx);
 %Extract the regions most overlapping with Ibox from each level in the pyramid
-[masker,sizer] = get_matching_masks(f_real, Ibox);
+% [masker,sizer] = get_matching_bbox(feat, bbox, size(I) );
+% [masker,sizer] = get_matching_masks(feat, Ibox, bbox);
+[bndX, bndY, tgtLevel] = get_matching_bbox(feat, bbox, size(I), ncell);
 
 %Now choose the mask which is closest to N cells
-[targetlvl, mask] = get_ncell_mask(init_params, masker, ...
-                                                sizer);
-[uu,vv] = find(mask);
-curfeats = f_real{targetlvl}(min(uu):max(uu),min(vv):max(vv),:);
+curfeats = feat{tgtLevel}(bndY(1):bndY(2),bndX(1):bndX(2),:);
 
-model.init_params = init_params;
-model.hg_size = size(curfeats);
-model.mask = logical(ones(model.hg_size(1),model.hg_size(2)));
+hg_size = size(curfeats);
 
-fprintf(1,'initialized with HOG_size = [%d %d]\n',model.hg_size(1),model.hg_size(2));
-model.w = curfeats - mean(curfeats(:));
-model.b = 0;
-model.x = curfeats;
+fprintf(1,'initialized with HOG_size = [%d %d]\n',hg_size(1),hg_size(2));
 
 %Fire inside self-image to get detection location
 % [model.bb, model.x] = get_target_bb(model, I, init_params);
@@ -73,47 +97,26 @@ model.x = curfeats;
 % end
 
 
-function [targetlvl,mask] = get_ncell_mask(init_params, masker, ...
-                                                        sizer)
-%Get a the mask and features, where mask is closest to NCELL cells
-%as possible
-for i = 1:size(masker)
-  [uu,vv] = find(masker{i});
-  if ((max(uu)-min(uu)+1) * (max(vv)-min(vv)+1) <= init_params.MAXNCELL)
-    targetlvl = i;
-    mask = masker{targetlvl};
-    return;
-  end
-end
-fprintf(1,'didnt find a match\n');
-%Default to older strategy
-ncells = prod(sizer,2);
-[aa,targetlvl] = min(abs(ncells-init_params.goal_ncells));
-mask = masker{targetlvl};
-
-function [masker,sizer] = get_matching_masks(f_real, Ibox)
+function [bndX, bndY, tgtLevel] = get_matching_bbox(f_real, bbox, imSize, n_max_cell)
 %Given a feature pyramid, and a segmentation mask inside Ibox, find
 %the best matching region per level in the feature pyramid
 
-masker = cell(length(f_real),1);
-sizer = zeros(length(f_real),2);
-
-for a = 1:length(f_real)
-  goods = double(sum(f_real{a}.^2,3)>0);
+for a = 1:length(f_real)  
+    
+  bndX = round((size(f_real{a},2)-1)*[bbox(1)-1 bbox(3)-1]/(imSize(2)-1)) + 1;
+  bndY = round((size(f_real{a},1)-1)*[bbox(2)-1 bbox(4)-1]/(imSize(1)-1)) + 1;
+%   bndX(1) = floor(bndX(1));
+%   bndX(2) = ceil(bndX(2));
+%   bndY(1) = floor(bndY(1));
+%   bndY(2) = ceil(bndY(2));
   
-  masker{a} = max(0.0,min(1.0,imresize(Ibox,[size(f_real{a},1) size(f_real{a}, ...z
-                                                  2)])));
-  [tmpval,ind] = max(masker{a}(:));
-  masker{a} = (masker{a}>.1) & goods;
-
-  if sum(masker{a}(:))==0
-    [aa,bb] = ind2sub(size(masker{a}),ind);
-    masker{a}(aa,bb) = 1;
+  if (bndX(2) - bndX(1) + 1) * (bndY(2) - bndY(1) + 1) <= n_max_cell
+    tgtLevel = a;
+    return;
   end
-  [uu,vv] = find(masker{a});
-  masker{a}(min(uu):max(uu),min(vv):max(vv))=1;
-  sizer(a,:) = [range(uu)+1 range(vv)+1];
 end
+disp('didnt find a match returning the closest level');
+
 
 function bbox = expand_bbox(bbox,I)
 %Expand region such that is still within image and tries to satisfy

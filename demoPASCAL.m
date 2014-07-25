@@ -65,6 +65,7 @@ detIdx = 0;
 
 gt(length(gtids))=struct('BB',[],'diff',[],'det',[]);
 for imgIdx=1:N_IMAGE
+    fprintf('%d/%d ',imgIdx,N_IMAGE);
     imgTic = tic;
     % read annotation
     recs(imgIdx)=PASreadrecord(sprintf(VOCopts.annopath,gtids{imgIdx}));
@@ -79,13 +80,17 @@ for imgIdx=1:N_IMAGE
 %     end
     
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
+    imSz = size(im);
     [bbsNMS ]= dwot_detect( im, templates, param);
+    bbsNMS = clip_to_image(bbsNMS, [0 0 imSz(2) imSz(1)]);
     
     nDet = size(bbsNMS,1);
     tp{imgIdx} = zeros(1,nDet);
     fp{imgIdx} = zeros(1,nDet);
+    
 %     atp{imgIdx} = zeros(1,nDet);
 %     afp{imgIdx} = zeros(1,nDet);
+
     if nDet > 0
       detectorId{imgIdx} = bbsNMS(:,11)';
       detScore{imgIdx} = bbsNMS(:,end)';
@@ -143,11 +148,11 @@ for imgIdx=1:N_IMAGE
       for bbsIdx = NDrawBox:-1:1
         % rectangle('position', bbsNMS(bbsIdx, 1:4) - [0 0 bbsNMS(bbsIdx, 1:2)] + [padding padding 0 0]);
         bnd = round(bbsNMS(bbsIdx, 1:4)) + padding;
-        szIm = size(paddedIm);
-        clip_bnd = [ min(bnd(1),szIm(2)),...
-            min(bnd(2), szIm(1)),...
-            min(bnd(3), szIm(2)),...
-            min(bnd(4), szIm(1))];
+        szPadIm = size(paddedIm);
+        clip_bnd = [ min(bnd(1),szPadIm(2)),...
+            min(bnd(2), szPadIm(1)),...
+            min(bnd(3), szPadIm(2)),...
+            min(bnd(4), szPadIm(1))];
         clip_bnd = [max(clip_bnd(1),1),...
             max(clip_bnd(2),1),...
             max(clip_bnd(3),1),...
@@ -164,17 +169,18 @@ for imgIdx=1:N_IMAGE
       
       for bbsIdx = NDrawBox:-1:1
         bnd = round(bbsNMS(bbsIdx, 1:4)) + padding;
-        szIm = size(paddedIm);
-        clip_bnd = [ min(bnd(1),szIm(2)),...
-            min(bnd(2), szIm(1)),...
-            min(bnd(3), szIm(2)),...
-            min(bnd(4), szIm(1))];
+        szPadIm = size(paddedIm);
+        clip_bnd = [ min(bnd(1),szPadIm(2)),...
+            min(bnd(2), szPadIm(1)),...
+            min(bnd(3), szPadIm(2)),...
+            min(bnd(4), szPadIm(1))];
         clip_bnd = [max(clip_bnd(1),1),...
             max(clip_bnd(2),1),...
             max(clip_bnd(3),1),...
             max(clip_bnd(4),1)];
         titler = {['score ' num2str( bbsNMS(bbsIdx,12))], ...
-          [' overlap ' num2str( bbsNMS(bbsIdx,9))]};
+          [' overlap ' num2str( bbsNMS(bbsIdx,9))], ...
+          [' detector ' num2str( bbsNMS(bbsIdx,11))] };
 
         plot_bbox(clip_bnd,cell2mat(titler),[1 1 1]);
       end
@@ -189,7 +195,7 @@ for imgIdx=1:N_IMAGE
     end
       
     npos=npos+sum(~gt(imgIdx).diff);
-    fprintf('%d/%d time : %0.4f\n', imgIdx, N_IMAGE, toc(imgTic));
+    fprintf('time : %0.4f\n', toc(imgTic));
 end
 
 detScore = cell2mat(detScore);

@@ -33,7 +33,7 @@ else
             tic
             renderer.setViewpoint(90-azGT,elGT,yawGT,0,fovGT);
             im = renderer.renderCrop();
-            [ WHOTemplate, HOGTemplate] = WHOTemplateDecomp( im, Mu, Gamma, n_cell_limit, lambda, 50);
+            [ WHOTemplate, HOGTemplate] = WHOTemplateDecompNonEmptyCell( im, Mu, Gamma, n_cell_limit, lambda, 50);
             toc;
 
             detectors{i}.whow = WHOTemplate;

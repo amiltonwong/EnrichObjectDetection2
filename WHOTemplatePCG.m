@@ -1,9 +1,13 @@
-function [ WHOTemplate, HOGTemplate ] = WHOTemplatePCG( im, Mu, Gamma, nCellLimit, lambda, padding)
+function [ WHOTemplate, HOGTemplate ] = WHOTemplatePCG( im, Mu, Gamma, nCellLimit, lambda, padding, hog_cell_threshold)
 %WHOTEMPLATEDECOMP Summary of this function goes here
 %   Detailed explanation goes here
 % Nrow = N1
 
-if nargin == 5
+if nargin < 7
+  hog_cell_threshold = 10^-4;
+end
+
+if nargin < 6
   padding = 50;
 end
 
@@ -17,11 +21,10 @@ paddedIm(1:padding,:,:) = 1;
 paddedIm(end-padding+1 : end, :, :) = 1;
 
 % bounding box coordinate x1, y1, x2, y2
-bbox = [1 1 size(paddedIm,2) size(paddedIm,1)] + padding;
+bbox = [1 1 size(im,2) size(im,1)] + padding;
 
 % TODO replace it
-model = esvm_initialize_goalsize_exemplar_ncell(paddedIm, bbox, nCellLimit);
-HOGTemplate = model.x;
+HOGTemplate = esvm_initialize_goalsize_exemplar_ncell(paddedIm, bbox, nCellLimit);
 
 %%%%%%%% WHO conversion using matrix decomposition
 
@@ -30,7 +33,11 @@ wHeight = sz(1);
 wWidth = sz(2);
 HOGDim = sz(3);
 
-Sigma = zeros(prod(sz));
+sigmaDim = prod(sz);
+
+CircSigma = zeros(sigmaDim);
+Sigma = zeros(sigmaDim);
+
 for i = 1:wHeight
     for j = 1:wWidth
         rowIdx = i + wHeight * (j - 1); % sub2ind([wHeight, wWidth],i,j);
@@ -56,7 +63,7 @@ while ~success
   end
   firstTry = false;
   [R, p] = chol(Sigma);
-  if p > 0
+  if p == 0
   	success = true;
   else
   	display('trying decomposition again');
@@ -65,8 +72,12 @@ end
 
 muSwapDim = zeros(1,1,HOGDim);
 muSwapDim(1,1,:) = Mu;
-backgroundWs = repmat(muSwapDim,[wHeight,wWidth,1]);
-centeredWs = HOGTemplate - backgroundWs;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+nonEmptyCells = (sum(HOGTemplate,3) > hog_cell_threshold);
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+centeredWs = bsxfun(@times,bsxfun(@minus,HOGTemplate,muSwapDim),nonEmptyCells);
 centeredWs = permute(centeredWs,[3 1 2]); % [HOGDim, Nrow, Ncol] = HOGDim, N1, N2
 
 sigInvCenteredWs = R\(R'\centeredWs(:));
