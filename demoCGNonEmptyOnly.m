@@ -13,7 +13,7 @@ end
 hog_cell_threshold = 1.5 * 10^0;
 padding = 20;
 % n_cell_limits = [50 100 150 200 250 300 350 400];
-n_cell_limits = 150;
+n_cell_limits = 50;
 lambda = 0.01;
 
 preprocess_time_per_case = zeros(1,numel(n_cell_limits));
@@ -23,7 +23,8 @@ decomp_residual_per_case = zeros(1,numel(n_cell_limits));
 cg_residual_per_case = zeros(1,numel(n_cell_limits));
 
 CG_THREASHOLD = 10^-4;
-N_CIRC_BLOCKS = 6;
+N_CIRC_BLOCKS = 10;
+DEBUG = 1;
 %%%%%%%% Get HOG template
 
 tic
@@ -60,13 +61,13 @@ for caseIdx = 1:numel(n_cell_limits)
 %   pdistCols = pdist(nonEmptyCols,'cityblock');
   
   n_non_empty_cells = int16(numel(nonEmptyRows));
-
+  N_CIRC_BLOCKS = min(N_CIRC_BLOCKS, floor(n_non_empty_cells/2));
   sigmaDim = n_non_empty_cells * HOGDim;
 
   Sigma = zeros(sigmaDim, sigmaDim, 'single');
   
-  CirculantBlocks = cell(1, N_CIRC_BLOCKS);
-  CirculantBlocks = cellfun(@(x) zeros(HOGDim, HOGDim, 'single'), CirculantBlocks, 'UniformOutput', false);
+  % CirculantBlocks = cell(1, 1, N_CIRC_BLOCKS);
+  % CirculantBlocks = cellfun(@(x) zeros(HOGDim, HOGDim, 'single'), CirculantBlocks, 'UniformOutput', false);
 
 
   for cellIdx = 1:n_non_empty_cells
@@ -84,15 +85,65 @@ for caseIdx = 1:numel(n_cell_limits)
       Sigma((cellIdx-1)*HOGDim + 1:cellIdx * HOGDim, (otherCellIdx-1)*HOGDim + 1:otherCellIdx*HOGDim) = ...
           Gamma((gammaRowIdx-1)*HOGDim + 1 : gammaRowIdx*HOGDim , (gammaColIdx - 1)*HOGDim + 1 : gammaColIdx*HOGDim);
         
-      circIdx = mod(gammaRowIdx - gammaColIdx,n_non_empty_cells) + 1;
-      if circIdx <= N_CIRC_BLOCKS
-        CirculantBlocks{circIdx} = CirculantBlocks{circIdx} + ...
-            Gamma((gammaRowIdx-1)*HOGDim + 1 : gammaRowIdx*HOGDim , (gammaColIdx - 1)*HOGDim + 1 : gammaColIdx*HOGDim);
-      end
+      % circIdxes(1) = gammaRowIdx - gammaColIdx + 1;
+      % circIdxes(2) = n_non_empty_cells + gammaRowIdx - gammaColIdx + 1;
+      % circIdxes(3) = gammaRowIdx - n_non_empty_cells - gammaColIdx + 1;
+      % circIdx = min(circIdxes);
+      
+      % if circIdx <= N_CIRC_BLOCKS
+      %   CirculantBlocks{circIdx} = CirculantBlocks{circIdx} + ...
+      %       Gamma((gammaRowIdx-1)*HOGDim + 1 : gammaRowIdx*HOGDim , (gammaColIdx - 1)*HOGDim + 1 : gammaColIdx*HOGDim);
+      % end
     end
   end
-  CirculantBlocks = cellfun(@(x) x/single(n_non_empty_cells), CirculantBlocks, 'UniformOutput', false);
+  % CirculantBlocks = cellfun(@(x) x/single(n_non_empty_cells), CirculantBlocks, 'UniformOutput', false);
   
+  %%%%%%%%% For Debuggin only
+  % No need to create one.
+  % P = sparse(kron(dftmtx(double(n_non_empty_cells)), eye(HOGDim)));
+  % P = kron(dftmtx(double(n_non_empty_cells)), eye(HOGDim));
+  
+  % CirculantMatrix = zeros(sigmaDim, sigmaDim, 'double');
+  % for cellIdx = 1:n_non_empty_cells
+  %   for otherCellIdx = 1:n_non_empty_cells
+  %     cellIdxDiff(1) = mod(abs(cellIdx - otherCellIdx), n_non_empty_cells) + 1;
+  %     cellIdxDiff(2) = mod(abs(n_non_empty_cells + cellIdx - otherCellIdx), n_non_empty_cells) + 1;
+  %     cellIdxDiff(3) = mod(abs(cellIdx - n_non_empty_cells - otherCellIdx), n_non_empty_cells) + 1;
+  %     cellIdxDiff = min(cellIdxDiff);
+  %     if cellIdxDiff <= N_CIRC_BLOCKS
+  %       CirculantMatrix ( ((cellIdx - 1) * HOGDim + 1) : (cellIdx * HOGDim),...
+  %               ((otherCellIdx - 1) * HOGDim + 1) : (otherCellIdx * HOGDim) )...
+  %               = CirculantBlocks{cellIdxDiff};
+  %     end
+  %   end
+  % end
+  
+  % P = sparse(kron(dftmtx(double(n_non_empty_cells)), eye(HOGDim)));
+  % DiagMatrix = P' * CirculantMatrix * P;
+  
+  % figure(1); imagesc(CirculantMatrix);
+  % figure(2); imagesc(abs(DiagMatrix));
+  
+  % %%%%%%%%%%%%% Fast Inverse
+  % CatCirculantBlocks = cell2mat(CirculantBlocks);
+  % CatCirculantBlocks(:,:,n_non_empty_cells:-1:(n_non_empty_cells - N_CIRC_BLOCKS + 1)) = CatCirculantBlocks;
+  % fftBlocks = zeros(HOGDim, HOGDim, n_non_empty_cells);
+  % for ii = 1:HOGDim
+  %   for jj = 1:HOGDim
+  %     fftBlocks(ii,jj,:) = fft(CatCirculantBlocks(ii,jj,:));
+  %   end
+  % end
+  
+  % if DEBUG
+  %   FFTDiagMatrix = zeros(n_non_empty_cells * HOGDim);
+  %   for ii = 1:n_non_empty_cells
+  %       FFTDiagMatrix( ((ii-1)*HOGDim + 1) :  (ii * HOGDim),...
+  %           ((ii-1)*HOGDim + 1) : (ii * HOGDim)) = fftBlocks(:,:,ii);
+  %   end
+  %   figure(3); imagesc(abs(FFTDiagMatrix))
+  % end
+  
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % imagesc(cell2mat(CirculantBlocks)); axis equal; colorbar;
 % CirculantBlocks = cell(1, ceil(n_non_empty_cells / 2) );
 % for cellIdx = 1:ceil(n_non_empty_cells/2)

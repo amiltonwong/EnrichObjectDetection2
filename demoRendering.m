@@ -11,5 +11,5 @@ if ~exist('renderer','var')
   end
 end
 
-renderer.setViewpoint(10,10,0,0,25);
+renderer.setViewpoint(10,10,ismac*180,0,25);
 [im, depth] = renderer.renderCrop();
