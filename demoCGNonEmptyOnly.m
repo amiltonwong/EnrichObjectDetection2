@@ -13,7 +13,7 @@ end
 hog_cell_threshold = 1.5 * 10^0;
 padding = 20;
 % n_cell_limits = [50 100 150 200 250 300 350 400];
-n_cell_limits = 50;
+n_cell_limits = 150;
 lambda = 0.01;
 
 preprocess_time_per_case = zeros(1,numel(n_cell_limits));
@@ -186,7 +186,9 @@ for caseIdx = 1:numel(n_cell_limits)
   A = Sigma + single(lambda) * eye(sigmaDim,'single');
   r = b;
   r_start_norm = r' * r;
-  % r = b - A * x;
+  
+  
+  % [x1,fl1,rr1,it1,rv1] = pcg(A,b,1e-8,60);
   d = r;
 
   n_cache = 1;

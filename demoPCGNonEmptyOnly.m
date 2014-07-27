@@ -13,7 +13,7 @@ end
 hog_cell_threshold = 1.5 * 10^0;
 padding = 20;
 % n_cell_limits = [50 100 150 200 250 300 350 400];
-n_cell_limits = 50;
+n_cell_limits = 250;
 lambda = 0.01;
 
 preprocess_time_per_case = zeros(1,numel(n_cell_limits));
@@ -22,9 +22,9 @@ cg_time_per_case = zeros(1,numel(n_cell_limits));
 decomp_residual_per_case = zeros(1,numel(n_cell_limits));
 cg_residual_per_case = zeros(1,numel(n_cell_limits));
 
-CG_THREASHOLD = 10^-4;
+CG_THREASHOLD = 10^-12;
 N_CIRC_BLOCKS = 10;
-DEBUG = 1;
+DEBUG = 0;
 %%%%%%%% Get HOG template
 
 tic
@@ -64,7 +64,11 @@ for caseIdx = 1:numel(n_cell_limits)
   N_CIRC_BLOCKS = min(N_CIRC_BLOCKS, ceil((n_non_empty_cells+1)/2));
   sigmaDim = n_non_empty_cells * HOGDim;
 
-  Sigma = zeros(sigmaDim, sigmaDim, 'single');
+  db_sigmaDim = double(sigmaDim);
+  db_n_non_empty_cells = double(n_non_empty_cells);
+  db_HOGDim = double(HOGDim);
+  
+  Sigma = zeros(sigmaDim, sigmaDim);
   
   CirculantBlocks = cell(1, 1, N_CIRC_BLOCKS);
   CirculantBlocks = cellfun(@(x) zeros(HOGDim, HOGDim, 'single'), CirculantBlocks, 'UniformOutput', false);
@@ -101,12 +105,10 @@ for caseIdx = 1:numel(n_cell_limits)
       end
     end
   end
-  CirculantBlocks = cellfun(@(x) x/single(n_non_empty_cells), CirculantBlocks, 'UniformOutput', false);
+  CirculantBlocks = cellfun(@(x) x/db_n_non_empty_cells, CirculantBlocks, 'UniformOutput', false);
   
-  %%%%%%%%% For Debuggin only
-  % No need to create one.
-  % P = sparse(kron(dftmtx(double(n_non_empty_cells)), eye(HOGDim)));
-  % P = kron(dftmtx(double(n_non_empty_cells)), eye(HOGDim));
+  % P = sparse(kron(dftmtx(db_n_non_empty_cells), eye(HOGDim)));
+  P = kron(dftmtx(db_n_non_empty_cells), eye(HOGDim));
   
   CirculantMatrix = zeros(sigmaDim, sigmaDim, 'double');
   for cellIdx = 1:n_non_empty_cells
@@ -122,38 +124,85 @@ for caseIdx = 1:numel(n_cell_limits)
       end
     end
   end
-  
-  P = sparse(kron(dftmtx(double(n_non_empty_cells)), eye(HOGDim)));
-  DiagMatrix =  P * CirculantMatrix * P' / double(n_non_empty_cells);
-  
-  figure(1); imagesc(CirculantMatrix);
-  figure(2); imagesc(abs(DiagMatrix));
-  
-  %%%%%%%%%%%%% Invert Diag Matrix and multipy its original form
-  InverseDiagMatrix = zeros(sigmaDim, sigmaDim, 'double');
-  for ii = 1:n_non_empty_cells
-    InverseDiagMatrix( ((ii - 1) * HOGDim + 1) : (ii * HOGDim), ((ii - 1) * HOGDim + 1) : (ii * HOGDim) ) = ...
-        inv(DiagMatrix( ((ii - 1) * HOGDim + 1) : (ii * HOGDim), ((ii - 1) * HOGDim + 1) : (ii * HOGDim) ));    
+  %%%%%%%%% For Debuggin only
+  % No need to create one.
+  % P = sparse(kron(dftmtx(double(n_non_empty_cells)), eye(HOGDim)));
+  % P = kron(dftmtx(double(n_non_empty_cells)), eye(HOGDim));
+  if DEBUG
+    
+    DiagMatrix =  P * CirculantMatrix * P' / double(n_non_empty_cells);
+
+    figure(1); imagesc(CirculantMatrix);
+    figure(2); imagesc(abs(DiagMatrix));
+
+    %%%%%%%%%%%%% Invert Diag Matrix and multipy its original form
+    InverseDiagMatrix = zeros(sigmaDim, sigmaDim, 'double');
+    for ii = 1:n_non_empty_cells
+      InverseDiagMatrix( ((ii - 1) * HOGDim + 1) : (ii * HOGDim), ((ii - 1) * HOGDim + 1) : (ii * HOGDim) ) = ...
+          inv(DiagMatrix( ((ii - 1) * HOGDim + 1) : (ii * HOGDim), ((ii - 1) * HOGDim + 1) : (ii * HOGDim) ));    
+    end
+    InverseCirculantMatrix = P' * InverseDiagMatrix * P / double(n_non_empty_cells);
+    imagesc(abs(InverseCirculantMatrix * CirculantMatrix))
   end
-  InverseCirculantMatrix = P' * InverseDiagMatrix * P / double(n_non_empty_cells);
-  imagesc(abs(InverseCirculantMatrix * CirculantMatrix))
+  
+  
   %%%%%%%%%%%%% Fast Inverse
-  CatCirculantBlocks = cell2mat(CirculantBlocks);
-  CatCirculantBlocks(:,:,n_non_empty_cells:-1:(n_non_empty_cells - N_CIRC_BLOCKS + 1)) = CatCirculantBlocks;
-  fftBlocks = zeros(HOGDim, HOGDim, n_non_empty_cells);
+  CatCirculantBlocks = zeros(HOGDim, HOGDim, n_non_empty_cells);
+  CatCirculantBlocks(:,:,1:N_CIRC_BLOCKS) = cell2mat(CirculantBlocks);
+  CatCirculantBlocks(:,:,n_non_empty_cells:-1:(n_non_empty_cells - N_CIRC_BLOCKS + 1 + 1)) = CatCirculantBlocks(:,:,2:N_CIRC_BLOCKS);
+  
+  FFTBlocks = zeros(HOGDim, HOGDim, n_non_empty_cells);
   for ii = 1:HOGDim
     for jj = 1:HOGDim
-      fftBlocks(ii,jj,:) = fft(CatCirculantBlocks(ii,jj,:));
+      FFTBlocks(ii,jj,:) = fft(CatCirculantBlocks(ii,jj,:));
+    end
+  end
+
+  % Vectorize
+  FFTInvBlocks = zeros(HOGDim, HOGDim, n_non_empty_cells);
+  InverseFFTDiagMatrix = sparse([],[],[],db_sigmaDim, db_sigmaDim, db_n_non_empty_cells * db_HOGDim * db_HOGDim);
+  FFTDiagMatrix = sparse([],[],[],db_sigmaDim, db_sigmaDim, db_n_non_empty_cells * db_HOGDim * db_HOGDim);
+  % InverseFFTDiagMatrix = zeros(sigmaDim, sigmaDim);
+  % FFTDiagMatrix = zeros(sigmaDim, sigmaDim);
+  for ii = 1:n_non_empty_cells
+    FFTInvBlocks(:,:,ii) = inv(FFTBlocks(:,:,ii));
+    InverseFFTDiagMatrix( ((ii - 1) * HOGDim + 1) : (ii * HOGDim), ((ii - 1) * HOGDim + 1) : (ii * HOGDim) ) = ...
+        FFTInvBlocks(:,:,ii);
+    FFTDiagMatrix( ((ii - 1) * HOGDim + 1) : (ii * HOGDim), ((ii - 1) * HOGDim + 1) : (ii * HOGDim) ) = ...
+        FFTBlocks(:,:,ii) / db_n_non_empty_cells;
+  end
+  
+  IFFTInvBlocks = zeros(HOGDim, HOGDim, n_non_empty_cells);
+  for ii = 1:HOGDim
+    for jj = 1:HOGDim
+      IFFTInvBlocks(ii,jj,:) = real(ifft(FFTInvBlocks(ii,jj,:)));
     end
   end
   
+  % IFFTInvBlocks = IFFTInvBlocks.*db_n_non_empty_cells;
+  InverseFFTCirculantMatrix = zeros(sigmaDim, sigmaDim,'single');
+  StitchIFFTInvBlocks = zeros(HOGDim, HOGDim * n_non_empty_cells);
+  for ii = 1:n_non_empty_cells
+    StitchIFFTInvBlocks( :, ((ii - 1) * HOGDim + 1) : (ii * HOGDim)) = IFFTInvBlocks(:,:,ii);
+  end
+  
+  for ii = 1:n_non_empty_cells
+    colCircIdx = mod(( 0 : (n_non_empty_cells * HOGDim - 1)) -  (ii-1)*HOGDim, n_non_empty_cells * HOGDim ) + 1;
+    InverseFFTCirculantMatrix( ( (ii-1)*HOGDim + 1) : (ii * HOGDim), :) = StitchIFFTInvBlocks(:,colCircIdx);
+  end
+  
+  % InverseFFTCirculantMatrix = real(P' * InverseFFTDiagMatrix * P);
+
+  
+  % visualize the matrix itself with reconstructed matrix
   if DEBUG
-    FFTDiagMatrix = zeros(n_non_empty_cells * HOGDim);
+    figure(1); imagesc( CirculantMatrix - real(P' * FFTDiagMatrix * P));
+    figure(2); imagesc(  InverseFFTCirculantMatrix * CirculantMatrix);
+    StitchIFFTInvBlocks = zeros(HOGDim, HOGDim * n_non_empty_cells);
     for ii = 1:n_non_empty_cells
-        FFTDiagMatrix( ((ii-1)*HOGDim + 1) :  (ii * HOGDim),...
-            ((ii-1)*HOGDim + 1) : (ii * HOGDim)) = fftBlocks(:,:,ii);
+      StitchIFFTInvBlocks( :, ((ii - 1) * HOGDim + 1) : (ii * HOGDim)) = IFFTInvBlocks(:,:,ii);
     end
-    figure(3); imagesc(abs(FFTDiagMatrix))
+    figure(3); imagesc(StitchIFFTInvBlocks);
   end
   
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -186,46 +235,45 @@ for caseIdx = 1:numel(n_cell_limits)
   preprocess_time_per_case(caseIdx) = toc
 
   %%%%%%%%%%%%% Conjugate Gradient 
-  muSwapDim = permute(single(mu),[2 3 1]);
+  muSwapDim = permute(mu,[2 3 1]);
   centeredHOG = bsxfun(@minus, HOGTemplate, muSwapDim);
   permHOG = permute(centeredHOG,[3 1 2]); % [HOGDim, Nrow, Ncol] = HOGDim, N1, N2
   onlyNonEmptyIdx = cell2mat(arrayfun(@(x) x + (1:HOGDim)', HOGDim * (idxNonEmptyCells - 1),'UniformOutput',false));
   nonEmptyHOG = permHOG(onlyNonEmptyIdx);
 
   tic
-  x = zeros(sigmaDim,1,'single');
+  x = zeros(sigmaDim,1);
   % x = 100 * nonEmptyHOG;
   b = nonEmptyHOG;
-  A = Sigma + single(lambda) * eye(sigmaDim,'single');
+  A = Sigma + lambda * eye(sigmaDim);
   r = b;
-  r_start_norm = r' * r;
-  % r = b - A * x;
-  d = r;
 
-  n_cache = 1;
-  x_cache = zeros(sigmaDim,n_cache,'single');
-  r_norm_cache = ones(1, n_cache) * inf;
+  % d = real(P' * InverseFFTDiagMatrix * P * r);
+  d = InverseFFTCirculantMatrix * r;
+  delta_new = r' * d;
+  delta_0 = delta_new;
 
-  MAX_ITER = 6 * 10^1;
-  r_hist = zeros(1, MAX_ITER,'single');
+  MAX_ITER = 4 * 10^1;
+  delta_hist = zeros(1, MAX_ITER);
   i = 0;
-  r_norm_next = inf;
-  while i < MAX_ITER
+
+  while i < MAX_ITER && abs(delta_new / delta_0) > CG_THREASHOLD
     i = i + 1;
 
-    r_norm = (r'*r);
-    r_hist(i) = r_norm/r_start_norm;
+    q = A * d;
+    alpha = delta_new / (d'*q);
 
-    if r_norm/r_start_norm < CG_THREASHOLD
-      break;
-    end
-
-    Ad = A * d;
-    alpha = r_norm/(d' * Ad);
     x = x + alpha * d;
-    r = r - alpha * Ad;
-    beta = r'*r/r_norm;
-    d = r + beta * d;
+    r = r - alpha * q;
+
+    % s = real(P' * InverseFFTDiagMatrix * P * r);
+    s = InverseFFTCirculantMatrix * r;
+    delta_old = delta_new;
+    delta_new = r' * s;
+    beta = delta_new / delta_old;
+    d = s + beta * d;
+
+    delta_hist(i) = delta_new;    
   end
 
   if i == MAX_ITER
@@ -233,7 +281,8 @@ for caseIdx = 1:numel(n_cell_limits)
   end
 
   WHOTemplate_CG = zeros(prod(HOGTemplatesz),1);
-  WHOTemplate_CG(onlyNonEmptyIdx) = x(:,1);
+  % WHOTemplate_CG(onlyNonEmptyIdx) = real(P' * FFTDiagMatrix * P * x);
+  WHOTemplate_CG(onlyNonEmptyIdx) = CirculantMatrix * x;
   WHOTemplate_CG =  reshape(WHOTemplate_CG,[HOGDim, wHeight, wWidth]);
   WHOTemplate_CG = permute(WHOTemplate_CG,[2,3,1]);
   cg_time_per_case(caseIdx) = toc
