@@ -12,8 +12,8 @@ end
 
 hog_cell_threshold = 1.5 * 10^0;
 padding = 20;
-n_cell_limits = [50 100 150 200 250 300 350 400];
-% n_cell_limits = 200;
+% n_cell_limits = [50 100 150 200 250 300 350 400];
+n_cell_limits = 200;
 lambda = 0.01;
 
 preprocess_time_per_case = zeros(1,numel(n_cell_limits));
