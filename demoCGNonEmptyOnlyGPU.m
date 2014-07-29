@@ -12,8 +12,8 @@ end
 
 hog_cell_threshold = 1.5 * 10^0;
 padding = 20;
-% n_cell_limits = [50 100 150 200 250 300 ];
-n_cell_limits = 200;
+n_cell_limits = [50 100 150 200 250 300 ];
+% n_cell_limits = 150;
 lambda = 0.01;
 
 preprocess_time_per_case = zeros(1,numel(n_cell_limits));
@@ -22,9 +22,9 @@ cg_time_per_case = zeros(1,numel(n_cell_limits));
 decomp_residual_per_case = zeros(1,numel(n_cell_limits));
 cg_residual_per_case = zeros(1,numel(n_cell_limits));
 
-CG_THREASHOLD = 10^-4;
+CG_THREASHOLD = 10^-3;
 CG_MAX_ITER = 60;
-N_THREAD = 16;
+N_THREAD = 32;
 
 %%%%%%%% Get HOG template
 
@@ -38,8 +38,10 @@ paddedIm(end-padding+1 : end, :, :) = 1;
 % bounding box coordinate x1, y1, x2, y2
 bbox = [1 1 size(im,2) size(im,1)] + padding;
 
-k = parallel.gpu.CUDAKernel('scrambleGammaToSigma.ptx','scrambleGammaToSigma.cu');
-k.ThreadBlockSize = [N_THREAD , N_THREAD , 1];
+scrambleKernel = parallel.gpu.CUDAKernel('scrambleGammaToSigma.ptx','scrambleGammaToSigma.cu');
+scrambleKernel.ThreadBlockSize = [N_THREAD , N_THREAD , 1];
+
+muSwapDim = permute(single(mu),[2 3 1]);
 
 GammaGPU = gpuArray(single(Gamma));
 gammaDim = size(Gamma);
@@ -68,7 +70,7 @@ for caseIdx = 1:numel(n_cell_limits)
   sigmaDim = n_non_empty_cells * HOGDim;
   
 
-  k.GridSize = [ceil(double(sigmaDim)/N_THREAD ), ceil(double(sigmaDim)/N_THREAD ), 1];
+  scrambleKernel.GridSize = [ceil(double(sigmaDim)/N_THREAD ), ceil(double(sigmaDim)/N_THREAD ), 1];
   SigmaGPU = zeros(sigmaDim, sigmaDim, 'single', 'gpuArray');
 
   nonEmptyRowsGPU = gpuArray(int32(nonEmptyRows - 1));
@@ -77,17 +79,17 @@ for caseIdx = 1:numel(n_cell_limits)
   HOGDimGPU = gpuArray(int32(HOGDim));
   n_non_empty_cellsGPU = gpuArray(int32(n_non_empty_cells));
 
-  AGPU = feval(k, SigmaGPU, GammaGPU, single(lambda), nonEmptyRowsGPU, nonEmptyColsGPU, gammaDimGPU, HOGDimGPU, n_non_empty_cellsGPU);
+  AGPU = feval(scrambleKernel, SigmaGPU, GammaGPU, single(lambda), nonEmptyRowsGPU, nonEmptyColsGPU, gammaDimGPU, HOGDimGPU, n_non_empty_cellsGPU);
   
   preprocess_time_per_case(caseIdx) = toc
 
   %%%%%%%%%%%%% Conjugate Gradient 
-  muSwapDim = permute(single(mu),[2 3 1]);
+  
   centeredHOG = bsxfun(@minus, HOGTemplate, muSwapDim);
   permHOG = permute(centeredHOG,[3 1 2]); % [HOGDim, Nrow, Ncol] = HOGDim, N1, N2
   onlyNonEmptyIdx = cell2mat(arrayfun(@(x) x + (1:HOGDim)', HOGDim * (idxNonEmptyCells - 1),'UniformOutput',false));
   nonEmptyHOG = permHOG(onlyNonEmptyIdx);
-  nonEmptyHOGGPU = gpuArray(nonEmptyHOG);
+  nonEmptyHOGGPU = gpuArray(single(nonEmptyHOG));
 
   tic
   % A = Sigma + single(lambda) * eye(sigmaDim,'single');
@@ -96,7 +98,7 @@ for caseIdx = 1:numel(n_cell_limits)
   % [x,fl,rr,it,rv] = bicg(A,nonEmptyHOG, CG_THREASHOLD, CG_MAX_ITER);
   % [x,fl,rr,it,rv] = cgs(A,nonEmptyHOG, CG_THREASHOLD, CG_MAX_ITER);
   
-  x = zeros(sigmaDim,1,'single');
+  x = zeros(sigmaDim,1,'single','gpuArray');
   % x = 100 * nonEmptyHOG;
   b = nonEmptyHOGGPU;
   r = gpuArray(nonEmptyHOG);
@@ -108,15 +110,13 @@ for caseIdx = 1:numel(n_cell_limits)
   x_cache = zeros(sigmaDim,n_cache,'single');
   r_norm_cache = ones(1, n_cache) * inf;
 
-  MAX_ITER = 6 * 10^1;
-  r_hist = zeros(1, MAX_ITER,'single');
+  r_hist = zeros(1, CG_MAX_ITER,'single','gpuArray');
   i = 0;
-  r_norm_next = inf;
-  while i < MAX_ITER
+  while i < CG_MAX_ITER
     i = i + 1;
 
     r_norm = (r'*r);
-    r_hist(i) = gather(r_norm/r_start_norm);
+    r_hist(i) = r_norm/r_start_norm;
 
     if r_hist(i) < CG_THREASHOLD
       break;
@@ -126,7 +126,7 @@ for caseIdx = 1:numel(n_cell_limits)
     alpha = r_norm/(d' * Ad);
     x = x + alpha * d;
     r = r - alpha * Ad;
-    beta = r'*r/r_norm;
+    beta = (r'*r)/r_norm;
     d = r + beta * d;
   end
 
@@ -148,12 +148,12 @@ for caseIdx = 1:numel(n_cell_limits)
   firstTry = true;
   while ~success
     if firstTry
-        AGPU = AGPU + lambda * eye(size(AGPU));
+        AGPU_decomp = AGPU + lambda * eye(sigmaDim);
     else
-        AGPU = AGPU + 0.01 * eye(size(AGPU));
+        AGPU_decomp = AGPU_decomp + 0.01 * eye(sigmaDim);
     end
     firstTry = false;
-    [R, p] = chol(AGPU);
+    [R, p] = chol(AGPU_decomp);
     if p == 0
       success = true;
     else
@@ -170,7 +170,7 @@ for caseIdx = 1:numel(n_cell_limits)
   decomp_time_per_case(caseIdx) = toc
   
   cg_residual_per_case(caseIdx) = norm(nonEmptyHOGGPU - AGPU * x)
-  decomp_residual_per_case(caseIdx) = norm(nonEmptyHOGGPU - AGPU * sigInvCenteredWs)
+  decomp_residual_per_case(caseIdx) = norm(nonEmptyHOGGPU - AGPU_decomp * sigInvCenteredWs)
 end
 
 figure(1); imagesc(HOGpicture(abs(WHOTemplate_CG))); colorbar; title('Conjugate Gradient nonzero cells');
