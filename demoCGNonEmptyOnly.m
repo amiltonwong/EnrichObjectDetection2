@@ -73,7 +73,7 @@ for caseIdx = 1:numel(n_cell_limits)
           Gamma((gammaRowIdx-1)*HOGDim + 1 : gammaRowIdx*HOGDim , (gammaColIdx - 1)*HOGDim + 1 : gammaColIdx*HOGDim);
     end
   end
-  
+
   preprocess_time_per_case(caseIdx) = toc
 
   %%%%%%%%%%%%% Conjugate Gradient 
@@ -85,11 +85,13 @@ for caseIdx = 1:numel(n_cell_limits)
 
   tic
   A = Sigma + single(lambda) * eye(sigmaDim,'single');
+  %%%%%%%%%%%%%%%%%%%%
   [x,fl,rr,it,rv] = pcg(A,nonEmptyHOG, CG_THREASHOLD, CG_MAX_ITER);
   % [x,fl,rr,it,rv] = bicgstabl(A,nonEmptyHOG, CG_THREASHOLD, CG_MAX_ITER);
   % [x,fl,rr,it,rv] = bicg(A,nonEmptyHOG, CG_THREASHOLD, CG_MAX_ITER);
   % [x,fl,rr,it,rv] = cgs(A,nonEmptyHOG, CG_THREASHOLD, CG_MAX_ITER);
-  
+  %%%%%%%%%%%%%%%%%%%%%%%
+
   WHOTemplate_CG = zeros(prod(HOGTemplateSz),1);
   WHOTemplate_CG(onlyNonEmptyIdx) = x;
   WHOTemplate_CG =  reshape(WHOTemplate_CG,[HOGDim, wHeight, wWidth]);
