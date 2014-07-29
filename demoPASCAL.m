@@ -17,11 +17,11 @@ mkdir('Result',[CLASS '_' TYPE]);
 % n_cell_limit = [150];
 % lambda = [0.015];
 
-azs = 0:45:345 + 5
-els = 0 :15 :30
+azs = 0:15:315
+els = 0 : 15 :30
 fovs = 25
 yaws = -30:15:30
-n_cell_limit = 120
+n_cell_limit = 200
 lambda = 0.015
 
 visualize_detection = true;
@@ -30,7 +30,7 @@ visualize_detector = false;
 
 sbin = 4;
 nlevel = 10;
-detection_threshold = 120;
+detection_threshold = 150;
 
 model_file = 'Mesh/Bicycle/road_bike';
 model_name = strrep(model_file, '/', '_');
@@ -43,7 +43,7 @@ if exist(detector_name,'file')
   load(detector_name);
 else
   load('Statistics/sumGamma_N1_40_N2_40_sbin_4_nLevel_10_nImg_1601_napoli1_gamma.mat');
-  detectors = dwot_make_detectors_slow(mu, Gamma, [model_file '.3ds'], azs, els, yaws, fovs, n_cell_limit, lambda, visualize_detector);
+  detectors = dwot_make_detectors_slow_gpu(mu, Gamma, [model_file '.3ds'], azs, els, yaws, fovs, n_cell_limit, lambda, visualize_detector);
   if sum(cellfun(@(x) isempty(x), detectors))
     error('Detector Not Completed');
   end
@@ -83,9 +83,9 @@ for imgIdx=1:N_IMAGE
     gt(imgIdx).diff=[recs(imgIdx).objects(clsinds).difficult];
     gt(imgIdx).det=false(length(clsinds),1);
     
-%     if isempty(clsinds)
-%       continue;
-%     end
+    if isempty(clsinds)
+      continue;
+    end
     
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
     imSz = size(im);
@@ -190,16 +190,16 @@ for imgIdx=1:N_IMAGE
           [' overlap ' num2str( bbsNMS(bbsIdx,9))], ...
           [' detector ' num2str( bbsNMS(bbsIdx,11))] };
 
-        plot_bbox(clip_bnd,cell2mat(titler),[1 1 1]);
+        plot_bbox(bnd,cell2mat(titler),[1 1 1]);
       end
       drawnow;
       disp('Press any button to continue');
       
-      save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.jpg',...
-        CLASS,TYPE,model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
-      print('-djpeg','-r100',['Result/' CLASS '_' TYPE '/' save_name])
+%       save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.jpg',...
+%         CLASS,TYPE,model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
+%       print('-djpeg','-r100',['Result/' CLASS '_' TYPE '/' save_name])
       
-      % waitforbuttonpress;
+      waitforbuttonpress;
     end
       
     npos=npos+sum(~gt(imgIdx).diff);
