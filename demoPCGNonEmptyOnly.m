@@ -53,9 +53,9 @@ for caseIdx = 1:numel(n_cell_limits)
   lambdaEye = lambda * eye(HOGDim);
   nonEmptyCells = (sum(HOGTemplate,3) > hog_cell_threshold);
   idxNonEmptyCells = find(nonEmptyCells);
-  [nonEmptyRows,nonEmptyCols] = ind2sub([wHeight, wWidth], idxNonEmptyCells);
-  nonEmptyRows = int16(nonEmptyRows);
-  nonEmptyCols = int16(nonEmptyCols);
+  [db_nonEmptyRows,db_nonEmptyCols] = ind2sub([wHeight, wWidth], idxNonEmptyCells);
+  nonEmptyRows = int16(db_nonEmptyRows);
+  nonEmptyCols = int16(db_nonEmptyCols);
 
 %   pdistRows = pdist(nonEmptyRows,'cityblock');
 %   pdistCols = pdist(nonEmptyCols,'cityblock');
@@ -72,8 +72,13 @@ for caseIdx = 1:numel(n_cell_limits)
   
   CirculantBlocks = cell(1, 1, N_CIRC_BLOCKS);
   CirculantBlocks = cellfun(@(x) zeros(HOGDim, HOGDim, 'single'), CirculantBlocks, 'UniformOutput', false);
-
-
+  
+  pdistRows = squareform(pdist(db_nonEmptyRows)) + 1;
+  pdistCols = squareform(pdist(db_nonEmptyCols)) + 1;
+  % gammaIndex = pdistRows + (pdistCols * wHeight) + 1;
+  
+  % gammaIndex = kron( pdistRows + (pdistCols * HOGDim) + 1, ones(HOGDim)) + repmat( reshape(0:HOGDim^2-1, HOGDim, HOGDim), n_non_empty_cells, n_non_empty_cells);
+  
   for cellIdx = 1:n_non_empty_cells
     rowIdx = nonEmptyRows(cellIdx); % sub2ind([wHeight, wWidth],i,j);
     colIdx = nonEmptyCols(cellIdx);
@@ -83,8 +88,10 @@ for caseIdx = 1:numel(n_cell_limits)
   %     gammaRowIdx = abs(rowIdx - otherRowIdx) + 1;
   %     gammaColIdx = abs(colIdx - otherColIdx) + 1;
 
-      gammaRowIdx = abs(rowIdx - nonEmptyRows(otherCellIdx)) + 1;
-      gammaColIdx = abs(colIdx - nonEmptyCols(otherCellIdx)) + 1;
+%       gammaRowIdx = abs(rowIdx - nonEmptyRows(otherCellIdx)) + 1;
+%       gammaColIdx = abs(colIdx - nonEmptyCols(otherCellIdx)) + 1;
+      gammaRowIdx = pdistRows(cellIdx, otherCellIdx);
+      gammaColIdx = pdistCols(cellIdx, otherCellIdx);
 
       Sigma((cellIdx-1)*HOGDim + 1:cellIdx * HOGDim, (otherCellIdx-1)*HOGDim + 1:otherCellIdx*HOGDim) = ...
           Gamma((gammaRowIdx-1)*HOGDim + 1 : gammaRowIdx*HOGDim , (gammaColIdx - 1)*HOGDim + 1 : gammaColIdx*HOGDim);
