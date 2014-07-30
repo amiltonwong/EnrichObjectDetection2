@@ -18,7 +18,7 @@ scales = scales(minsizes >= padder*2);
 bbsAll = cell(length(hog),1);
 
 for level = length(hog):-1:1
-  HM = fconvblas(hog{level}, templates, 1, nTemplates);
+  HM = fconvblasfloat(single(hog{level}), templates, 1, nTemplates);
 
 %      for modelIdx = 1:nTemplates
 %        HM{modelIdx} = convnc(t.hog{level},flipTemplates{modelIdx},'valid');

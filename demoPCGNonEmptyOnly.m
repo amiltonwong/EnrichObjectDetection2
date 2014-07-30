@@ -326,16 +326,16 @@ for caseIdx = 1:numel(n_cell_limits)
   decomp_residual_per_case(caseIdx) = norm(b - A * sigInvCenteredWs)
 end
 
-figure(1); imagesc(HOGpicture(abs(WHOTemplate_CG))); colorbar; title('Conjugate Gradient nonzero cells');
+figure(1); imagesc(HOGpicture(abs(WHOTemplate_CG))); colorbar; title('Preconditioned Conjugate Gradient nonzero cells');
 figure(2); imagesc(HOGpicture(abs(WHOTemplate))); colorbar; title('Decomposition nonzero cells');
 
-figure(3); plot(n_cell_limits, cg_time_per_case,'-+'); title('Conjugate Gradient/Decomposition nonzero cells'); xlabel('N Cells'); ylabel('seconds');
+figure(3); plot(n_cell_limits, cg_time_per_case,'-+'); title('Preconditioned Conjugate Gradient/Decomposition nonzero cells'); xlabel('N Cells'); ylabel('seconds');
 hold on;   plot(n_cell_limits, decomp_time_per_case,'r-o'); 
 hold on;   plot(n_cell_limits, preprocess_time_per_case,'k-x');
-legend('CG','Decomp','Preprocessing');
+legend('PCG','Decomp','Preprocessing');
 
-figure(4); plot(n_cell_limits, cg_residual_per_case, '-+'); title('Conjugate Gradient/Decomposition nonzero cells'); xlabel('N Cells'); ylabel('residuals');
-hold on; plot(n_cell_limits, decomp_residual_per_case, 'r-o'); legend('CG','Decomp');
+figure(4); plot(n_cell_limits, cg_residual_per_case, '-+'); title('Preconditioned Conjugate Gradient/Decomposition nonzero cells'); xlabel('N Cells'); ylabel('residuals');
+hold on; plot(n_cell_limits, decomp_residual_per_case, 'r-o'); legend('PCG','Decomp');
 
 % imagesc(HOGpicture(abs(WHOTemplate))); colorbar; title('Decomposition all cells');
 

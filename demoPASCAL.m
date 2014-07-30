@@ -20,8 +20,8 @@ mkdir('Result',[CLASS '_' TYPE]);
 azs = 0:15:315
 els = 0 : 15 :30
 fovs = 25
-yaws = -30:15:30
-n_cell_limit = 200
+yaws = -45:15:45
+n_cell_limit = 150
 lambda = 0.015
 
 visualize_detection = true;
@@ -34,7 +34,6 @@ detection_threshold = 150;
 
 model_file = 'Mesh/Bicycle/road_bike';
 model_name = strrep(model_file, '/', '_');
-
 
 detector_name = sprintf('%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
     model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
@@ -50,7 +49,7 @@ else
   eval(sprintf(['save ' detector_name ' detectors']));
 end
 
-templates = cellfun(@(x) x.whow, detectors,'UniformOutput',false);
+templates = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
 param = get_default_params(sbin, nlevel, detection_threshold);
 
 VOCinit;

@@ -16,3 +16,6 @@ mex -O features_raw.cc
 
 mex CXX=gcc CXXOPTIMFLAGS='-O3 -DNDEBUG -funroll-all-loops' fconvblas.cc ...
         -lmwblas
+
+% Use the following if error occurs
+% mex CXXOPTIMFLAGS='-O3 -DNDEBUG -funroll-all-loops' fconvblasfloat.cc -lmwblas
