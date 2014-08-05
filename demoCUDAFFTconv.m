@@ -19,7 +19,7 @@ n_cell_limit = [150];
 lambda = [0.02];
 visualize = true;
 % visualize = false;
-sbin = 4;
+sbin = 2;
 nlevel = 10;
 detection_threshold = 100;
 HOGDim = 31;
@@ -42,7 +42,15 @@ else
 end
 
 templates = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
+db_templates = cellfun(@(x) x.whow, detectors,'UniformOutput',false);
 
+nTemplates =  numel(templates);
+templateSz = cellfun(@(x) size(x), templates, 'UniformOutput',false);
+templateGPU = cellfun(@(x) gpuArray(x(end:-1:1,end:-1:1,:)), templates, 'UniformOutput',false);
+
+maxTemplateHeight = max(cellfun(@(x) x(1), templateSz));
+maxTemplateWidth = max(cellfun(@(x) x(2), templateSz));
+    
 param = get_default_params(sbin, nlevel, detection_threshold);
 
 % extract ground truth objects
@@ -55,6 +63,7 @@ detScore = cell(1,N_IMAGE);
 detectorId = cell(1,N_IMAGE);
 detIdx = 0;
 
+cos(gpuArray(1));
 
 startTime = clock;
 for imgIdx = 1:(IMAGE_END_IDX - IMAGE_START_IDX + 1)
@@ -74,10 +83,7 @@ for imgIdx = 1:(IMAGE_END_IDX - IMAGE_START_IDX + 1)
     padder = param.detect_pyramid_padding;
     sbin = param.sbin;
 
-    nTemplates =  numel(templates);
-    templateSz = cellfun(@(x) size(x), templates, 'UniformOutput',false);
-    maxTemplateHeight = max(cellfun(@(x) x(1), templateSz));
-    maxTemplateWidth = max(cellfun(@(x) x(2), templateSz));
+
     for level = 1:length(hog)
         hog{level} = padarray(hog{level}, [padder padder 0], 0); % Convolution, same size
     end
@@ -88,9 +94,12 @@ for imgIdx = 1:(IMAGE_END_IDX - IMAGE_START_IDX + 1)
     bbsAll = cell(length(hog),1);
 
     % for level = length(hog):-1:1
+    
     for level = 1:length(hog)
+      singleHOG = single(hog{level});
+      
       tic
-      HM = fconvblasfloat(single(hog{level}), templates, 1, nTemplates);
+      HM = fconvblasfloat(singleHOG, templates, 1, nTemplates);
       toc
       
       szHOG = size(hog{level});
@@ -99,11 +108,7 @@ for imgIdx = 1:(IMAGE_END_IDX - IMAGE_START_IDX + 1)
       mlen = szHOG(2) + maxTemplateWidth;
       
       tic
-      fhog = zeros(nlen, mlen, HOGDim,'single','gpuArray');
-      for dIdx = 1:HOGDim
-        fhog(:,:,dIdx) = fftn(gpuArray(single(hog{level}(:,:,dIdx))),[nlen mlen]);
-      end
-      toc
+      fhog = cudaFFTData(single(hog{level}), maxTemplateHeight, maxTemplateWidth);
 %       [x, y] = ndgrid(1:nlen,1:mlen);
 %       [xf, yf] = ndgrid(1:0.5:nlen,1:0.5:mlen);
 %       vq = interpn(x,y,fftshift(real(fhog(:,:,1))),xf,yf,'cubic');
@@ -119,23 +124,32 @@ for imgIdx = 1:(IMAGE_END_IDX - IMAGE_START_IDX + 1)
 %       end
       
 
-      
-      tic
       HMFFT = cell(1, nTemplates);
       for templateIdx = 1:nTemplates
-        HMFFT{templateIdx} = zeros(nlen, mlen,'single','gpuArray');
-        % conj(fft( )) = ifft * n_len * m_len
-        currGPUTemplate = gpuArray(templates{templateIdx}).*(nlen * mlen);
-        for dIdx = 1:HOGDim
-          fthog = ifftn(currGPUTemplate(:,:,dIdx), [nlen, mlen]);
-          HMFFT{templateIdx} = HMFFT{templateIdx} + real(ifftn(fhog(:,:,dIdx).*fthog));
-        end
-        HMFFT{templateIdx} = gather(HMFFT{templateIdx});
+        HMFFT{templateIdx} = cudaConvFFTData(fhog,templateGPU{templateIdx});
       end
       toc
+%       db_cvmatlab = {};
+%       for templateIdx = 1:nTemplates
+%         szTemplate = size(db_templates{templateIdx});
+%         e = zeros(szHOG(1) + szTemplate(1) - 1, szHOG(2) + szTemplate(2) - 1, HOGDim);
+%         for i = 1:HOGDim
+%           e(:,:,i) = conv2(hog{level}(:,:,i),db_templates{templateIdx}(end:-1:1,end:-1:1,i));
+%         end
+%         db_cvmatlab{templateIdx} = sum(e,3);
+%       end
+%       
+%       
+%       for templateIdx = 1:nTemplates
+%         subplot(131); imagesc(HM{templateIdx}); caxis([-100 100]); colorbar; 
+%         subplot(132); imagesc(HMFFT{templateIdx}); caxis([-100 100]); colorbar;
+%         subplot(133); imagesc(db_cvmatlab{templateIdx}); caxis([-100 100]); colorbar;
+%         waitforbuttonpress;
+%       end
+
+      scale = scales(level);
       
       rmsizes = cellfun(@(x) size(x), HM, 'UniformOutput',false);
-      scale = scales(level);
       templateIdxes = find(cellfun(@(x) prod(x), rmsizes));
       bbsTemplate = cell(nTemplates,1);
 
