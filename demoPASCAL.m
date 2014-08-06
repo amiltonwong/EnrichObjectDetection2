@@ -7,6 +7,7 @@ addpath('../MatlabRenderer/');
 addpath(VOC_PATH);
 addpath([VOC_PATH, 'VOCcode']);
 
+USE_GPU = true;
 CLASS = 'bicycle';
 TYPE = 'val';
 mkdir('Result',[CLASS '_' TYPE]);
@@ -49,7 +50,12 @@ else
   eval(sprintf(['save ' detector_name ' detectors']));
 end
 
-templates = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
+
+if USE_GPU
+  templates = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
+else
+  templates = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
+end
 param = get_default_params(sbin, nlevel, detection_threshold);
 
 VOCinit;
@@ -88,7 +94,11 @@ for imgIdx=1:N_IMAGE
     
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
     imSz = size(im);
-    [bbsNMS ]= dwot_detect( im, templates, param);
+    if USE_GPU
+      [bbsNMS ]= dwot_detect_gpu( im, templates, param);
+    else
+      [bbsNMS ]= dwot_detect( im, templates, param);
+    end
     bbsNMS = clip_to_image(bbsNMS, [0 0 imSz(2) imSz(1)]);
     
     nDet = size(bbsNMS,1);
