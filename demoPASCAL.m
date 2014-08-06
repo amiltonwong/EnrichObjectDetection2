@@ -4,10 +4,17 @@ addpath('HoG');
 addpath('HoG/features');
 addpath('Util');
 addpath('../MatlabRenderer/');
+addpath('../MatlabCUDAConv/');
 addpath(VOC_PATH);
 addpath([VOC_PATH, 'VOCcode']);
 
 USE_GPU = true;
+if USE_GPU
+  gdevice = gpuDevice(1);
+  reset(gdevice);
+  cos(gpuArray(1));
+end
+
 CLASS = 'bicycle';
 TYPE = 'val';
 mkdir('Result',[CLASS '_' TYPE]);
