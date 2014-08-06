@@ -19,7 +19,7 @@ n_cell_limit = [150];
 lambda = [0.02];
 visualize = true;
 % visualize = false;
-sbin = 2;
+sbin = 4;
 nlevel = 10;
 detection_threshold = 100;
 HOGDim = 31;
@@ -96,18 +96,14 @@ for imgIdx = 1:(IMAGE_END_IDX - IMAGE_START_IDX + 1)
     % for level = length(hog):-1:1
     
     for level = 1:length(hog)
-      singleHOG = single(hog{level});
-      
-      tic
-      HM = fconvblasfloat(singleHOG, templates, 1, nTemplates);
-      toc
+%       singleHOG = single(hog{level});
+%       HM = fconvblasfloat(singleHOG, templates, 1, nTemplates);
       
       szHOG = size(hog{level});
       
       nlen = szHOG(1) + maxTemplateHeight;
       mlen = szHOG(2) + maxTemplateWidth;
       
-      tic
       fhog = cudaFFTData(single(hog{level}), maxTemplateHeight, maxTemplateWidth);
 %       [x, y] = ndgrid(1:nlen,1:mlen);
 %       [xf, yf] = ndgrid(1:0.5:nlen,1:0.5:mlen);
@@ -122,13 +118,13 @@ for imgIdx = 1:(IMAGE_END_IDX - IMAGE_START_IDX + 1)
 %           fthog{templateIdx}(:,:,dIdx) = conj(fftn(gpuArray(single(templates{templateIdx}(:,:,dIdx))), [nlen, mlen]));
 %         end
 %       end
+      HMFFT = cudaConvFFTData(fhog,templateGPU);
       
-
-      HMFFT = cell(1, nTemplates);
-      for templateIdx = 1:nTemplates
-        HMFFT{templateIdx} = cudaConvFFTData(fhog,templateGPU{templateIdx});
-      end
-      toc
+%       HMSz = szHOG - templateSz{templateIdx} + 1;
+%       startHeightIdx = templateSz{templateIdx}(1);
+%       startWidthIdx = templateSz{templateIdx}(2);
+%       figure; imagesc(HM{templateIdx} - HMFFT{templateIdx}(startHeightIdx:(startHeightIdx + HMSz(1) - 1),startWidthIdx:(startWidthIdx + HMSz(2) - 1))); colorbar;
+      
 %       db_cvmatlab = {};
 %       for templateIdx = 1:nTemplates
 %         szTemplate = size(db_templates{templateIdx});
@@ -148,21 +144,26 @@ for imgIdx = 1:(IMAGE_END_IDX - IMAGE_START_IDX + 1)
 %       end
 
       scale = scales(level);
-      
-      rmsizes = cellfun(@(x) size(x), HM, 'UniformOutput',false);
-      templateIdxes = find(cellfun(@(x) prod(x), rmsizes));
+%       rmsizes = cellfun(@(x) size(x), HM, 'UniformOutput',false);
+      rmfftsizes = cellfun(@(x) size(x), HMFFT, 'UniformOutput',false);
+%       templateIdxes = find(cellfun(@(x) prod(x), rmsizes));
       bbsTemplate = cell(nTemplates,1);
 
-      for templateIdx = templateIdxes
-        [idx] = find(HM{templateIdx}(:) > param.detection_threshold);
+      for templateIdx = 1:nTemplates
+%         [idx] = find(HM{templateIdx}(:) > param.detection_threshold);
+        [idx] = find(HMFFT{templateIdx}(:) > param.detection_threshold);
         if isempty(idx)
           continue;
         end
 
-        [uus,vvs] = ind2sub(rmsizes{templateIdx}(1:2), idx);
-
-        o = [uus vvs] - padder;
-
+%         [uus,vvs] = ind2sub(rmsizes{templateIdx}(1:2), idx);
+%         o = [uus vvs] - padder;
+%         bbs = ([o(:,2) o(:,1) o(:,2)+templateSz{templateIdx}(2) ...
+%                    o(:,1)+templateSz{templateIdx}(1)] - 1) * ...
+%                  sbin/scale + 1 + repmat([0 0 -1 -1],...
+%                   length(uus),1);
+        [uus,vvs] = ind2sub(rmfftsizes{templateIdx}(1:2), idx);
+        o = bsxfun(@minus,[uus vvs] - padder, [templateSz{templateIdx}(1) templateSz{templateIdx}(2)] + 1);
         bbs = ([o(:,2) o(:,1) o(:,2)+templateSz{templateIdx}(2) ...
                    o(:,1)+templateSz{templateIdx}(1)] - 1) * ...
                  sbin/scale + 1 + repmat([0 0 -1 -1],...
@@ -179,7 +180,7 @@ for imgIdx = 1:(IMAGE_END_IDX - IMAGE_START_IDX + 1)
         % bbs(:,10) = abs(detectors{templateIdx}.az - azGT) < 30;
 
         bbs(:,11) = templateIdx;
-        bbs(:,12) = HM{templateIdx}(idx);
+        bbs(:,12) = HMFFT{templateIdx}(idx);
         bbsTemplate{templateIdx} = bbs;
 
         % if visualize
@@ -188,7 +189,7 @@ for imgIdx = 1:(IMAGE_END_IDX - IMAGE_START_IDX + 1)
           % subplot(231); imagesc(templates{templateIdx}.rendering); axis equal; axis tight;
           % subplot(232); imagesc(detectors{exemplarIdx}.hogpic); axis equal; axis tight; axis off;
           text(10,20,{['score ' num2str(bbs(Idx,12))],['azimuth ' num2str(bbs(Idx,10))]},'BackgroundColor',[.7 .9 .7]);
-          subplot(233); imagesc(HM{templateIdx}); %caxis([100 200]); 
+          subplot(233); imagesc(HMFFT{templateIdx}); %caxis([100 200]); 
           colorbar; axis equal; axis tight; 
           subplot(234); imagesc(doubleIm); axis equal; % axis tight; axis off;
           rectangle('Position',bbs(Idx,1:4)-[0 0 bbs(Idx,1:2)]);
@@ -235,6 +236,7 @@ for imgIdx = 1:(IMAGE_END_IDX - IMAGE_START_IDX + 1)
         afp{imgIdx}(bbsIdx) = 1;
       end
     end
+    fprintf('%d/%d time : %0.4f\n', imgIdx, N_IMAGE, toc(imgTic));
     
     if visualize
       padding = 50;
@@ -286,7 +288,6 @@ for imgIdx = 1:(IMAGE_END_IDX - IMAGE_START_IDX + 1)
       waitforbuttonpress;
     end
       
-    fprintf('%d/%d time : %0.4f\n', imgIdx, N_IMAGE, toc(imgTic));
 end
 
 detScore = cell2mat(detScore);

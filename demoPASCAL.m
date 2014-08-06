@@ -17,7 +17,7 @@ mkdir('Result',[CLASS '_' TYPE]);
 % n_cell_limit = [150];
 % lambda = [0.015];
 
-azs = 0:15:315
+azs = 0:15:345
 els = 0 : 15 :30
 fovs = 25
 yaws = -45:15:45
@@ -145,7 +145,8 @@ for imgIdx=1:N_IMAGE
       
       bbsNMS(bbsIdx, 9) = ovmax;
     end
-    
+   fprintf('time : %0.4f\n', toc(imgTic));
+
     % if visualize
     if visualize_detection && sum(~gt(imgIdx).diff)
       padding = 25;
@@ -202,7 +203,6 @@ for imgIdx=1:N_IMAGE
     end
       
     npos=npos+sum(~gt(imgIdx).diff);
-    fprintf('time : %0.4f\n', toc(imgTic));
 end
 
 detScore = cell2mat(detScore);
