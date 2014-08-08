@@ -1,12 +1,15 @@
-function [bbsNMS, hog, scales] = dwot_detect(I, templates, param)
+function [bbsNMS] = dwot_detect_gpu_and_cpu(I, templates_gpu, templates_cpu, param)
 
 doubleIm = im2double(I);
 [hog, scales] = esvm_pyramid(doubleIm, param);
 padder = param.detect_pyramid_padding;
 sbin = param.sbin;
 
-nTemplates =  numel(templates);
-sz = cellfun(@(x) size(x), templates, 'UniformOutput',false);
+nTemplates =  numel(templates_gpu);
+
+sz = cellfun(@(x) size(x), templates_gpu, 'UniformOutput',false);
+maxTemplateHeight = max(cellfun(@(x) x(1), sz));
+maxTemplateWidth = max(cellfun(@(x) x(2), sz));
 
 for level = 1:length(hog)
     hog{level} = padarray(hog{level}, [padder padder 0], 0); % Convolution, same size
@@ -18,18 +21,18 @@ scales = scales(minsizes >= padder*2);
 bbsAll = cell(length(hog),1);
 
 for level = length(hog):-1:1
-  HM = fconvblasfloat(single(hog{level}), templates, 1, nTemplates);
-
-%      for modelIdx = 1:nTemplates
-%        HM{modelIdx} = convnc(t.hog{level},flipTemplates{modelIdx},'valid');
-%      end
+  if level > length(hog)/2
+    fhog = cudaFFTData(single(hog{level}), maxTemplateHeight, maxTemplateWidth);
+    HM = cudaConvFFTData(fhog,templates_gpu, [8, 8, 8, 16]);
+  else
+    HM = fconvblasfloat(single(hog{level}), templates_cpu, 1, nTemplates);
+  end
 
   rmsizes = cellfun(@(x) size(x), HM, 'UniformOutput',false);
   scale = scales(level);
-  templateIdxes = find(cellfun(@(x) prod(x), rmsizes));
   bbsTemplate = cell(nTemplates,1);
   
-  for templateIdx = templateIdxes
+  for templateIdx = 1:nTemplates
     [idx] = find(HM{templateIdx}(:) > param.detection_threshold);
     if isempty(idx)
       continue;
@@ -37,10 +40,10 @@ for level = length(hog):-1:1
 
     [uus,vvs] = ind2sub(rmsizes{templateIdx}(1:2), idx);
 
-    o = [uus vvs] - padder;
+    o = bsxfun(@minus,[uus vvs] - padder, [sz{templateIdx}(1) sz{templateIdx}(2)] );
 
     bbs = ([o(:,2) o(:,1) o(:,2)+sz{templateIdx}(2) ...
-               o(:,1)+sz{templateIdx}(1)] - 1) * ...
+               o(:,1)+sz{templateIdx}(1)] ) * ...
              sbin/scale + 1 + repmat([0 0 -1 -1],...
               length(uus),1);
 

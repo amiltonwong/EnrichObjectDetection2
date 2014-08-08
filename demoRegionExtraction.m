@@ -58,7 +58,6 @@ else
 end
 
 renderings = cellfun(@(x) x.rendering, detectors, 'UniformOutput', false);
-
 if USE_GPU
   templates = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
   % templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
@@ -70,7 +69,7 @@ param = get_default_params(sbin, nlevel, detection_threshold);
 VOCinit;
 
 % load dataset
-[gtids,t] = textread(sprintf(VOCopts.imgsetpath,[CLASS '_' TYPE]),'%s %d');
+[gtids,t]=textread(sprintf(VOCopts.imgsetpath,[CLASS '_' TYPE]),'%s %d');
 
 N_IMAGE = length(gtids);
 
@@ -105,10 +104,13 @@ for imgIdx=1:N_IMAGE
     imSz = size(im);
     if USE_GPU
       % [bbsNMS ] = dwot_detect_gpu_and_cpu( im, templates, templates_cpu, param);
-      [bbsNMS ] = dwot_detect_gpu( im, templates, param);
+      [bbsNMS, hog] = dwot_detect_gpu( im, templates, param);
     else
-      [bbsNMS ] = dwot_detect( im, templates, param);
+      [bbsNMS, hog] = dwot_detect( im, templates, param);
     end
+    
+%     [hog_regions, im_regions] = dwot_extrac_region(im, bbsNMS, param);
+    
     bbsNMS_clip = clip_to_image(bbsNMS, [1 1 imSz(2) imSz(1)]);
 
     nDet = size(bbsNMS_clip,1);
@@ -166,23 +168,22 @@ for imgIdx=1:N_IMAGE
       bbsNMS(bbsIdx, 9) = ovmax;
       bbsNMS_clip(bbsIdx, 9) = ovmax;
     end
-    
     fprintf('time : %0.4f\n', toc(imgTic));
 
     % if visualize
     if visualize_detection && ~isempty(clsinds)
       dwot_draw_overlap_detection(im, bbsNMS, renderings, 5, 50, visualize_detection);
-      
+
       disp('Press any button to continue');
       
       save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.jpg',...
         CLASS,TYPE,model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
       print('-djpeg','-r100',['Result/' CLASS '_' TYPE '/' save_name])
       
-%       waitforbuttonpress;
+      waitforbuttonpress;
     end
       
-    npos=npos+sum(~gt(imgIdx).diff);
+    npos = npos + sum(~gt(imgIdx).diff);
 end
 
 detScore = cell2mat(detScore);

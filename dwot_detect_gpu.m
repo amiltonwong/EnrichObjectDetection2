@@ -1,8 +1,8 @@
-function [bbsNMS] = dwot_detect_gpu(I, templates, param)
+function [bbsNMS, hog, scales] = dwot_detect_gpu(I, templates, param)
 
 doubleIm = im2double(I);
 [hog, scales] = esvm_pyramid(doubleIm, param);
-padder = param.detect_pyramid_padding;
+% padder = param.detect_pyramid_padding;
 sbin = param.sbin;
 
 nTemplates =  numel(templates);
@@ -11,21 +11,19 @@ sz = cellfun(@(x) size(x), templates, 'UniformOutput',false);
 maxTemplateHeight = max(cellfun(@(x) x(1), sz));
 maxTemplateWidth = max(cellfun(@(x) x(2), sz));
 
-for level = 1:length(hog)
-    hog{level} = padarray(hog{level}, [padder padder 0], 0); % Convolution, same size
-end
+% for level = 1:length(hog)
+%     hog{level} = padarray(hog{level}, [padder padder 0], 0); % Convolution, same size
+% end
 
 minsizes = cellfun(@(x)min([size(x,1) size(x,2)]), hog);
-hog = hog(minsizes >= padder*2);
-scales = scales(minsizes >= padder*2);
+hog = hog(minsizes >= 10);
+scales = scales(minsizes >= 10);
 bbsAll = cell(length(hog),1);
 
 for level = length(hog):-1:1
   
   fhog = cudaFFTData(single(hog{level}), maxTemplateHeight, maxTemplateWidth);
-  HM = cudaConvFFTData(fhog,templates);
-
-
+  HM = cudaConvFFTData(fhog,templates, [8, 8, 4, 8]);
 
 %      for modelIdx = 1:nTemplates
 %        HM{modelIdx} = convnc(t.hog{level},flipTemplates{modelIdx},'valid');
@@ -43,12 +41,10 @@ for level = length(hog):-1:1
 
     [uus,vvs] = ind2sub(rmsizes{templateIdx}(1:2), idx);
 
-    o = bsxfun(@minus,[uus vvs] - padder, [sz{templateIdx}(1) sz{templateIdx}(2)] );
+%     o = bsxfun(@minus,[uus vvs] - padder, [sz{templateIdx}(1) sz{templateIdx}(2)] );
+    o = bsxfun(@minus,[uus vvs], [sz{templateIdx}(1) sz{templateIdx}(2)] );
 
-    bbs = ([o(:,2) o(:,1) o(:,2)+sz{templateIdx}(2) ...
-               o(:,1)+sz{templateIdx}(1)] ) * ...
-             sbin/scale + 1 + repmat([0 0 -1 -1],...
-              length(uus),1);
+    bbs = ([o(:,2) o(:,1) o(:,2)+sz{templateIdx}(2) o(:,1)+sz{templateIdx}(1)] ) * sbin/scale + 1 + repmat([0 0 -1 -1],length(uus),1);
 
     bbs(:,5:12) = 0;
 
