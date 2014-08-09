@@ -25,11 +25,11 @@ mkdir('Result',[CLASS '_' TYPE]);
 % n_cell_limit = [150];
 % lambda = [0.015];
 
-azs = 0:15:345
-els = 0 : 15 :30
-fovs = 25
-yaws = -45:15:45
-n_cell_limit = 150
+azs = 0:10:350
+els = 0 : 10 : 40
+fovs = [15, 30]
+yaws = -40:10:40
+n_cell_limit = 200
 lambda = 0.015
 
 visualize_detection = true;
@@ -65,8 +65,8 @@ if USE_GPU
 else
   templates = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
 end
-param = get_default_params(sbin, nlevel, detection_threshold);
 
+param = dwot_get_default_params(sbin, nlevel, detection_threshold);
 VOCinit;
 
 % load dataset
@@ -97,9 +97,9 @@ for imgIdx=1:N_IMAGE
     gt(imgIdx).diff=[recs(imgIdx).objects(clsinds).difficult];
     gt(imgIdx).det=false(length(clsinds),1);
     
-    if isempty(clsinds)
-      continue;
-    end
+%     if isempty(clsinds)
+%       continue;
+%     end
     
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
     imSz = size(im);
@@ -109,6 +109,8 @@ for imgIdx=1:N_IMAGE
     else
       [bbsNMS ] = dwot_detect( im, templates, param);
     end
+    fprintf(' time to convolution: %0.4f', toc(imgTic));
+        
     bbsNMS_clip = clip_to_image(bbsNMS, [1 1 imSz(2) imSz(1)]);
 
     nDet = size(bbsNMS_clip,1);
@@ -167,7 +169,7 @@ for imgIdx=1:N_IMAGE
       bbsNMS_clip(bbsIdx, 9) = ovmax;
     end
     
-    fprintf('time : %0.4f\n', toc(imgTic));
+    fprintf(' time : %0.4f\n', toc(imgTic));
 
     % if visualize
     if visualize_detection && ~isempty(clsinds)

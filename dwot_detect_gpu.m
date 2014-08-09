@@ -16,8 +16,8 @@ maxTemplateWidth = max(cellfun(@(x) x(2), sz));
 % end
 
 minsizes = cellfun(@(x)min([size(x,1) size(x,2)]), hog);
-hog = hog(minsizes >= 10);
-scales = scales(minsizes >= 10);
+hog = hog(minsizes >= param.min_hog_length);
+scales = scales(minsizes >= param.min_hog_length);
 bbsAll = cell(length(hog),1);
 
 for level = length(hog):-1:1
@@ -41,11 +41,12 @@ for level = length(hog):-1:1
 
     [uus,vvs] = ind2sub(rmsizes{templateIdx}(1:2), idx);
 
-%     o = bsxfun(@minus,[uus vvs] - padder, [sz{templateIdx}(1) sz{templateIdx}(2)] );
-    o = bsxfun(@minus,[uus vvs], [sz{templateIdx}(1) sz{templateIdx}(2)] );
-
-    bbs = ([o(:,2) o(:,1) o(:,2)+sz{templateIdx}(2) o(:,1)+sz{templateIdx}(1)] ) * sbin/scale + 1 + repmat([0 0 -1 -1],length(uus),1);
-
+    [y1, x1] = dwot_hog_to_img_fft(uus, vvs, sz{templateIdx}, sbin, scale);
+    [y2, x2] = dwot_hog_to_img_fft(uus + sz{templateIdx}(1), vvs + sz{templateIdx}(2), sz{templateIdx}, sbin, scale);
+    
+    bbs = zeros(numel(uus), 12);
+    bbs(:,1:4) = [x1 y1, x2, y2];
+    
     bbs(:,5:12) = 0;
 
     bbs(:,5) = scale;

@@ -1,4 +1,7 @@
 VOC_PATH = '/home/chrischoy/Dataset/VOCdevkit/';
+if ismac
+  VOC_PATH = '~/dataset/VOCdevkit/';
+end
 
 addpath('HoG');
 addpath('HoG/features');
@@ -8,8 +11,8 @@ addpath('../MatlabCUDAConv/');
 addpath(VOC_PATH);
 addpath([VOC_PATH, 'VOCcode']);
 
-USE_GPU = true;
-if USE_GPU
+COMPUTING_MODE = 0;
+if COMPUTING_MODE > 0
   gdevice = gpuDevice(1);
   reset(gdevice);
   cos(gpuArray(1));
@@ -58,15 +61,22 @@ else
 end
 
 renderings = cellfun(@(x) x.rendering, detectors, 'UniformOutput', false);
-if USE_GPU
+
+if COMPUTING_MODE == 1
   templates = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
-  % templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
+elseif COMPUTING_MODE == 2
+  templates = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
+  templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
 else
   templates = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
 end
-param = get_default_params(sbin, nlevel, detection_threshold);
 
+param = dwot_get_default_params(sbin, nlevel, detection_threshold);
+
+curDir = pwd;
+eval(['cd ' VOC_PATH]);
 VOCinit;
+eval(['cd ' curDir]);
 
 % load dataset
 [gtids,t]=textread(sprintf(VOCopts.imgsetpath,[CLASS '_' TYPE]),'%s %d');
@@ -102,14 +112,17 @@ for imgIdx=1:N_IMAGE
     
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
     imSz = size(im);
-    if USE_GPU
+    if COMPUTING_MODE == 1
       % [bbsNMS ] = dwot_detect_gpu_and_cpu( im, templates, templates_cpu, param);
       [bbsNMS, hog] = dwot_detect_gpu( im, templates, param);
+    elseif COMPUTING_MODE == 2
+      [bbsNMS, hog] = dwot_detect_combined( im, templates, templates_cpu, param);
     else
       [bbsNMS, hog] = dwot_detect( im, templates, param);
     end
     
 %     [hog_regions, im_regions] = dwot_extrac_region(im, bbsNMS, param);
+    fprintf(' time to convolution: %0.4f', toc(imgTic));
     
     bbsNMS_clip = clip_to_image(bbsNMS, [1 1 imSz(2) imSz(1)]);
 
@@ -168,7 +181,7 @@ for imgIdx=1:N_IMAGE
       bbsNMS(bbsIdx, 9) = ovmax;
       bbsNMS_clip(bbsIdx, 9) = ovmax;
     end
-    fprintf('time : %0.4f\n', toc(imgTic));
+    fprintf(' time : %0.4f\n', toc(imgTic));
 
     % if visualize
     if visualize_detection && ~isempty(clsinds)

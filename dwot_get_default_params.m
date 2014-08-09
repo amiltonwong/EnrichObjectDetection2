@@ -56,7 +56,7 @@ default_params.nms_threshold = 0.5;
 default_params.detect_pyramid_padding = 5;
 
 % minimum image hog length that we use for convolution
-param.min_hog_length = 10;
+default_params.min_hog_length = 10;
 
 %The maximum scale to consdider in the feature pyramid
 default_params.detect_max_scale = 1.0;

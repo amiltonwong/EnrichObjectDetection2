@@ -1,9 +1,13 @@
-function [bbsNMS] = dwot_detect_gpu_and_cpu(I, templates_gpu, templates_cpu, param)
+function [bbsNMS, hog, scales] = dwot_detect_combined(I, templates_gpu, templates_cpu, param)
 
 doubleIm = im2double(I);
 [hog, scales] = esvm_pyramid(doubleIm, param);
 padder = param.detect_pyramid_padding;
 sbin = param.sbin;
+
+if ~isfield(param, 'use_cpu_threshold')
+  param.use_cpu_threshold = 10;
+end
 
 nTemplates =  numel(templates_gpu);
 
@@ -11,21 +15,20 @@ sz = cellfun(@(x) size(x), templates_gpu, 'UniformOutput',false);
 maxTemplateHeight = max(cellfun(@(x) x(1), sz));
 maxTemplateWidth = max(cellfun(@(x) x(2), sz));
 
-for level = 1:length(hog)
-    hog{level} = padarray(hog{level}, [padder padder 0], 0); % Convolution, same size
-end
-
 minsizes = cellfun(@(x)min([size(x,1) size(x,2)]), hog);
 hog = hog(minsizes >= padder*2);
 scales = scales(minsizes >= padder*2);
 bbsAll = cell(length(hog),1);
 
 for level = length(hog):-1:1
-  if level > length(hog)/2
+  % GPU
+  if level > param.use_cpu_threshold
     fhog = cudaFFTData(single(hog{level}), maxTemplateHeight, maxTemplateWidth);
     HM = cudaConvFFTData(fhog,templates_gpu, [8, 8, 8, 16]);
+  % CPU
   else
-    HM = fconvblasfloat(single(hog{level}), templates_cpu, 1, nTemplates);
+    hog{level} = padarray(single(hog{level}), [padder padder 0], 0); % Convolution, same size
+    HM = fconvblasfloat(hog{level}, templates_cpu, 1, nTemplates);
   end
 
   rmsizes = cellfun(@(x) size(x), HM, 'UniformOutput',false);
@@ -40,14 +43,18 @@ for level = length(hog):-1:1
 
     [uus,vvs] = ind2sub(rmsizes{templateIdx}(1:2), idx);
 
-    o = bsxfun(@minus,[uus vvs] - padder, [sz{templateIdx}(1) sz{templateIdx}(2)] );
+    % GPU
+    if level > param.use_cpu_threshold
+      [y1, x1] = dwot_hog_to_img_fft(uus, vvs, sz{templateIdx}, sbin, scale);
+      [y2, x2] = dwot_hog_to_img_fft(uus + sz{templateIdx}(1), vvs + sz{templateIdx}(2), sz{templateIdx}, sbin, scale);
+    % CPU
+    else
+      [y1, x1] = dwot_hog_to_img_conv(uus, vvs, sbin, scale, padder);
+      [y2, x2] = dwot_hog_to_img_conv(uus + sz{templateIdx}(1), vvs + sz{templateIdx}(2), sbin, scale, padder);
+    end
 
-    bbs = ([o(:,2) o(:,1) o(:,2)+sz{templateIdx}(2) ...
-               o(:,1)+sz{templateIdx}(1)] ) * ...
-             sbin/scale + 1 + repmat([0 0 -1 -1],...
-              length(uus),1);
-
-    bbs(:,5:12) = 0;
+    bbs = zeros(numel(uus), 12);
+    bbs(:,1:4) = [x1 y1, x2, y2];
 
     bbs(:,5) = scale;
     bbs(:,6) = level;

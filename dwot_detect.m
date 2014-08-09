@@ -37,12 +37,19 @@ for level = length(hog):-1:1
 
     [uus,vvs] = ind2sub(rmsizes{templateIdx}(1:2), idx);
 
-    o = [uus vvs] - padder;
-
-    bbs = ([o(:,2) o(:,1) o(:,2)+sz{templateIdx}(2) ...
-               o(:,1)+sz{templateIdx}(1)] - 1) * ...
-             sbin/scale + 1 + repmat([0 0 -1 -1],...
-              length(uus),1);
+    [y1, x1] = dwot_hog_to_img_conv(uus, vvs, sbin, scale, padder);
+    [y2, x2] = dwot_hog_to_img_conv(uus + sz{templateIdx}(1), vvs + sz{templateIdx}(2), sbin, scale, padder);
+    
+    bbs = zeros(numel(uus), 12);
+    bbs(:,1:4) = [x1 y1, x2, y2];
+    
+    bbs(:,5:12) = 0;
+%     o = [uus vvs] - padder;
+% 
+%     bbs = ([o(:,2) o(:,1) o(:,2)+sz{templateIdx}(2) ...
+%                o(:,1)+sz{templateIdx}(1)] - 1) * ...
+%              sbin/scale + 1 + repmat([0 0 -1 -1],...
+%               length(uus),1);
 
     bbs(:,5:12) = 0;
 

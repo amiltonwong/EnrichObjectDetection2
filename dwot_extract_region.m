@@ -4,11 +4,11 @@ function [hog_region, im_region]= dwot_extract_region(im, bbsNMS, param)
 % im_region : 
 
 % Padded Region
-%  ┌─────────────────────
+%  -------------------
 %  | offset x, y
-%  | ↘
-%  |   ┌─── Actual image and hog region start
-%  |   |
+%  | 
+%  |  ----- Actual image and hog region start
+%  |  |
 % To prevent unnecessary 
 
 if isfield(param,'extraction_padding')
