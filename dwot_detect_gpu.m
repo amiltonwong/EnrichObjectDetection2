@@ -18,7 +18,7 @@ bbsAll = cell(length(hog),1);
 for level = length(hog):-1:1
   
   fhog = cudaFFTData(single(hog{level}), maxTemplateHeight, maxTemplateWidth);
-  HM = cudaConvFFTData(fhog,templates, [8, 8, 4, 8]);
+  HM = cudaConvFFTData(fhog,templates, param.cuda_conv_n_threads);
 
 %      for modelIdx = 1:nTemplates
 %        HM{modelIdx} = convnc(t.hog{level},flipTemplates{modelIdx},'valid');

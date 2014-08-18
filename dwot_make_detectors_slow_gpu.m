@@ -1,7 +1,5 @@
 function [detectors, detector_name]= dwot_make_detectors_slow_gpu(mesh_path, azs, els, yaws, fovs, param, visualize)
 
-Mu            = param.hog_mu;
-Gamma         = param.hog_gamma;
 n_cell_limit  = param.n_cell_limit;
 lambda        = param.lambda;
 
@@ -38,10 +36,6 @@ else
     error('fail to load model');
   end
   
-  scrambleKernel                  = parallel.gpu.CUDAKernel([param.scramble_gamma_to_sigma_file '.ptx'],[param.scramble_gamma_to_sigma_file '.cu']);
-  scrambleKernel.ThreadBlockSize  = [param.N_THREAD_H , param.N_THREAD_W , 1];
-
-  
   i = 1;
   detectors = cell(1,numel(azs) * numel(els) * numel(fovs));
   try
@@ -59,7 +53,7 @@ else
             im = renderer.renderCrop();
             % [ WHOTemplate, HOGTemplate] = WHOTemplateDecompNonEmptyCell( im, Mu, Gamma, n_cell_limit, lambda, 50);
             % [ WHOTemplate, HOGTemplate] = WHOTemplateCG( im, Mu, Gamma, n_cell_limit, lambda, 50, 1.5, 10^-3, 100);
-            [WHOTemplate, HOGTemplate] = WHOTemplateCG_GPU( im, scrambleKernel, param);
+            [WHOTemplate, HOGTemplate] = WHOTemplateCG_GPU( im, param);
             toc;
 
             detectors{i}.whow = WHOTemplate;

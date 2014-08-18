@@ -1,5 +1,8 @@
-function [detectors, detector_name]= dwot_mcmc_proposal_region(Mu, Gamma, mesh_path, azs, els, yaws, fovs, n_cell_limit, lambda, visualize)
+function [detectors, detector_name]= dwot_mcmc_proposal_region(im, hog, scale, hog_region_pyramid, param, visualize)
 
+if nargin < 6
+  visualize = false;
+end
 mesh_name = strrep(mesh_path, '/', '_');
 
 detector_name = sprintf('%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...

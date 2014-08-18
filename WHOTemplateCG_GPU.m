@@ -1,4 +1,4 @@
-function [ WHOTemplate_CG, HOGTemplate, r_hist, residual] = WHOTemplateCG_GPU(im, scrambleKernel, param)
+function [ WHOTemplate_CG, HOGTemplate, r_hist, residual] = WHOTemplateCG_GPU(im, param)
   % ( im, scrambleKernel, Mu, Gamma_GPU, gammaDim, n_cell_limit, lambda, padding, hog_cell_threshold, CG_THREASHOLD, CG_MAX_ITER, N_THREAD_H, N_THREAD_W)
 %WHOTEMPLATEDECOMP Summary of this function goes here
 %   Detailed explanation goes here
@@ -77,13 +77,13 @@ n_non_empty_cells = int32(numel(nonEmptyRows));
 
 sigmaDim = n_non_empty_cells * HOGDim;
 SigmaGPU = zeros(sigmaDim, sigmaDim, 'single', 'gpuArray');
-scrambleKernel.GridSize = [ceil(double(sigmaDim)/param.N_THREAD_W ), ceil(double(sigmaDim)/param.N_THREAD_H ), 1];
+param.scramble_kernel.GridSize = [ceil(double(sigmaDim)/param.N_THREAD_W ), ceil(double(sigmaDim)/param.N_THREAD_H ), 1];
 
 
 nonEmptyRowsGPU = gpuArray(nonEmptyRows - 1);
 nonEmptyColsGPU = gpuArray(nonEmptyCols - 1);
 
-AGPU = feval(scrambleKernel, SigmaGPU, Gamma_GPU, single(lambda), nonEmptyRowsGPU, nonEmptyColsGPU, gammaDim, HOGDim, n_non_empty_cells);
+AGPU = feval(param.scramble_kernel, SigmaGPU, Gamma_GPU, single(lambda), nonEmptyRowsGPU, nonEmptyColsGPU, gammaDim(1), HOGDim, n_non_empty_cells);
   
 muSwapDim = permute(Mu,[2 3 1]);
 centeredHOG = bsxfun(@minus, HOGTemplate, muSwapDim);

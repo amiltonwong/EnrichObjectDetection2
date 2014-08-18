@@ -18,6 +18,13 @@ COMPUTING_MODE = 1;
 CLASS = 'bicycle';
 TYPE = 'val';
 mkdir('Result',[CLASS '_' TYPE]);
+
+if COMPUTING_MODE > 0
+  gdevice = gpuDevice(1);
+  reset(gdevice);
+  cos(gpuArray(1));
+end
+
 azs = 0:45:315; % azs = [azs , azs - 10, azs + 10];
 els = 0:20:20;
 fovs = [25];
@@ -44,37 +51,7 @@ detection_threshold = 120;
 model_file = 'Mesh/Bicycle/road_bike';
 model_name = strrep(model_file, '/', '_');
 
-load('Statistics/sumGamma_N1_40_N2_40_sbin_4_nLevel_10_nImg_1601_napoli1_gamma.mat');
-
-param                 = dwot_get_default_params(sbin, nlevel, detection_threshold);
-param.hog_mu          = mu;
-param.hog_gamma       = Gamma;
-param.hog_gamma_gpu   = gpuArray(single(Gamma));
-param.hog_gamma_dim   = size(Gamma);
-param.scramble_gamma_to_sigma_file = 'scrambleGammaToSigma';
-% param.scramble_kernel = scrambleKernel;
-
-param.image_padding       = 50;
-param.lambda              = lambda;
-param.n_level_per_octave  = nlevel;
-param.detection_threshold = detection_threshold;
-param.n_cell_limit        = n_cell_limit;
-param.class               = CLASS;
-param.type                = TYPE;
-param.hog_cell_threshold  = 1.5;
-
-param.N_THREAD_H = 32;
-param.N_THREAD_W = 32;
-
-param.cg_threshold        = 10^-3;
-param.cg_max_iter         = 60;
-
-param.computing_mode = COMPUTING_MODE;
-if COMPUTING_MODE > 0
-  gdevice = gpuDevice(1);
-  reset(gdevice);
-  cos(gpuArray(1));
-end
+dwot_get_default_params;
 
 detector_name = sprintf('%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
     model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
@@ -148,6 +125,7 @@ for imgIdx=5:N_IMAGE
     if COMPUTING_MODE == 0
       [bbsNMS, hog, scales] = dwot_detect( im, templates, param);
       [hog_region_pyramid, im_region] = dwot_extract_region_conv(im, hog, scales, bbsNMS, param);
+      [bbsNMS_MCMC] = dwot_mcmc_proposal_region(im, hog, scale, hog_region_pyramid, param);
     elseif COMPUTING_MODE == 1
       % [bbsNMS ] = dwot_detect_gpu_and_cpu( im, templates, templates_cpu, param);
       [bbsNMS, hog, scales] = dwot_detect_gpu( im, templates, param);

@@ -11,40 +11,46 @@ addpath('../MatlabCUDAConv/');
 addpath(VOC_PATH);
 addpath([VOC_PATH, 'VOCcode']);
 
-USE_GPU = true;
-if USE_GPU
+COMPUTING_MODE = 1;
+CLASS = 'bicycle';
+TYPE = 'val';
+mkdir('Result',[CLASS '_' TYPE]);
+
+if COMPUTING_MODE > 0
   gdevice = gpuDevice(1);
   reset(gdevice);
   cos(gpuArray(1));
 end
 
-CLASS = 'bicycle';
-TYPE = 'val';
-mkdir('Result',[CLASS '_' TYPE]);
-% azs = 0:45:315; % azs = [azs , azs - 10, azs + 10];
-% els = 0:30:30;
-% fovs = [15, 45];
-% yaws = [-30:30:30];
-% n_cell_limit = [110];
-% lambda = [0.015];
+azs = 0:45:315; % azs = [azs , azs - 10, azs + 10];
+els = 0:30:30;
+fovs = [15, 45];
+yaws = [-30:30:30];
+n_cell_limit = [110];
+lambda = [0.015];
 
-azs = 0:10:350
-els = 0 : 10 : 40
-fovs = [15, 45]
-yaws = -40:10:40
-n_cell_limit = 200
-lambda = 0.015
+% azs = 0:10:350
+% els = 0 : 10 : 40
+% fovs = [15, 45]
+% yaws = -40:10:40
+% n_cell_limit = 130
+% lambda = 0.015
 
 visualize_detection = true;
 visualize_detector = false;
 % visualize = false;
 
 sbin = 4;
-nlevel = 10;
+nLevel = 10;
 detection_threshold = 120;
 
 model_file = 'Mesh/Bicycle/road_bike';
 model_name = strrep(model_file, '/', '_');
+
+
+%%%%%%%%%%%%%%% Set Parameters %%%%%%%%%%%%
+dwot_get_default_params;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 detector_name = sprintf('%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
     model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
@@ -52,8 +58,7 @@ detector_name = sprintf('%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
 if exist(detector_name,'file')
   load(detector_name);
 else
-  load('Statistics/sumGamma_N1_40_N2_40_sbin_4_nLevel_10_nImg_1601_napoli1_gamma.mat');
-  detectors = dwot_make_detectors_slow_gpu(mu, Gamma, [model_file '.3ds'], azs, els, yaws, fovs, n_cell_limit, lambda, visualize_detector);
+  detectors = dwot_make_detectors_slow_gpu([model_file '.3ds'], azs, els, yaws, fovs, param, visualize_detector);
   if sum(cellfun(@(x) isempty(x), detectors))
     error('Detector Not Completed');
   end
@@ -62,14 +67,19 @@ end
 
 renderings = cellfun(@(x) x.rendering, detectors, 'UniformOutput', false);
 
-if USE_GPU
-  templates = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
-  % templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
-else
+if COMPUTING_MODE == 0
+  % for CPU convolution, use fconvblas which handles template inversion
   templates = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
+elseif COMPUTING_MODE == 1
+  % for GPU convolution, invert template
+  templates_gpu = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
+elseif COMPUTING_MODE == 2
+  templates_gpu = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
+  templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
+else
+  error('Computing mode undefined');
 end
 
-param = dwot_get_default_params(sbin, nlevel, detection_threshold);
 curDir = pwd;
 eval(['cd ' VOC_PATH]);
 VOCinit;
@@ -110,11 +120,18 @@ for imgIdx=1:N_IMAGE
     
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
     imSz = size(im);
-    if USE_GPU
+    if COMPUTING_MODE == 0
+      [bbsNMS, hog, scales] = dwot_detect( im, templates, param);
+%       [hog_region_pyramid, im_region] = dwot_extract_region_conv(im, hog, scales, bbsNMS, param);
+%       [bbsNMS_MCMC] = dwot_mcmc_proposal_region(im, hog, scale, hog_region_pyramid, param);
+    elseif COMPUTING_MODE == 1
       % [bbsNMS ] = dwot_detect_gpu_and_cpu( im, templates, templates_cpu, param);
-      [bbsNMS ] = dwot_detect_gpu( im, templates, param);
+      [bbsNMS, hog, scales] = dwot_detect_gpu( im, templates_gpu, param);
+%       [hog_region_pyramid, im_region] = dwot_extract_region_fft(im, hog, scales, bbsNMS, param);
+    elseif COMPUTING_MODE == 2
+      [bbsNMS, hog, scales] = dwot_detect_combined( im, templates_gpu, templates_cpu, param);
     else
-      [bbsNMS ] = dwot_detect( im, templates, param);
+      error('Computing Mode Undefined');
     end
     fprintf(' time to convolution: %0.4f', toc(imgTic));
         
