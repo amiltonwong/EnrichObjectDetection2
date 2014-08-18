@@ -77,6 +77,8 @@ n_non_empty_cells = int32(numel(nonEmptyRows));
 
 sigmaDim = n_non_empty_cells * HOGDim;
 SigmaGPU = zeros(sigmaDim, sigmaDim, 'single', 'gpuArray');
+scrambleKernel.GridSize = [ceil(double(sigmaDim)/param.N_THREAD_W ), ceil(double(sigmaDim)/param.N_THREAD_H ), 1];
+
 
 nonEmptyRowsGPU = gpuArray(nonEmptyRows - 1);
 nonEmptyColsGPU = gpuArray(nonEmptyCols - 1);

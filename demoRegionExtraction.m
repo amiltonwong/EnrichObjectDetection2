@@ -51,7 +51,7 @@ param.hog_mu          = mu;
 param.hog_gamma       = Gamma;
 param.hog_gamma_gpu   = gpuArray(single(Gamma));
 param.hog_gamma_dim   = size(Gamma);
-param.scramble_gamma_to_sigma_file = './scrambleGammaToSigma';
+param.scramble_gamma_to_sigma_file = 'scrambleGammaToSigma';
 % param.scramble_kernel = scrambleKernel;
 
 param.image_padding       = 50;
