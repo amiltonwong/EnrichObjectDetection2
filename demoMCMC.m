@@ -14,23 +14,29 @@ addpath([VOC_PATH, 'VOCcode']);
 % Computing Mode  = 0, CPU
 %                 = 1, GPU
 %                 = 2, Combined
-COMPUTING_MODE = 1;
+COMPUTING_MODE = 0;
+if COMPUTING_MODE > 0
+  gdevice = gpuDevice(1);
+  reset(gdevice);
+  cos(gpuArray(1));
+end
+
 CLASS = 'bicycle';
 TYPE = 'val';
 mkdir('Result',[CLASS '_' TYPE]);
-azs = 0:45:315; % azs = [azs , azs - 10, azs + 10];
-els = 0:20:20;
-fovs = [25];
-yaws = [-10:10:10];
-n_cell_limit = [140];
-lambda = [0.015];
+% azs = 0:45:315; % azs = [azs , azs - 10, azs + 10];
+% els = 0:20:20;
+% fovs = [25];
+% yaws = ismac * 180 + [-10:10:10];
+% n_cell_limit = [150];
+% lambda = [0.015];
 
-% azs = 0:15:345
-% els = 0 : 15 :30
-% fovs = 25
-% yaws = -45:15:45
-% n_cell_limit = 150
-% lambda = 0.015
+azs = 0:15:345
+els = 0 : 15 :30
+fovs = 25
+yaws = -45:15:45
+n_cell_limit = 150
+lambda = 0.015
 
 visualize_detection = true;
 visualize_detector = false;
@@ -40,41 +46,8 @@ sbin = 4;
 nlevel = 10;
 detection_threshold = 120;
 
-
 model_file = 'Mesh/Bicycle/road_bike';
 model_name = strrep(model_file, '/', '_');
-
-load('Statistics/sumGamma_N1_40_N2_40_sbin_4_nLevel_10_nImg_1601_napoli1_gamma.mat');
-
-param                 = dwot_get_default_params(sbin, nlevel, detection_threshold);
-param.hog_mu          = mu;
-param.hog_gamma       = Gamma;
-param.hog_gamma_gpu   = gpuArray(single(Gamma));
-param.hog_gamma_dim   = size(Gamma);
-param.scramble_gamma_to_sigma_file = './scrambleGammaToSigma';
-% param.scramble_kernel = scrambleKernel;
-
-param.image_padding       = 50;
-param.lambda              = lambda;
-param.n_level_per_octave  = nlevel;
-param.detection_threshold = detection_threshold;
-param.n_cell_limit        = n_cell_limit;
-param.class               = CLASS;
-param.type                = TYPE;
-param.hog_cell_threshold  = 1.5;
-
-param.N_THREAD_H = 32;
-param.N_THREAD_W = 32;
-
-param.cg_threshold        = 10^-3;
-param.cg_max_iter         = 60;
-
-param.computing_mode = COMPUTING_MODE;
-if COMPUTING_MODE > 0
-  gdevice = gpuDevice(1);
-  reset(gdevice);
-  cos(gpuArray(1));
-end
 
 detector_name = sprintf('%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
     model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
@@ -82,7 +55,8 @@ detector_name = sprintf('%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
 if exist(detector_name,'file')
   load(detector_name);
 else
-  detectors = dwot_make_detectors_slow_gpu([model_file '.3ds'], azs, els, yaws, fovs, param, visualize_detector);
+  load('Statistics/sumGamma_N1_40_N2_40_sbin_4_nLevel_10_nImg_1601_napoli1_gamma.mat');
+  detectors = dwot_make_detectors_slow_gpu(mu, Gamma, [model_file '.3ds'], azs, els, yaws, fovs, n_cell_limit, lambda, visualize_detector);
   if sum(cellfun(@(x) isempty(x), detectors))
     error('Detector Not Completed');
   end
@@ -90,22 +64,23 @@ else
 end
 
 
-% For Debuggin purpose only
-param.detectors           = detectors;
-param.detect_pyramid_padding = 10;
 
 renderings = cellfun(@(x) x.rendering, detectors, 'UniformOutput', false);
 
-if COMPUTING_MODE == 0
-  templates = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
-elseif COMPUTING_MODE == 1
-  templates = cellfun(@(x) (single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
+if COMPUTING_MODE == 1
+  templates = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
 elseif COMPUTING_MODE == 2
   templates = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
   templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
 else
-  error('Computing mode undefined');
+  templates = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
 end
+
+param = dwot_get_default_params(sbin, nlevel, detection_threshold);
+
+% For Debuggin purpose only
+param.detectors = detectors;
+param.detect_pyramid_padding = 10;
 
 curDir = pwd;
 eval(['cd ' VOC_PATH]);
@@ -127,6 +102,7 @@ detScore = cell(1,N_IMAGE);
 detectorId = cell(1,N_IMAGE);
 detIdx = 0;
 
+
 gt(length(gtids))=struct('BB',[],'diff',[],'det',[]);
 for imgIdx=5:N_IMAGE
     fprintf('%d/%d ',imgIdx,N_IMAGE);
@@ -145,17 +121,14 @@ for imgIdx=5:N_IMAGE
     
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
     imSz = size(im);
-    if COMPUTING_MODE == 0
-      [bbsNMS, hog, scales] = dwot_detect( im, templates, param);
-      [hog_region_pyramid, im_region] = dwot_extract_region_conv(im, hog, scales, bbsNMS, param);
-    elseif COMPUTING_MODE == 1
+    if COMPUTING_MODE == 1
       % [bbsNMS ] = dwot_detect_gpu_and_cpu( im, templates, templates_cpu, param);
       [bbsNMS, hog, scales] = dwot_detect_gpu( im, templates, param);
-      [hog_region_pyramid, im_region] = dwot_extract_region_fft(im, hog, scales, bbsNMS, param);
     elseif COMPUTING_MODE == 2
       [bbsNMS, hog, scales] = dwot_detect_combined( im, templates, templates_cpu, param);
     else
-      error('Computing Mode Undefined');
+      [bbsNMS, hog, scales] = dwot_detect( im, templates, param);
+      [hog_region_pyramid, im_region] = dwot_extract_region_conv(im, hog, scales, bbsNMS, param);
     end
     
 %     [hog_regions, im_regions] = dwot_extrac_region(im, bbsNMS, param);

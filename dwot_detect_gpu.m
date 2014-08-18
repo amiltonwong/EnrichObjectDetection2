@@ -2,7 +2,6 @@ function [bbsNMS, hog, scales] = dwot_detect_gpu(I, templates, param)
 
 doubleIm = im2double(I);
 [hog, scales] = esvm_pyramid(doubleIm, param);
-% padder = param.detect_pyramid_padding;
 sbin = param.sbin;
 
 nTemplates =  numel(templates);
@@ -10,10 +9,6 @@ nTemplates =  numel(templates);
 sz = cellfun(@(x) size(x), templates, 'UniformOutput',false);
 maxTemplateHeight = max(cellfun(@(x) x(1), sz));
 maxTemplateWidth = max(cellfun(@(x) x(2), sz));
-
-% for level = 1:length(hog)
-%     hog{level} = padarray(hog{level}, [padder padder 0], 0); % Convolution, same size
-% end
 
 minsizes = cellfun(@(x)min([size(x,1) size(x,2)]), hog);
 hog = hog(minsizes >= param.min_hog_length);
@@ -46,14 +41,14 @@ for level = length(hog):-1:1
     
     bbs = zeros(numel(uus), 12);
     bbs(:,1:4) = [x1 y1, x2, y2];
-    
-    bbs(:,5:12) = 0;
-
     bbs(:,5) = scale;
     bbs(:,6) = level;
     bbs(:,7) = uus;
     bbs(:,8) = vvs;
 
+    % bbs(:,9) is designated for overlap
+    % bbs(:,10) is designated for viewpoint
+    
     % bbs(:,9) = boxoverlap(bbs, annotation.bbox + [0 0 annotation.bbox(1:2)]);
     % bbs(:,10) = abs(detectors{templateIdx}.az - azGT) < 30;
 

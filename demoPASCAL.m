@@ -1,4 +1,7 @@
 VOC_PATH = '/home/chrischoy/Dataset/VOCdevkit/';
+if ismac
+  VOC_PATH = '~/dataset/VOCdevkit/';
+end
 
 addpath('HoG');
 addpath('HoG/features');
@@ -19,15 +22,15 @@ CLASS = 'bicycle';
 TYPE = 'val';
 mkdir('Result',[CLASS '_' TYPE]);
 % azs = 0:45:315; % azs = [azs , azs - 10, azs + 10];
-% els = 0:20:20;
-% fovs = [25];
-% yaws = ismac * 180 + [-10:10:10];
-% n_cell_limit = [150];
+% els = 0:30:30;
+% fovs = [15, 45];
+% yaws = [-30:30:30];
+% n_cell_limit = [110];
 % lambda = [0.015];
 
 azs = 0:10:350
 els = 0 : 10 : 40
-fovs = [15, 30]
+fovs = [15, 45]
 yaws = -40:10:40
 n_cell_limit = 200
 lambda = 0.015
@@ -67,13 +70,17 @@ else
 end
 
 param = dwot_get_default_params(sbin, nlevel, detection_threshold);
+curDir = pwd;
+eval(['cd ' VOC_PATH]);
 VOCinit;
+eval(['cd ' curDir]);
+
 
 % load dataset
 [gtids,t] = textread(sprintf(VOCopts.imgsetpath,[CLASS '_' TYPE]),'%s %d');
 
 N_IMAGE = length(gtids);
-
+N_IMAGE = 500;
 % extract ground truth objects
 npos = 0;
 tp = cell(1,N_IMAGE);
@@ -177,11 +184,11 @@ for imgIdx=1:N_IMAGE
       
       disp('Press any button to continue');
       
-      save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.jpg',...
-        CLASS,TYPE,model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
-      print('-djpeg','-r100',['Result/' CLASS '_' TYPE '/' save_name])
+%       save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.jpg',...
+%         CLASS,TYPE,model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
+%       print('-djpeg','-r100',['Result/' CLASS '_' TYPE '/' save_name])
       
-%       waitforbuttonpress;
+      % waitforbuttonpress;
     end
       
     npos=npos+sum(~gt(imgIdx).diff);

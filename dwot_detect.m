@@ -2,23 +2,20 @@ function [bbsNMS, hog, scales] = dwot_detect(I, templates, param)
 
 doubleIm = im2double(I);
 [hog, scales] = esvm_pyramid(doubleIm, param);
-padder = param.detect_pyramid_padding;
+hogPadder = param.detect_pyramid_padding;
 sbin = param.sbin;
 
 nTemplates =  numel(templates);
 sz = cellfun(@(x) size(x), templates, 'UniformOutput',false);
 
-for level = 1:length(hog)
-    hog{level} = padarray(hog{level}, [padder padder 0], 0); % Convolution, same size
-end
-
 minsizes = cellfun(@(x)min([size(x,1) size(x,2)]), hog);
-hog = hog(minsizes >= padder*2);
-scales = scales(minsizes >= padder*2);
+hog = hog(minsizes >= hogPadder*2);
+scales = scales(minsizes >= hogPadder*2);
 bbsAll = cell(length(hog),1);
 
 for level = length(hog):-1:1
-  HM = fconvblasfloat(single(hog{level}), templates, 1, nTemplates);
+  hog{level} = padarray(single(hog{level}), [hogPadder hogPadder 0], 0); % Convolution, same size
+  HM = fconvblasfloat(hog{level}, templates, 1, nTemplates);
 
 %      for modelIdx = 1:nTemplates
 %        HM{modelIdx} = convnc(t.hog{level},flipTemplates{modelIdx},'valid');
@@ -37,27 +34,28 @@ for level = length(hog):-1:1
 
     [uus,vvs] = ind2sub(rmsizes{templateIdx}(1:2), idx);
 
-    [y1, x1] = dwot_hog_to_img_conv(uus, vvs, sbin, scale, padder);
-    [y2, x2] = dwot_hog_to_img_conv(uus + sz{templateIdx}(1), vvs + sz{templateIdx}(2), sbin, scale, padder);
+    [y1, x1] = dwot_hog_to_img_conv(uus, vvs, sbin, scale, hogPadder);
+    [y2, x2] = dwot_hog_to_img_conv(uus + sz{templateIdx}(1), vvs + sz{templateIdx}(2), sbin, scale, hogPadder);
     
     bbs = zeros(numel(uus), 12);
     bbs(:,1:4) = [x1 y1, x2, y2];
     
-    bbs(:,5:12) = 0;
-%     o = [uus vvs] - padder;
+%     o = [uus vvs] - hogPadder;
 % 
 %     bbs = ([o(:,2) o(:,1) o(:,2)+sz{templateIdx}(2) ...
 %                o(:,1)+sz{templateIdx}(1)] - 1) * ...
 %              sbin/scale + 1 + repmat([0 0 -1 -1],...
 %               length(uus),1);
-
-    bbs(:,5:12) = 0;
+%     bbs(:,5:12) = 0;
 
     bbs(:,5) = scale;
     bbs(:,6) = level;
     bbs(:,7) = uus;
     bbs(:,8) = vvs;
 
+    % bbs(:,9) is designated for overlap
+    % bbs(:,10) is designated for viewpoint
+    
     % bbs(:,9) = boxoverlap(bbs, annotation.bbox + [0 0 annotation.bbox(1:2)]);
     % bbs(:,10) = abs(detectors{templateIdx}.az - azGT) < 30;
 
