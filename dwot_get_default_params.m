@@ -7,7 +7,7 @@ param.sbin = sbin;
 %Levels-per-octave defines how many levels between 2x sizes in pyramid
 %(denser pyramids will have more windows and thus be slower for
 %detection/training)
-param.detect_levels_per_octave = nLevel;
+param.detect_levels_per_octave = n_level;
 
 %By default dont save feature vectors of detections (training turns
 %this on automatically)
@@ -27,6 +27,8 @@ param.detect_levels_per_octave = nLevel;
 %too many redundant windows [defaults to 0.5]
 %NOTE: mining is much faster if this is turned off!
 param.nms_threshold = 0.5;
+
+param.min_overlap = 0.5;
 
 %How much we pad the pyramid (to let detections fall outside the image)
 param.detect_pyramid_padding = 5;
@@ -68,32 +70,33 @@ init_params.sbin = sbin;
 
 param.init_params = init_params;
 
+%% WHO setting
+param.image_padding       = 50;
+param.lambda              = lambda;
+param.n_level_per_octave  = n_level;
+param.detection_threshold = detection_threshold;
+param.n_cell_limit        = n_cell_limit;
+param.class               = CLASS;
+param.type                = TYPE;
+param.hog_cell_threshold  = 1.5;
+param.feature_dim         = 31;
 
+% Statistics
 stats = load('Statistics/sumGamma_N1_40_N2_40_sbin_4_nLevel_10_nImg_1601_napoli1_gamma.mat');
 
 param.hog_mu          = stats.mu;
 param.hog_gamma       = stats.Gamma;
 param.hog_gamma_gpu   = gpuArray(single(stats.Gamma));
 param.hog_gamma_dim   = size(stats.Gamma);
-param.scramble_gamma_to_sigma_file = './scrambleGammaToSigma';
-% param.scramble_kernel = scrambleKernel;
 
-param.image_padding       = 50;
-param.lambda              = lambda;
-param.n_level_per_octave  = nlevel;
-param.detection_threshold = detection_threshold;
-param.n_cell_limit        = n_cell_limit;
-param.class               = CLASS;
-param.type                = TYPE;
-param.hog_cell_threshold  = 1.5;
-
+%% CG setting
 param.N_THREAD_H = 32;
 param.N_THREAD_W = 32;
 
-if ~exist('scrambleGammaToSigma.ptx','file')
-    system('nvcc -ptx scrambleGammaToSigma.cu');
+param.scramble_gamma_to_sigma_file = './scrambleGammaToSigma';
+if ~exist([param.scramble_gamma_to_sigma_file  '.ptx'],'file')
+    system(['nvcc -ptx ' param.scramble_gamma_to_sigma_file '.cu']);
 end
-  
 scramble_kernel                  = parallel.gpu.CUDAKernel([param.scramble_gamma_to_sigma_file '.ptx'],[param.scramble_gamma_to_sigma_file '.cu']);
 scramble_kernel.ThreadBlockSize  = [param.N_THREAD_H , param.N_THREAD_W , 1];
 param.scramble_kernel = scramble_kernel;
@@ -104,8 +107,12 @@ param.cg_max_iter         = 60;
 param.computing_mode = COMPUTING_MODE;
 
 %% Region Extraction
-param.region_extraction_padding_ratio = 0.1;
+param.region_extraction_padding_ratio = 0.2;
+param.region_extraction_levels = 2;
+% MCMC Setting
+param.mcmc_max_iter = 50;
 
 %% Cuda Convolution Params
 % THREAD_PER_BLOCK_H, THREAD_PER_BLOCK_W, THREAD_PER_BLOCK_D, THREAD_PER_BLOCK_2D
 param.cuda_conv_n_threads = [8, 8, 4, 8];
+

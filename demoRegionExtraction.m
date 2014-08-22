@@ -29,37 +29,38 @@ azs = 0:45:315; % azs = [azs , azs - 10, azs + 10];
 els = 0:20:20;
 fovs = [25];
 yaws = [-10:10:10];
-n_cell_limit = [140];
+n_cell_limit = [190];
 lambda = [0.015];
 
-% azs = 0:15:345
-% els = 0 : 15 :30
-% fovs = 25
-% yaws = -45:15:45
-% n_cell_limit = 150
-% lambda = 0.015
+azs = 0:15:345
+els = 0 : 15 :30
+fovs = 25
+yaws = -45:15:45
+n_cell_limit = 190
+lambda = 0.015
 
 visualize_detection = true;
 visualize_detector = false;
 % visualize = false;
 
 sbin = 4;
-nlevel = 10;
+n_level = 10;
 detection_threshold = 120;
+n_proposals = 1;
 
-
-model_file = 'Mesh/Bicycle/road_bike';
-model_name = strrep(model_file, '/', '_');
+models_path = {'Mesh/Bicycle/road_bike'};
+models_name = cellfun(@(x) strrep(x, '/', '_'), models_path, 'UniformOutput', false);
 
 dwot_get_default_params;
+param.models_path = models_path;
 
-detector_name = sprintf('%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
-    model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
+detector_name = sprintf('%s_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
+    CLASS, numel(models_path), n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
 
 if exist(detector_name,'file')
   load(detector_name);
 else
-  detectors = dwot_make_detectors_slow_gpu([model_file '.3ds'], azs, els, yaws, fovs, param, visualize_detector);
+  detectors = dwot_make_detectors_slow_gpu([models_path{1} '.3ds'], azs, els, yaws, fovs, param, visualize_detector);
   if sum(cellfun(@(x) isempty(x), detectors))
     error('Detector Not Completed');
   end
@@ -68,8 +69,9 @@ end
 
 
 % For Debuggin purpose only
-param.detectors           = detectors;
+param.detectors              = detectors;
 param.detect_pyramid_padding = 10;
+param.gpu = gdevice;
 
 renderings = cellfun(@(x) x.rendering, detectors, 'UniformOutput', false);
 
@@ -90,7 +92,7 @@ VOCinit;
 eval(['cd ' curDir]);
 
 % load dataset
-[gtids,t]=textread(sprintf(VOCopts.imgsetpath,[CLASS '_' TYPE]),'%s %d');
+[gtids,t] = textread(sprintf(VOCopts.imgsetpath,[CLASS '_' TYPE]),'%s %d');
 
 N_IMAGE = length(gtids);
 
@@ -105,7 +107,9 @@ detectorId = cell(1,N_IMAGE);
 detIdx = 0;
 
 gt(length(gtids))=struct('BB',[],'diff',[],'det',[]);
-for imgIdx=5:N_IMAGE
+% 138
+% 256
+for imgIdx = 312:N_IMAGE
     fprintf('%d/%d ',imgIdx,N_IMAGE);
     imgTic = tic;
     % read annotation
@@ -124,29 +128,51 @@ for imgIdx=5:N_IMAGE
     imSz = size(im);
     if COMPUTING_MODE == 0
       [bbsNMS, hog, scales] = dwot_detect( im, templates, param);
-      [hog_region_pyramid, im_region] = dwot_extract_region_conv(im, hog, scales, bbsNMS, param);
-      [bbsNMS_MCMC] = dwot_mcmc_proposal_region(im, hog, scale, hog_region_pyramid, param);
+      % [hog_region_pyramid, im_region] = dwot_extract_region_conv(im, hog, scales, bbsNMS, param);
+      % [bbsNMS_MCMC] = dwot_mcmc_proposal_region(im, hog, scale, hog_region_pyramid, param);
     elseif COMPUTING_MODE == 1
       % [bbsNMS ] = dwot_detect_gpu_and_cpu( im, templates, templates_cpu, param);
       [bbsNMS, hog, scales] = dwot_detect_gpu( im, templates, param);
-      [hog_region_pyramid, im_region] = dwot_extract_region_fft(im, hog, scales, bbsNMS, param);
     elseif COMPUTING_MODE == 2
       [bbsNMS, hog, scales] = dwot_detect_combined( im, templates, templates_cpu, param);
     else
       error('Computing Mode Undefined');
     end
-    
-%     [hog_regions, im_regions] = dwot_extrac_region(im, bbsNMS, param);
     fprintf(' time to convolution: %0.4f', toc(imgTic));
     
     bbsNMS_clip = clip_to_image(bbsNMS, [1 1 imSz(2) imSz(1)]);
 
-    nDet = size(bbsNMS_clip,1);
-    tp{imgIdx} = zeros(1,nDet);
-    fp{imgIdx} = zeros(1,nDet);
+    if visualize_detection && ~isempty(clsinds)
+      figure(2);
+      dwot_draw_overlap_detection(im, bbsNMS_clip, renderings, n_proposals, 50, visualize_detection);
+      drawnow;
+      %  waitforbuttonpress;
+    end
+    n_mcmc = min(n_proposals, size(bbsNMS,1));
+    [hog_region_pyramid, im_region] = dwot_extract_hog(hog, scales, templates, bbsNMS(1:n_mcmc,:), param, im);
+    [best_proposals] = dwot_mcmc_proposal_region(hog_region_pyramid, im_region, detectors, param, im);
+    for proposal_idx = 1:n_mcmc
+      subplot(121);
+      dwot_draw_overlap_detection(im, bbsNMS_clip, renderings, n_mcmc, 50, true);
+      subplot(122);
+      dwot_draw_overlap_detection(im, best_proposals{proposal_idx}.image_bbox, best_proposals{proposal_idx}.rendering_image, n_mcmc, 50, true);
+      fprintf('press any button to continue\n');
+      waitforbuttonpress
+    end
     
-%     atp{imgIdx} = zeros(1,nDet);
-%     afp{imgIdx} = zeros(1,nDet);
+
+    bbsNMS_clip = clip_to_image(bbsNMS_clip, [1 1 imSz(2) imSz(1)]);
+    % dwot_bfgs_proposal_region(hog_region_pyramid, im_region, detectors, param); 
+    mcmc_score = cellfun(@(x) x.score, best_proposals);
+    mcmc_score ./ bbsNMS_clip(1:n_mcmc,end)'
+    bbsNMS_clip(1:n_mcmc,end) = mcmc_score';
+    
+    for region_idx = 1:n_mcmc
+      bbsNMS_clip(region_idx,1:4) = best_proposals{region_idx}.image_bbox;
+    end
+    
+    fprintf(' time to mcmc: %0.4f', toc(imgTic));
+    nDet = size(bbsNMS_clip,1);
 
     if nDet > 0
       detectorId{imgIdx} = bbsNMS_clip(:,11)';
@@ -156,59 +182,21 @@ for imgIdx=5:N_IMAGE
       detScore{imgIdx} = [];
     end
     
-    for bbsIdx = 1:nDet
-      ovmax=-inf;
-      
-      % search over all objects in the image
-      for j=1:size(gt(imgIdx).BB,2)
-          bbgt=gt(imgIdx).BB(:,j);
-          bi=[max(bbsNMS_clip(bbsIdx,1),bbgt(1)) ; max(bbsNMS_clip(bbsIdx,2),bbgt(2)) ; min(bbsNMS_clip(bbsIdx,3),bbgt(3)) ; min(bbsNMS_clip(bbsIdx,4),bbgt(4))];
-          iw=bi(3)-bi(1)+1;
-          ih=bi(4)-bi(2)+1;
-          if iw>0 && ih>0                
-              % compute overlap as area of intersection / area of union
-              ua=(bbsNMS_clip(bbsIdx,3)-bbsNMS_clip(bbsIdx,1)+1)*(bbsNMS_clip(bbsIdx,4)-bbsNMS_clip(bbsIdx,2)+1)+...
-                 (bbgt(3)-bbgt(1)+1)*(bbgt(4)-bbgt(2)+1)-...
-                 iw*ih;
-              ov=iw*ih/ua;
-              
-              if ov > ovmax
-                  ovmax = ov;
-                  jmax = j;
-              end
-          end
-      end
-      
-      % assign detection as true positive/don't care/false positive
-      if ovmax >= VOCopts.minoverlap
-          if ~gt(imgIdx).diff(jmax)
-              if ~gt(imgIdx).det(jmax)
-                  tp{imgIdx}(bbsIdx)=1;            % true positive
-                  gt(imgIdx).det(jmax)=true;
-              else
-                  fp{imgIdx}(bbsIdx)=1;            % false positive (multiple detection)
-              end
-          end
-      else
-          fp{imgIdx}(bbsIdx)=1;                    % false positive
-      end
-      
-      bbsNMS(bbsIdx, 9) = ovmax;
-      bbsNMS_clip(bbsIdx, 9) = ovmax;
-    end
+    [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, gt(imgIdx)] = dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
+    
     fprintf(' time : %0.4f\n', toc(imgTic));
 
     % if visualize
     if visualize_detection && ~isempty(clsinds)
-      dwot_draw_overlap_detection(im, bbsNMS, renderings, 5, 50, visualize_detection);
+      dwot_draw_overlap_detection(im, bbsNMS_clip, renderings, 5, 50, visualize_detection);
 
-      disp('Press any button to continue');
+      % disp('Press any button to continue');
       
       % save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.jpg',...
       %   CLASS,TYPE,model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
       % print('-djpeg','-r100',['Result/' CLASS '_' TYPE '/' save_name])
       
-      waitforbuttonpress;
+      % waitforbuttonpress;
     end
       
     npos = npos + sum(~gt(imgIdx).diff);
@@ -251,7 +239,7 @@ tit = sprintf('Average Precision = %.1f', 100*ap);
 title(tit);
 axis([0 1 0 1]);
 set(gcf,'color','w');
-save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.jpg',...
-        CLASS, TYPE, model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
+save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.png',...
+        CLASS, TYPE, models_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
 
 print('-dpng','-r150',['Result/' CLASS '_' TYPE '/' save_name])

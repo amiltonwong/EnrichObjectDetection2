@@ -1,4 +1,4 @@
-function [ WHOTemplate_CG, HOGTemplate, r_hist, residual] = WHOTemplateCG_GPU_const_active_cell( im, scrambleKernel, Mu, Gamma_GPU, gammaDim, n_cell_limit, lambda, padding, hog_cell_threshold, CG_THREASHOLD, CG_MAX_ITER, N_THREAD)
+function [ WHOTemplate_CG, HOGTemplate, residual] = WHOTemplateCG_GPU_const_active_cell( im, scrambleKernel, Mu, Gamma_GPU, gammaDim, n_cell_limit, lambda, padding, hog_cell_threshold, CG_THREASHOLD, CG_MAX_ITER, N_THREAD)
 %WHOTEMPLATEDECOMP Summary of this function goes here
 %   Detailed explanation goes here
 % Nrow = N1
@@ -112,6 +112,8 @@ WHOTemplate_CG(onlyNonEmptyIdx) = gather(x_min);
 WHOTemplate_CG =  reshape(WHOTemplate_CG,[HOGDim, wHeight, wWidth]);
 WHOTemplate_CG = permute(WHOTemplate_CG,[2,3,1]);
 
-if nargout > 3
+if nargout > 2
   residual = norm(b-AGPU*x);
 end
+
+clear r b d AGPU Ad nonEmptyHOGGPU SigmaGPU nonEmptyColsGPU nonEmptyRowsGPU x x_min r_hist r_min

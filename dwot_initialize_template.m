@@ -50,7 +50,7 @@ for i = 1:MAXLEVELS
   
   if (bndX(2) - bndX(1) + 1) * (bndY(2) - bndY(1) + 1) <= ncell
     curfeats = feat{i}(bndY(1):bndY(2),bndX(1):bndX(2),:);
-    fprintf(1,'initialized with HOG_size = [%d %d]\n',range(bndY) + 1, range(bndX) + 1);
+    % fprintf(1,'initialized with HOG_size = [%d %d]\n',range(bndY) + 1, range(bndX) + 1);
     return;
   end
 end

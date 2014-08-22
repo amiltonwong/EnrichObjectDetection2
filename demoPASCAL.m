@@ -41,7 +41,7 @@ visualize_detector = false;
 % visualize = false;
 
 sbin = 4;
-nLevel = 10;
+n_level = 10;
 detection_threshold = 120;
 
 model_file = 'Mesh/Bicycle/road_bike';

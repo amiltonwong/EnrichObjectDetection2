@@ -32,12 +32,12 @@ for level = length(hog):-1:1
       continue;
     end
 
-    [uus,vvs] = ind2sub(rmsizes{templateIdx}(1:2), idx);
+    [y_coord,x_coord] = ind2sub(rmsizes{templateIdx}(1:2), idx);
 
-    [y1, x1] = dwot_hog_to_img_conv(uus, vvs, sbin, scale, hogPadder);
-    [y2, x2] = dwot_hog_to_img_conv(uus + sz{templateIdx}(1), vvs + sz{templateIdx}(2), sbin, scale, hogPadder);
+    [y1, x1] = dwot_hog_to_img_conv(y_coord, x_coord, sbin, scale, hogPadder);
+    [y2, x2] = dwot_hog_to_img_conv(y_coord + sz{templateIdx}(1), x_coord + sz{templateIdx}(2), sbin, scale, hogPadder);
     
-    bbs = zeros(numel(uus), 12);
+    bbs = zeros(numel(y_coord), 12);
     bbs(:,1:4) = [x1 y1, x2, y2];
     
 %     o = [uus vvs] - hogPadder;
@@ -50,8 +50,8 @@ for level = length(hog):-1:1
 
     bbs(:,5) = scale;
     bbs(:,6) = level;
-    bbs(:,7) = uus;
-    bbs(:,8) = vvs;
+    bbs(:,7) = y_coord;
+    bbs(:,8) = x_coord;
 
     % bbs(:,9) is designated for overlap
     % bbs(:,10) is designated for viewpoint

@@ -14,7 +14,6 @@ function [hog_region_pyramid, im_region] = dwot_extract_region_fft(im, hog, scal
 % To prevent unnecessary 
 
 
-padder = param.detect_pyramid_padding;
 sbin = param.sbin;
 
 if isfield(param,'region_extraction_padding_ratio')
