@@ -1,6 +1,6 @@
-gpu = gpuDevice(1);
-reset(gpu);
-
+% gpu = gpuDevice(1);
+% reset(gpu);
+!rm cudaDecorrelateFeature.o
 % Run system command
 % Linux example
 if isunix && ~ismac
@@ -10,6 +10,7 @@ end
 
 % Mac error fix example
 if ismac
+  !rm cudaDecorrelateFeature.mexmaci64
   !nvcc -v -O3 -DNDEBUG  -gencode=arch=compute_30,code=sm_30 -Xcompiler -fPIC -I/Applications/MATLAB_R2014a.app/extern/include -I/Applications/MATLAB_R2014a.app/toolbox/distcomp/gpu/extern/include -c cudaDecorrelateFeature.cu
   % Use default cuda in MATLABROOT/bin/maci64/
   mex -v -largeArrayDims cudaDecorrelateFeature.o -I/usr/local/cuda/include -L/Applications/MATLAB_R2014a.app/bin/maci64  -lcudart -lcublas -lmwgpu

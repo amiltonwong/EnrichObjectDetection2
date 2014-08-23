@@ -7,24 +7,19 @@
 #include "cudaDecorrelateFeature.h"
 #include "cudaDecorrelateFeature.cuh"
 
-static bool debug = true;
-
-    /*
-        STAGE
-                1. Return host Scrambled Sigma
-                2. Return host 
-    */
+static bool debug = false;
 
 /*
-    prhs[0] = gpu_Gamma     single precision
-    prhs[1] = HOGTemplate   single precision
-    prhs[2] = nonEmptyRows  int32
-    prhs[3] = nonEmptyCols  int32
-    prhs[4] = lambda        double
-    prhs[5] = (optional) FEATURE_THRESHOLD
-    prhs[6] = (optional) CG_TOLERANCE
-    prhs[7] = (optional) CG_MAX_ITER
-    prhs[8] = (optional) thread size
+    int GAMMA_IN            = 0;
+    int CENTERED_TEMPLATE_IN= 1;
+    int NON_EMPTY_ROW_IN    = 2;
+    int NON_EMPTY_COL_IN    = 3;
+    int FEATURE_DIM_IN      = 4;
+    int LAMBDA_IN           = 5;
+    int FEATURE_THRESHOLD_IN= 6;   // Optional 
+    int CG_TOLERANCE_IN     = 7;   // Optional 
+    int CG_MAX_ITER_IN      = 8;   // Optional 
+    int THREAD_SIZE_IN      = 9;   // Optional 
 */
 ////////////////////////////////////////////////////////////////////////////////
 // Mex Entry
@@ -35,9 +30,8 @@ void mexFunction(int nlhs, mxArray *plhs[],
     char const * const errId = "cudaDecorrelateFeature:InvalidInput";
 
     float FEATURE_THRESHOLD = 1.5f;
-    float CG_TOLERANCE      = 0.001f;
+    float CG_TOLERANCE      = 0.01f;
     int CG_MAX_ITER         = 60;
-    int TEMPLATE_WIDTH, TEMPLATE_HEIGHT, FEATURE_DIM;
 
     /* Choose a reasonably sized number of threads for the block. */
     int THREAD_PER_BLOCK_H  = 16;
@@ -47,25 +41,25 @@ void mexFunction(int nlhs, mxArray *plhs[],
     int THREAD_PER_BLOCK_2D_W = 32;
 
     /* Initialize the MathWorks GPU API. */
-    mxInitGPU();
-    
-    int SIGMA_OUT   = 0;
-    int CG_OUT      = 1;
+    // If initialized mxInitGPU do nothing
+    if (mxInitGPU() != MX_GPU_SUCCESS)
+        mexErrMsgTxt("mxInitGPU fail");
 
-    int GAMMA_IN            = 0;
-    int CENTERED_TEMPLATE_IN= 1;
-    int TEMPLATE_HEIGHT_IN  = 2;
-    int TEMPLATE_WIDTH_IN   = 3;
-    int FEATURE_DIM_IN      = 4;
-    int NON_EMPTY_ROW_IN    = 5;
-    int NON_EMPTY_COL_IN    = 6;
-    int LAMBDA_IN           = 7;
-    int FEATURE_THRESHOLD_IN= 8;    /* Optional */
-    int CG_TOLERANCE_IN     = 9;    /* Optional */
-    int CG_MAX_ITER_IN      = 10;   /* Optional */
-    int THREAD_SIZE_IN      = 11;   /* Optional */
+    int CG_OUT      = 0;
+    int SIGMA_OUT   = 1;
 
-    if ( (nrhs < 5) || (nrhs > 9) )
+    int GAMMA_IN             = 0;
+    int CENTERED_TEMPLATE_IN = 1;
+    int NON_EMPTY_ROW_IN     = 2;
+    int NON_EMPTY_COL_IN     = 3;
+    int FEATURE_DIM_IN       = 4;
+    int LAMBDA_IN            = 5;
+    int FEATURE_THRESHOLD_IN = 6;   // Optional 
+    int CG_TOLERANCE_IN      = 7;   // Optional 
+    int CG_MAX_ITER_IN       = 8;   // Optional 
+    int THREAD_SIZE_IN       = 9;   // Optional 
+
+    if ( (nrhs < FEATURE_THRESHOLD_IN ) || (nrhs > (THREAD_SIZE_IN + 1) ) )
         mexErrMsgIdAndTxt(errId, "Wrong number of inputs");
     
 
@@ -87,21 +81,21 @@ void mexFunction(int nlhs, mxArray *plhs[],
     float * h_centered_template = (float *)mxGetPr(mxCenteredTemplate);
     
     /* Template height */
-    if (mxGetClassID(prhs[TEMPLATE_HEIGHT_IN]) != mxDOUBLE_CLASS)
-        mexErrMsgTxt("Invalid input: template height");
-    TEMPLATE_HEIGHT = (float)mxGetScalar(prhs[TEMPLATE_HEIGHT_IN]);
+    // if (mxGetClassID(prhs[TEMPLATE_HEIGHT_IN]) != mxDOUBLE_CLASS)
+    //     mexErrMsgTxt("Invalid input: template height");
+    // TEMPLATE_HEIGHT = (float)mxGetScalar(prhs[TEMPLATE_HEIGHT_IN]);
 
 
     /* Template height */
-    if (mxGetClassID(prhs[TEMPLATE_WIDTH_IN]) != mxDOUBLE_CLASS)
-        mexErrMsgTxt("Invalid input: template width");
-    TEMPLATE_WIDTH = (float)mxGetScalar(prhs[TEMPLATE_WIDTH_IN]);
+    // if (mxGetClassID(prhs[TEMPLATE_WIDTH_IN]) != mxDOUBLE_CLASS)
+    //     mexErrMsgTxt("Invalid input: template width");
+    // TEMPLATE_WIDTH = (float)mxGetScalar(prhs[TEMPLATE_WIDTH_IN]);
 
 
     /* Feature dimension */
     if (mxGetClassID(prhs[FEATURE_DIM_IN]) != mxDOUBLE_CLASS)
         mexErrMsgTxt("Invalid input: feature dimension");
-    FEATURE_DIM = (float)mxGetScalar(prhs[FEATURE_DIM_IN]);
+    int FEATURE_DIM = (float)mxGetScalar(prhs[FEATURE_DIM_IN]);
 
 
     /* Non Empty Col and Row Index */
@@ -148,8 +142,9 @@ void mexFunction(int nlhs, mxArray *plhs[],
 
 
     /* Check the Thread Size Parameters */
+    // THREAD_PER_BLOCK_H, THREAD_PER_BLOCK_W, THREAD_PER_BLOCK_D, THREAD_PER_BLOCK_2D_H, THREAD_PER_BLOCK_2D_W
     if ( nrhs > THREAD_SIZE_IN  && mxGetNumberOfElements(prhs[THREAD_SIZE_IN]) != 5)
-        mexErrMsgIdAndTxt(errId, "CUDA Thread Size must be 4 integers : THREAD_PER_BLOCK_H, THREAD_PER_BLOCK_W, THREAD_PER_BLOCK_D, THREAD_PER_BLOCK_2D_H, THREAD_PER_BLOCK_2D_W\nYou must choose size such that total thread will not be larger than MaxThreadsPerBlock");
+        mexErrMsgIdAndTxt(errId, "CUDA Thread size invalid format");
 
     if ( nrhs > THREAD_SIZE_IN ){
         const double* threadSize = (double *)mxGetData(prhs[THREAD_SIZE_IN]);
@@ -158,7 +153,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
         THREAD_PER_BLOCK_D = (int)threadSize[2];
         THREAD_PER_BLOCK_2D_H = (int)threadSize[3];
         THREAD_PER_BLOCK_2D_W = (int)threadSize[4];
-        if(debug) fprintf(stderr,"Thread size: H=%d, W=%d, D=%d, 2D=%d\n",
+        if(debug) fprintf(stderr,"Thread size: H=%d, W=%d, D=%d, 2D_H=%d, 2D_W=%d\n",
                                     THREAD_PER_BLOCK_H, THREAD_PER_BLOCK_W, THREAD_PER_BLOCK_D, 
                                     THREAD_PER_BLOCK_2D_H, THREAD_PER_BLOCK_2D_W);
     }
@@ -191,14 +186,23 @@ void mexFunction(int nlhs, mxArray *plhs[],
     dim3 dataBlockGrid2D( iDivUp(N, threadBlock2D.x), 
                           iDivUp(N, threadBlock2D.y));
 
+    float * d_Sigma;
+    cudaMalloc((void **)&d_Sigma, N * N * sizeof(float));
 
-    thrust::device_vector<float> vec_d_Sigma(N * N);
-    float* d_Sigma  = thrust::raw_pointer_cast(&vec_d_Sigma[0]);
+    // thrust::device_vector<float> vec_d_Sigma(N * N);
+    // float* d_Sigma  = thrust::raw_pointer_cast(&vec_d_Sigma[0]);
 
-    thrust::device_vector<int> vec_d_nonEmptyRows(h_nonEmptyRows, h_nonEmptyRows + N_ACTIVE_CELL);
-    thrust::device_vector<int> vec_d_nonEmptyCols(h_nonEmptyCols, h_nonEmptyCols + N_ACTIVE_CELL);
-    int* d_nonEmptyRows  = thrust::raw_pointer_cast(&vec_d_nonEmptyRows[0]);
-    int* d_nonEmptyCols  = thrust::raw_pointer_cast(&vec_d_nonEmptyCols[0]);
+    int * d_nonEmptyRows;
+    int * d_nonEmptyCols;
+    cudaMalloc((void **)&d_nonEmptyRows, N_ACTIVE_CELL * sizeof(float));
+    cudaMalloc((void **)&d_nonEmptyCols, N_ACTIVE_CELL * sizeof(float));
+    cudaMemcpy(d_nonEmptyRows, h_nonEmptyRows, N_ACTIVE_CELL * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_nonEmptyCols, h_nonEmptyCols, N_ACTIVE_CELL * sizeof(float), cudaMemcpyHostToDevice);
+
+    // thrust::device_vector<int> vec_d_nonEmptyRows(h_nonEmptyRows, h_nonEmptyRows + N_ACTIVE_CELL);
+    // thrust::device_vector<int> vec_d_nonEmptyCols(h_nonEmptyCols, h_nonEmptyCols + N_ACTIVE_CELL);
+    // int* d_nonEmptyRows  = thrust::raw_pointer_cast(&vec_d_nonEmptyRows[0]);
+    // int* d_nonEmptyCols  = thrust::raw_pointer_cast(&vec_d_nonEmptyCols[0]);
     scrambleGammaToSigma<<<dataBlockGrid2D, threadBlock2D>>>( d_Sigma,
                                 d_Gamma,
                                 lambda,
@@ -211,114 +215,35 @@ void mexFunction(int nlhs, mxArray *plhs[],
     ///    DEBUG
     /////////////////////////////////////////////
     if (debug){
-        // thrust::host_vector<float> vec_h_Sigma = vec_d_Sigma;
         mwSize mwSigma[2];
         mwSigma[0] = N; mwSigma[1] = N;
         plhs[SIGMA_OUT] = mxCreateNumericArray(2, mwSigma, mxSINGLE_CLASS, mxREAL);
         float* h_Sigma = (float *)mxGetData(plhs[SIGMA_OUT]);
         cudaMemcpy(h_Sigma, d_Sigma, N * N * sizeof(float) ,cudaMemcpyDeviceToHost);
-        // mxFree(mwSigma);
     }
     /////////////////////////////////////////////
 
 
-    // Initial point is at the origin
-    thrust::device_vector<float> vec_d_x(N, 0);
-    thrust::device_vector<float> vec_d_r(h_centered_template, h_centered_template + N);
-    thrust::device_vector<float> vec_d_p(N);
-    thrust::device_vector<float> vec_d_Ax(N);
+    float * d_x;
+    float * d_r;
+    cudaMalloc((void **)&d_x, N * sizeof(float));
+    cudaMalloc((void **)&d_r, N * sizeof(float));
+    cudaMemset(d_x, 0, N * sizeof(float));
+    cudaMemcpy(d_r, h_centered_template, N * sizeof(float), cudaMemcpyHostToDevice);
 
-    float* d_x  = thrust::raw_pointer_cast(&vec_d_x[0]);
-    float* d_r  = thrust::raw_pointer_cast(&vec_d_r[0]);
-    float* d_p  = thrust::raw_pointer_cast(&vec_d_p[0]);
-    float* d_Ax = thrust::raw_pointer_cast(&vec_d_Ax[0]);
-
-    float alpha     = 1.0f;
-    float alpham1   = -1.0f;
-    float beta      = 0.0f;
-    float a, b, na, r0, r1, dot;
-
-    // Ax = A * x
-    // y = α op(A) * x + β * y
-    cublasStatus = cublasSgemv(cublasHandle, CUBLAS_OP_N, 
-                N, N, 
-                &alpha,
-                d_Sigma, N,
-                d_x, 1,
-                &beta, 
-                d_Ax, 1);
-    checkCudaErrors(cublasStatus);
-
-    // r = -A * x = - Ax
-    // y = α x + y
-    cublasStatus = cublasSaxpy(cublasHandle, N, &alpham1, d_Ax, 1, d_r, 1);
-    checkCudaErrors(cublasStatus);
-
-    // r1 = r^T r
-    cublasStatus = cublasSdot(cublasHandle, N, d_r, 1, d_r, 1, &r1);
-    checkCudaErrors(cublasStatus);
-
-    int k = 1;
-
-    while (r1 > CG_TOLERANCE*CG_TOLERANCE && k <= CG_MAX_ITER)
-    {
-        if (k > 1)
-        {
-            b = r1 / r0;
-            // p = bp
-            cublasStatus = cublasSscal(cublasHandle, N, &b, d_p, 1);
-            checkCudaErrors(cublasStatus);
-            // p = r + p
-            cublasStatus = cublasSaxpy(cublasHandle, N, &alpha, d_r, 1, d_p, 1);
-            checkCudaErrors(cublasStatus);
-        }
-        else
-        {
-            // Initialize p = r
-            // p = r
-            cublasStatus = cublasScopy(cublasHandle, N, d_r, 1, d_p, 1);
-            checkCudaErrors(cublasStatus);
-        }
-
-        // Ax = A * p
-        // y = α op(A) * p + β * y
-        cublasStatus = cublasSgemv(cublasHandle, CUBLAS_OP_N, 
-                N, N, 
-                &alpha,
-                d_Sigma, N,
-                d_p, 1,
-                &beta, 
-                d_Ax, 1);
-        checkCudaErrors(cublasStatus);
-
-        // dot = p^T * Ax = p^T * A * p
-        cublasStatus = cublasSdot(cublasHandle, N, d_p, 1, d_Ax, 1, &dot);
-        checkCudaErrors(cublasStatus);
-        a = r1 / dot;
-
-        // x = a * p + x
-        cublasStatus = cublasSaxpy(cublasHandle, N, &a, d_p, 1, d_x, 1);
-        checkCudaErrors(cublasStatus);
-        na = -a;
-        // r = - a * Ax = - a * A * p
-        cublasStatus = cublasSaxpy(cublasHandle, N, &na, d_Ax, 1, d_r, 1);
-        checkCudaErrors(cublasStatus);
-        r0 = r1;
-        // r1 = r^T * r
-        cublasStatus = cublasSdot(cublasHandle, N, d_r, 1, d_r, 1, &r1);
-        checkCudaErrors(cublasStatus);
-
-        cudaThreadSynchronize();
-        printf("iteration = %3d, residual = %e\n", k, sqrt(r1));
-        k++;
-    }
-
+    decorrelateFeature(cublasHandle, d_x, d_Sigma, d_r, N, CG_TOLERANCE, CG_MAX_ITER);
 
     mwSize mwN[1];
     mwN[0] = N;
     plhs[CG_OUT] = mxCreateNumericArray(1, mwN, mxSINGLE_CLASS, mxREAL);
     float* h_CG = (float *)mxGetData(plhs[CG_OUT]);
     cudaMemcpy(h_CG, d_x, N * sizeof(float) ,cudaMemcpyDeviceToHost);
+
+    cudaFree(d_Sigma);
+    cudaFree(d_nonEmptyRows);
+    cudaFree(d_nonEmptyCols);
+    cudaFree(d_x);
+    cudaFree(d_r);
 
     cublasDestroy(cublasHandle);
     mxGPUDestroyGPUArray(mxGamma);

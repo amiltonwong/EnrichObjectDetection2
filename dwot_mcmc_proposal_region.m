@@ -81,7 +81,7 @@ param.n_cell_limit = org_cell_limit;
 function [max_score, template, template_size, rendering_image, image_bbox] = dwot_detect_using_instant_detector(renderer, hog_pyramid, az, el, yaw, fov, models_idx, param, im_region)
 renderer.setViewpoint(90-az,el,yaw,0,fov);
 rendering_image = renderer.renderCrop();
-template = WHOTemplateCG_GPU( rendering_image, param);
+template = WHOTemplateCG_CUDA( rendering_image, param);
 template_size = size(template);
 n_hog = numel(hog_pyramid.pyramid);
 c = cell(1, n_hog);

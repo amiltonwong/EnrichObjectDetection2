@@ -14,7 +14,7 @@ addpath([VOC_PATH, 'VOCcode']);
 % Computing Mode  = 0, CPU
 %                 = 1, GPU
 %                 = 2, Combined
-COMPUTING_MODE = 1;
+COMPUTING_MODE = 0;
 CLASS = 'bicycle';
 TYPE = 'val';
 mkdir('Result',[CLASS '_' TYPE]);
@@ -127,7 +127,7 @@ for imgIdx = 312:N_IMAGE
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
     imSz = size(im);
     if COMPUTING_MODE == 0
-      [bbsNMS, hog, scales] = dwot_detect( im, templates, param);
+      [bbsNMS, hog, scales, voting_planes] = dwot_detect_voting( im, templates, param);
       % [hog_region_pyramid, im_region] = dwot_extract_region_conv(im, hog, scales, bbsNMS, param);
       % [bbsNMS_MCMC] = dwot_mcmc_proposal_region(im, hog, scale, hog_region_pyramid, param);
     elseif COMPUTING_MODE == 1
@@ -137,6 +137,20 @@ for imgIdx = 312:N_IMAGE
       [bbsNMS, hog, scales] = dwot_detect_combined( im, templates, templates_cpu, param);
     else
       error('Computing Mode Undefined');
+    end
+    
+    for template_index = 1:numel(templates)
+      subplot(131);
+      imagesc(im);
+      axis equal;
+      subplot(132);
+      imagesc(param.detectors{template_index}.rendering);
+      axis equal;
+      subplot(133);
+      imagesc(voting_planes(:,:,template_index));
+      axis equal;
+      colorbar;
+      waitforbuttonpress;
     end
     fprintf(' time to convolution: %0.4f', toc(imgTic));
     

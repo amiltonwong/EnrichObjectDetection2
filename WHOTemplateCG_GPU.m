@@ -55,7 +55,7 @@ paddedIm(end-padding+1 : end, :, :) = 1;
 bbox = [1 1 size(im,2) size(im,1)] + padding;
 
 % TODO replace it
-if 0
+if (param.template_initialization_mode == 0)
   HOGTemplate = dwot_initialize_template(paddedIm, bbox, n_cell_limit);
 else
   HOGTemplate = dwot_initialize_template_const_active_cell(paddedIm, bbox, n_cell_limit, hog_cell_threshold);
@@ -140,5 +140,5 @@ if nargout > 3
   residual = norm(b-AGPU*x);
 end
 
-clear r b d AGPU Ad nonEmptyHOGGPU SigmaGPU nonEmptyColsGPU nonEmptyRowsGPU x x_min r_hist r_min r_norm r_start_norm beta alpha
-wait(param.gpu);
+% clear r b d AGPU Ad nonEmptyHOGGPU SigmaGPU nonEmptyColsGPU nonEmptyRowsGPU x x_min r_hist r_min r_norm r_start_norm beta alpha
+% wait(param.gpu);

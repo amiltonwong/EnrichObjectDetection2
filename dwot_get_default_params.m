@@ -71,6 +71,13 @@ init_params.sbin = sbin;
 param.init_params = init_params;
 
 %% WHO setting
+% TEMPLATE_INITIALIZATION_MODE == 0
+%     Creates templates that have approximately same number of cells
+% TEMPLATE_INITIALIZATION_MODE == 1
+%     Creates templates that have approxmiately same number of active cells
+% Active cells are the HOG cells whose absolute values is above the
+% HOG_CELL_THRESHOLD
+param.template_initialization_mode = 0; 
 param.image_padding       = 50;
 param.lambda              = lambda;
 param.n_level_per_octave  = n_level;
@@ -78,7 +85,7 @@ param.detection_threshold = detection_threshold;
 param.n_cell_limit        = n_cell_limit;
 param.class               = CLASS;
 param.type                = TYPE;
-param.hog_cell_threshold  = 1.5;
+param.hog_cell_threshold  = 1.0;
 param.feature_dim         = 31;
 
 % Statistics
