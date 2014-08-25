@@ -4,7 +4,7 @@ addpath('Util');
 addpath('../MatlabRenderer/');
 addpath('DecorrelateFeature/');
 
-COMPUTING_MODE = 1;
+COMPUTING_MODE = 0;
 CLASS = 'bicycle';
 TYPE  = 'val';
 if COMPUTING_MODE > 0

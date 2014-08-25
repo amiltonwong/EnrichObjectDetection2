@@ -1,23 +1,16 @@
-function [ WHOTemplate, HOGTemplate, r_hist, residual] = WHOTemplateCG( im, Mu, Gamma, n_cell_limit, lambda, padding, hog_cell_threshold, CG_THREASHOLD, MAX_ITER)
+function [ WHOTemplate, HOGTemplate, r_hist, residual] = WHOTemplateCG( im, param)
 %WHOTEMPLATEDECOMP Summary of this function goes here
 %   Detailed explanation goes here
 % Nrow = N1
-if nargin < 9
-  MAX_ITER = 6 * 10^1;
-end
-
-if nargin < 8
-  CG_THREASHOLD = 10^-3;
-end
-
-if nargin < 7
-  hog_cell_threshold = 1.5 * 10^0;
-end
-
-if nargin < 6
-  padding = 50;
-end
-
+padding             = param.image_padding;
+hog_cell_threshold  = param.hog_cell_threshold;
+n_cell_limit        = param.n_cell_limit;
+Mu                  = param.hog_mu;
+% Gamma_GPU           = param.hog_gamma_gpu;
+gammaDim            = param.hog_gamma_dim;
+lambda              = param.lambda;
+CG_THREASHOLD       = param.cg_threshold;
+CG_MAX_ITER         = param.cg_max_iter;
 
 %%%%%%%% Get HOG template
 
@@ -32,7 +25,7 @@ paddedIm(end-padding+1 : end, :, :) = 1;
 bbox = [1 1 size(im,2) size(im,1)] + padding;
 
 % TODO replace it
-HOGTemplate = dwot_initialize_template(paddedIm, bbox, n_cell_limit);
+HOGTemplate = dwot_initialize_template(paddedIm, bbox, param);
 
 %%%%%%%% WHO conversion using matrix decomposition
 

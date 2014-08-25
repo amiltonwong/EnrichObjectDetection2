@@ -1,9 +1,6 @@
-function curfeats = dwot_initialize_template_const_active_cell(I, bbox, N_CELL_THRESHOLD, hog_cell_threshold)
+function curfeats = dwot_initialize_template_const_active_cell(I, bbox, param)
 
-if nargin < 4
-  hog_cell_threshold = 1.5;
-end
-
+hog_cell_threshold = param.hog_cell_threshold;
 sbin = 4;
 
 %Expand the bbox to have some minimum and maximum aspect ratio
@@ -21,7 +18,7 @@ Ibox = zeros(size(I,1), size(I,2));
 Ibox(bbox(2):bbox(4), bbox(1):bbox(3)) = 1;
 
 %Get the hog feature pyramid for the entire image
-interval = 10;
+interval = 15;
 
 %Hardcoded maximum number of levels in the pyramid
 MAXLEVELS = 200;

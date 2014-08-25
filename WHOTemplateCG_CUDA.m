@@ -1,4 +1,4 @@
-function [ WHOTemplate_CG, HOGTemplate, residual] = WHOTemplateCG_GPU(im, param)
+function [ WHOTemplate_CG, HOGTemplate, residual] = WHOTemplateCG_CUDA(im, param)
   % ( im, scrambleKernel, Mu, Gamma_GPU, gammaDim, n_cell_limit, lambda, padding, hog_cell_threshold, CG_THREASHOLD, CG_MAX_ITER, N_THREAD_H, N_THREAD_W)
 %WHOTEMPLATEDECOMP Summary of this function goes here
 %   Detailed explanation goes here
@@ -39,11 +39,6 @@ CG_THREASHOLD       = param.cg_threshold;
 CG_MAX_ITER         = param.cg_max_iter;
 %%%%%%%% Get HOG template
 
-  
-if ~exist([param.scramble_gamma_to_sigma_file '.ptx'],'file')
-  system('nvcc -ptx .cu');
-end
-
 % create white background padding
 paddedIm = padarray(im2double(im), [padding, padding, 0]);
 paddedIm(:,1:padding,:) = 1;
@@ -73,66 +68,18 @@ idxNonEmptyCells = find(nonEmptyCells);
 nonEmptyRows = int32(nonEmptyRows);
 nonEmptyCols = int32(nonEmptyCols);
 
-n_non_empty_cells = int32(numel(nonEmptyRows));
-
-sigmaDim = n_non_empty_cells * HOGDim;
-SigmaGPU = zeros(sigmaDim, sigmaDim, 'single', 'gpuArray');
-param.scramble_kernel.GridSize = [ceil(double(sigmaDim)/param.N_THREAD_H ), ceil(double(sigmaDim)/param.N_THREAD_W ), 1];
-
-nonEmptyRowsGPU = gpuArray(nonEmptyRows - 1);
-nonEmptyColsGPU = gpuArray(nonEmptyCols - 1);
-
-AGPU = feval(param.scramble_kernel, SigmaGPU, param.hog_gamma_gpu, single(lambda), nonEmptyRowsGPU, nonEmptyColsGPU, gammaDim(1), HOGDim, n_non_empty_cells);
-  
 muSwapDim = permute(Mu,[2 3 1]);
 centeredHOG = bsxfun(@minus, HOGTemplate, muSwapDim);
 permHOG = permute(centeredHOG,[3 1 2]); % [HOGDim, Nrow, Ncol] = HOGDim, N1, N2
 onlyNonEmptyIdx = cell2mat(arrayfun(@(x) x + (1:HOGDim)', HOGDim * (idxNonEmptyCells - 1),'UniformOutput',false));
 nonEmptyHOG = permHOG(onlyNonEmptyIdx);
-nonEmptyHOGGPU = gpuArray(single(nonEmptyHOG));
 
-x = zeros(sigmaDim,1,'single','gpuArray');
-x_min = zeros(sigmaDim,1,'single','gpuArray');
+[WHO_ACTIVE_CELLS] = cudaDecorrelateFeature(param.hog_gamma_gpu, single(nonEmptyHOG(:)),nonEmptyRows, nonEmptyCols, HOGDim, lambda);
 
-b = nonEmptyHOGGPU;
-r = b;
-r_start_norm = r' * r;
-d = b;
-
-r_hist = zeros(1, CG_MAX_ITER,'single','gpuArray');
-r_min = ones(1,'single','gpuArray');
-
-i = 0;
-while i < CG_MAX_ITER
-  i = i + 1;
-
-  r_norm = (r'*r);
-  r_hist(i) = r_norm/r_start_norm;
-
-  if r_hist(i) < CG_THREASHOLD
-    break;
-  end
-  
-  if r_min > r_hist(i)
-    x_min = x;
-  end
-  
-  Ad = AGPU * d;
-  
-  alpha = r_norm/(d' * Ad);
-  x = x + alpha * d;
-  r = r - alpha * Ad;
-  beta = (r'*r)/r_norm;
-  d = r + beta * d;
-end
-
-if i == CG_MAX_ITER
-  disp('fail to get x within threshold');
-end
 
 WHOTemplate_CG = zeros(prod(HOGTemplateSz),1,'single');
 % WHOTemplate_CG(onlyNonEmptyIdx) = gather(x_min) / double(n_non_empty_cells);
-WHOTemplate_CG(onlyNonEmptyIdx) = gather(x_min);
+WHOTemplate_CG(onlyNonEmptyIdx) = WHO_ACTIVE_CELLS;
 WHOTemplate_CG =  reshape(WHOTemplate_CG,[HOGDim, wHeight, wWidth]);
 WHOTemplate_CG = permute(WHOTemplate_CG,[2,3,1]);
 

@@ -1,3 +1,13 @@
+param.azimuth_discretization 	= daz;
+param.elevation_discretization  = del;
+param.yaw_discretization		= dyaw;
+param.fov_discretization		= dfov;
+
+param.azimuths 		= azs;
+param.elevations 	= els;
+param.yaws 			= yaws;
+param.fovs 			= fovs;
+
 %Turn on image flips for detection/training. If enabled, processing
 %happes on each image as well as its left-right flipped version.
 param.detect_add_flip = 0;
@@ -31,7 +41,7 @@ param.nms_threshold = 0.5;
 param.min_overlap = 0.5;
 
 %How much we pad the pyramid (to let detections fall outside the image)
-param.detect_pyramid_padding = 5;
+param.detect_pyramid_padding = 15;
 
 % minimum image hog length that we use for convolution
 param.min_hog_length = 10;
@@ -123,3 +133,6 @@ param.mcmc_max_iter = 50;
 % THREAD_PER_BLOCK_H, THREAD_PER_BLOCK_W, THREAD_PER_BLOCK_D, THREAD_PER_BLOCK_2D
 param.cuda_conv_n_threads = [8, 8, 4, 8];
 
+
+%% Binary Search params
+param.binary_search_max_depth = 4;

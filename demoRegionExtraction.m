@@ -6,6 +6,7 @@ end
 addpath('HoG');
 addpath('HoG/features');
 addpath('Util');
+addpath('DecorrelateFeature/');
 addpath('../MatlabRenderer/');
 addpath('../MatlabCUDAConv/');
 addpath(VOC_PATH);
@@ -24,6 +25,10 @@ if COMPUTING_MODE > 0
   reset(gdevice);
   cos(gpuArray(1));
 end
+daz = 45;
+del = 20;
+dfov = 10;
+dyaw = 10;
 
 azs = 0:45:315; % azs = [azs , azs - 10, azs + 10];
 els = 0:20:20;
@@ -60,7 +65,7 @@ detector_name = sprintf('%s_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
 if exist(detector_name,'file')
   load(detector_name);
 else
-  detectors = dwot_make_detectors_slow_gpu([models_path{1} '.3ds'], azs, els, yaws, fovs, param, visualize_detector);
+  detectors = dwot_make_detectors([models_path{1} '.3ds'], azs, els, yaws, fovs, param, visualize_detector);
   if sum(cellfun(@(x) isempty(x), detectors))
     error('Detector Not Completed');
   end
@@ -150,14 +155,16 @@ for imgIdx = 312:N_IMAGE
     end
     n_mcmc = min(n_proposals, size(bbsNMS,1));
     [hog_region_pyramid, im_region] = dwot_extract_hog(hog, scales, templates, bbsNMS(1:n_mcmc,:), param, im);
-    [best_proposals] = dwot_mcmc_proposal_region(hog_region_pyramid, im_region, detectors, param, im);
+    [best_proposals] = dwot_binary_search_proposal_region(hog_region_pyramid, im_region, detectors, param, im);
+    % [best_proposals] = dwot_mcmc_proposal_region(hog_region_pyramid, im_region, detectors, param, im);
+
     for proposal_idx = 1:n_mcmc
       subplot(121);
       dwot_draw_overlap_detection(im, bbsNMS_clip, renderings, n_mcmc, 50, true);
       subplot(122);
       dwot_draw_overlap_detection(im, best_proposals{proposal_idx}.image_bbox, best_proposals{proposal_idx}.rendering_image, n_mcmc, 50, true);
       fprintf('press any button to continue\n');
-      waitforbuttonpress
+      % waitforbuttonpress
     end
     
 
@@ -200,6 +207,11 @@ for imgIdx = 312:N_IMAGE
     end
       
     npos = npos + sum(~gt(imgIdx).diff);
+end
+
+if isfield(param,'renderer')
+  param.renderer.delete();
+  param.renderer = [];
 end
 
 detScore = cell2mat(detScore);

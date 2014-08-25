@@ -4,25 +4,16 @@ if nargin < 7
   visualize = false;
 end
 
-if exist('renderer','var')
-  renderer.delete();
-  clear renderer;
-end
-
-%   CG_THREASHOLD = 10^-4;
-%   CG_MAX_ITER = 60;
-%   N_THREAD = 32;
-%   
-%   hog_cell_threshold = param.hog_cell_threshold;
-%   padding = param.image_padding;
-% 
-%   GammaGPU = pagam.hog_gamma_gpu;
-%   gammaDim = param.gamma_dim;
+%  Container class for fast query. Hash table k
+param.detector_table = containers.Map;
 
 
-renderer = Renderer();
-if ~renderer.initialize([mesh_path], 700, 700, 0, 0, 0, 0, 25)
-  error('fail to load model');
+if ~isfield(param, 'renderer')
+  renderer = Renderer();
+  if ~renderer.initialize([mesh_path], 700, 700, 0, 0, 0, 0, 25)
+    error('fail to load model');
+  end
+  param.renderer = renderer;
 end
 
 i = 1;
@@ -38,22 +29,10 @@ try
           fovGT = fovs(fovIdx);
 
           tic
-          renderer.setViewpoint(90-azGT,elGT,yawGT,0,fovGT);
-          im = renderer.renderCrop();
-          % [ WHOTemplate, HOGTemplate] = WHOTemplateDecompNonEmptyCell( im, Mu, Gamma, n_cell_limit, lambda, 50);
-          % [ WHOTemplate, HOGTemplate] = WHOTemplateCG( im, Mu, Gamma, n_cell_limit, lambda, 50, 1.5, 10^-3, 100);
-          [WHOTemplate, HOGTemplate] = WHOTemplateCG_GPU( im, param);
+          detector = dwot_get_detector(azGT, elGT, yawGT, fovGT, [1], 'not_supported_model_class', param)
           toc;
-
-          detectors{i}.whow = WHOTemplate;
-          % detectors{i}.hogw = HOGTemplate;
-          detectors{i}.az = azGT;
-          detectors{i}.el = elGT;
-          detectors{i}.yaw = yawGT;
-          detectors{i}.fov = fovGT;
-          detectors{i}.rendering = im;
-          detectors{i}.sz = size(WHOTemplate);
-          % detectors{i}.whopic = HOGpicture(WHOTemplate);
+          detectors{i} = detector;
+          param.detector_table( dwot_detector_key(azGT, elGT, yawGT, fovGT) ) = i;
 
           if visualize
             figure(1); subplot(131);

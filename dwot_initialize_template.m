@@ -1,5 +1,6 @@
-function curfeats = dwot_initialize_template(I, bbox, ncell)
+function curfeats = dwot_initialize_template(I, bbox, param)
 sbin = 8;
+ncell = param.n_cell_limit;
 
 %Expand the bbox to have some minimum and maximum aspect ratio
 %constraints (if it it too horizontal, expand vertically, etc)
@@ -16,7 +17,7 @@ Ibox = zeros(size(I,1), size(I,2));
 Ibox(bbox(2):bbox(4), bbox(1):bbox(3)) = 1;
 
 %Get the hog feature pyramid for the entire image
-interval = 10;
+interval = 15;
 
 %Hardcoded maximum number of levels in the pyramid
 MAXLEVELS = 200;

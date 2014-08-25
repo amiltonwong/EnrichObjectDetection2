@@ -119,6 +119,9 @@ for region_idx = 1:n_regions
                                                                                 clip_padded_x1, clip_padded_y1, clip_padded_x2, clip_padded_y2,...
                                                                                 xpadding, ypadding,...
                                                                                 param);
+    % TODO
+    hog_region_pyramid{region_idx}.pyramid(pyramidIdx).image_coord          = 1;
+
     hog_region_pyramid{region_idx}.pyramid(pyramidIdx).level                = level;
     hog_region_pyramid{region_idx}.pyramid(pyramidIdx).scale                = scale;
 
@@ -172,16 +175,17 @@ if nargout > 1
   end
 end
 
+% Padding. index off by one error.
 function pad_hog = pad_hog_region(hog,...
                               hog_x1, hog_y1, hog_x2, hog_y2,...
-                              clip_x1, clip_y1, clip_x2, clip_y2,...
+                              padded_clip_x1, padded_clip_y1, padded_clip_x2, padded_clip_y2,...
                               xpadding, ypadding,...
                               param)
-pad_hog = zeros(hog_y2 - hog_y1 + 2 * ypadding + 1, hog_x2 - hog_x1 + 2 * xpadding + 1, param.feature_dim, 'single');
+pad_hog = zeros(hog_y2 - hog_y1 + 1 + 2 * ypadding, hog_x2 - hog_x1 + 1 + 2 * xpadding, param.feature_dim, 'single');
 
 %%%%%%%%%%%%%%%% Check this for tuning the localization
-u_start = clip_y1 - hog_y1 + 1 + ypadding;
-v_start = clip_x1 - hog_x1 + 1 + xpadding;
+u_start = padded_clip_y1 - hog_y1 + 1 + ypadding;
+v_start = padded_clip_x1 - hog_x1 + 1 + xpadding;
 if u_start < 1
   u_start = 1;
 end
@@ -190,6 +194,6 @@ if v_start < 1
   v_start = 1;
 end
 
-u_size = clip_y2 - clip_y1;
-v_size = clip_x2 - clip_x1;
-pad_hog(u_start:(u_start + u_size), v_start:(v_start + v_size),:) = hog(clip_y1:clip_y2,clip_x1:clip_x2,:);
+u_size = padded_clip_y2 - padded_clip_y1;
+v_size = padded_clip_x2 - padded_clip_x1;
+pad_hog(u_start:(u_start + u_size), v_start:(v_start + v_size),:) = hog(padded_clip_y1:padded_clip_y2,padded_clip_x1:padded_clip_x2,:);

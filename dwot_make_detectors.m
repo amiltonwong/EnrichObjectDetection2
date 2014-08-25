@@ -1,4 +1,4 @@
-function [detectors, detector_name]= dwot_make_detectors_slow(mesh_path, azs, els, yaws, fovs, param, visualize)
+function [detectors, detector_name]= dwot_make_detectors(mesh_path, azs, els, yaws, fovs, param, visualize)
 
 if nargin < 7
   visualize = false;
@@ -29,7 +29,7 @@ try
           fovGT = fovs(fovIdx);
           
           tic
-          detector = dwot_get_detector(azGT, elGT, yawGT, fovGT, [1], 'not_supported_model_class', param)
+          detector = dwot_get_detector(azGT, elGT, yawGT, fovGT, [1], 'not_supported_model_class', param);
           toc;
           detectors{i} = detector;
           param.detector_table( dwot_detector_key(azGT, elGT, yawGT, fovGT) ) = i;

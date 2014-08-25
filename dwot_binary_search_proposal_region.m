@@ -1,12 +1,14 @@
-function [best_proposals]= dwot_mcmc_proposal_region(hog_region_pyramid, im_region, detectors, param, im)
+function [best_proposals]= dwot_binary_search_proposal_region(hog_region_pyramid, im_region, detectors, param, im)
 
-if ~isfield(param,'renderer')
+if ~isfield(param, 'renderer')
   renderer = Renderer();
-  if ~renderer.initialize([param.models_path{1} '.3ds'], 700, 700, 0, 0, 0, 0, 25)
+  if ~renderer.initialize([mesh_path], 700, 700, 0, 0, 0, 0, 25)
     error('fail to load model');
   end
   param.renderer = renderer;
 end
+
+
 
 n_proposal_region = numel(hog_region_pyramid);
 
@@ -19,19 +21,25 @@ try
   for region_idx = 1:n_proposal_region
     % Initialize Chain
     template_idx = hog_region_pyramid{region_idx}.template_idx;
-    best_state = struct('x', [detectors{template_idx}.az, detectors{template_idx}.el, detectors{template_idx}.yaw, detectors{template_idx}.fov],...
+    best_state = struct('az', detectors{template_idx}.az,...
+                    'el', detectors{template_idx}.el,...
+                    'yaw', detectors{template_idx}.yaw,...
+                    'fov', detectors{template_idx}.fov],...
                     'models_idx', cell(1, n_batch),... % there can be multiple models and renderings 
                     'template_size', cell(1, n_batch),...
                     'rendering_image', detectors{template_idx}.rendering,...
                     'image_bbox', hog_region_pyramid{region_idx}.image_bbox,...
                     'score', hog_region_pyramid{region_idx}.det_score);
+    daz = param.azimuth_discretization;
+    del = param.elevation_discretization;
+    dyaw = param.yaw_discretization;
+    dfov = param.fov_discretization;
+    for depth_idx = 1:param.binar_search_max_depth
+      [azs, els, yaws, fovs] = proposal_viewpoints(best_state.az,  best_state.el,  best_state.yaw,  best_state.fov,...
+                          daz del, dyaw, dfov,...
+                          2, 2, 2, 2, param);
+      detectors_subset = dwot_find_detector(detectors, azs, els, yaws, fovs, [1], 'not_yet_supported', param);
 
-    current_state = struct('x', [detectors{template_idx}.az, detectors{template_idx}.el, detectors{template_idx}.yaw, detectors{template_idx}.fov],...
-                    'models_idx', cell(1, n_batch),... % for multiple model
-                    'score', hog_region_pyramid{region_idx}.det_score);
-
-    % Run Chain using Gibbs sampling
-    for mcmc_iter = 1:param.mcmc_max_iter
       update_idx = mod( mcmc_iter - 1, 4) + 1;
       for chain_idx = 1:n_batch
         proposal_x = current_state(chain_idx).x;
@@ -63,15 +71,22 @@ try
           current_state(chain_idx).score = max_score;
         end
       end
+
+      daz = daz / 2;
+      del = del / 2;
+      dyaw = dyaw / 2;
+      dfov = dfov / 2;
     end
     
     best_proposals{region_idx} = best_state;
   end
 catch e
   disp(e.message);
+  renderer.delete();
   param.n_cell_limit = org_cell_limit;
   rethrow(e);
 end
+  renderer.delete();
 param.n_cell_limit = org_cell_limit;
 
 
@@ -79,19 +94,15 @@ param.n_cell_limit = org_cell_limit;
 %     return maximum score that got from the 
 %     instant detector
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [max_score, template, template_size, rendering_image, image_bbox] = dwot_detect_using_instant_detector(renderer, hog_pyramid, az, el, yaw, fov, models_idx, param, im_region)
-renderer.setViewpoint(90-az,el,yaw,0,fov);
-rendering_image = renderer.renderCrop();
-template = WHOTemplateCG_CUDA( rendering_image, param);
-template_size = size(template);
+function [max_score, template, template_size, rendering_image, image_bbox] = dwot_detect_region(hog_pyramid, templates, param, im_region)
 n_hog = numel(hog_pyramid.pyramid);
 c = cell(1, n_hog);
 max_score  = -inf;
 max_level  = -1;
 max_idx  = -1;
 for level_idx = 1:n_hog
-  % c{level_idx} = fconvblasfloat(hog_pyramid.pyramid(level_idx).padded_hog, {WHOTemplate}, 1, 1);
-  c{level_idx} = dwot_conv(hog_pyramid.pyramid(level_idx).padded_hog, template, param);
+  c{level_idx} = fconvblasfloat(hog_pyramid.pyramid(level_idx).padded_hog, {WHOTemplate}, 1, 1);
+  % c{level_idx} = dwot_conv(hog_pyramid.pyramid(level_idx).padded_hog, template, param);
   [max_c, max_c_idx] = max(c{level_idx}(:));
   if max_score < max_c;
     max_score = max_c;
@@ -141,7 +152,29 @@ else
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%     unnormalized probability from score
+%     Proposal Viewpoints
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function p = probability_from_score(score)
-p = exp(score);
+function [azs, els, yaws, fovs] = proposal_viewpoints(az,  el,  yaw,  fov,...
+                                                      daz, del, dyaw, dfov,...
+                                                      naz, nel, nyaw, nfov, param)
+
+n_az_views = 2 * naz + 1;
+n_el_views = 2 * nel + 1;
+n_yaw_views = 2 * nyaw + 1;
+n_fov_views = 2 * nfov + 1;
+
+fovs = (-nfov:nfov)' * dfov + fov;
+fovs = repmat(fovs, [n_az_views * n_el_views * n_yaw_views, 1]);
+fovs = fovs(:);
+
+yaws = (-nyaw:nyaw)' * dyaw + yaw;
+yaws = repmat(yaws, [n_az_views * n_el_views, n_fov_views])';
+yaws = yaws(:);
+
+els = (-nel:nel)' * del + el;
+els = repmat(els, [n_az_views, n_yaw_views * n_fov_views])';
+els = els(:);
+
+azs = (-naz:naz)' * dfov + fov;
+azs = repmat(azs, [1, n_el_views * n_yaw_views * n_fov_views])';
+azs = azs(:);
