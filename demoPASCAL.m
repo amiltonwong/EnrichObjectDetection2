@@ -52,6 +52,12 @@ model_name = strrep(model_file, '/', '_');
 dwot_get_default_params;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
+%%%%% For Debuggin purpose only
+param.detectors              = detectors;
+param.detect_pyramid_padding = 10;
+%%%%%%%%%%%%
+
 detector_name = sprintf('%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
     model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
 
@@ -65,11 +71,11 @@ else
   eval(sprintf(['save ' detector_name ' detectors']));
 end
 
-renderings = cellfun(@(x) x.rendering, detectors, 'UniformOutput', false);
+renderings = cellfun(@(x) x.rendering_image, detectors, 'UniformOutput', false);
 
 if COMPUTING_MODE == 0
   % for CPU convolution, use fconvblas which handles template inversion
-  templates = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
+  templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
 elseif COMPUTING_MODE == 1
   % for GPU convolution, invert template
   templates_gpu = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
@@ -103,7 +109,7 @@ detIdx = 0;
 
 
 gt(length(gtids))=struct('BB',[],'diff',[],'det',[]);
-for imgIdx=1:N_IMAGE
+for imgIdx=233:N_IMAGE
     fprintf('%d/%d ',imgIdx,N_IMAGE);
     imgTic = tic;
     % read annotation
@@ -114,14 +120,14 @@ for imgIdx=1:N_IMAGE
     gt(imgIdx).diff=[recs(imgIdx).objects(clsinds).difficult];
     gt(imgIdx).det=false(length(clsinds),1);
     
-%     if isempty(clsinds)
-%       continue;
-%     end
+    if isempty(clsinds)
+      continue;
+    end
     
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
     imSz = size(im);
     if COMPUTING_MODE == 0
-      [bbsNMS, hog, scales] = dwot_detect( im, templates, param);
+      [bbsNMS, hog, scales] = dwot_detect( im, templates_cpu, param);
 %       [hog_region_pyramid, im_region] = dwot_extract_region_conv(im, hog, scales, bbsNMS, param);
 %       [bbsNMS_MCMC] = dwot_mcmc_proposal_region(im, hog, scale, hog_region_pyramid, param);
     elseif COMPUTING_MODE == 1

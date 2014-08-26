@@ -120,7 +120,7 @@ for region_idx = 1:n_regions
                                                                                 xpadding, ypadding,...
                                                                                 param);
     % TODO
-    hog_region_pyramid{region_idx}.pyramid(pyramidIdx).image_coord          = 1;
+    % hog_region_pyramid{region_idx}.pyramid(pyramidIdx).image_coord          = 1;
 
     hog_region_pyramid{region_idx}.pyramid(pyramidIdx).level                = level;
     hog_region_pyramid{region_idx}.pyramid(pyramidIdx).scale                = scale;

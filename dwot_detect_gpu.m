@@ -59,8 +59,9 @@ for level = length(hog):-1:1
     % if visualize
     if 0
       [score, Idx] = max(bbs(:,12));
-      % subplot(231); imagesc(templates{templateIdx}.rendering); axis equal; axis tight;
-      % subplot(232); imagesc(detectors{exemplarIdx}.hogpic); axis equal; axis tight; axis off;
+      subplot(231); imagesc(HOGpicture(param.detectors{templateIdx}.whow)); axis equal; axis tight;
+      subplot(232); imagesc(param.detectors{templateIdx}.rendering_image); axis equal; axis tight; axis off;
+      Idx = 1;
       text(10,20,{['score ' num2str(bbs(Idx,12))],['azimuth ' num2str(bbs(Idx,10))]},'BackgroundColor',[.7 .9 .7]);
       subplot(233); imagesc(HM{templateIdx}); %caxis([100 200]); 
       colorbar; axis equal; axis tight; 

@@ -9,8 +9,8 @@ nTemplates =  numel(templates);
 sz = cellfun(@(x) size(x), templates, 'UniformOutput',false);
 
 minsizes = cellfun(@(x)min([size(x,1) size(x,2)]), hog);
-hog = hog(minsizes >= hogPadder*2);
-scales = scales(minsizes >= hogPadder*2);
+hog = hog(minsizes >= param.min_hog_length);
+scales = scales(minsizes >= param.min_hog_length);
 bbsAll = cell(length(hog),1);
 
 for level = length(hog):-1:1
@@ -65,9 +65,8 @@ for level = length(hog):-1:1
     
     % if visualize
     if 0
-      [score, Idx] = max(bbs(:,12));
-      % subplot(231); imagesc(templates{templateIdx}.rendering); axis equal; axis tight;
-      % subplot(232); imagesc(detectors{exemplarIdx}.hogpic); axis equal; axis tight; axis off;
+      subplot(231); imagesc(HOGpicture(templates{templateIdx})); axis equal; axis tight;
+      subplot(232); imagesc(param.detectors{templateIdx}.rendering_image); axis equal; axis tight; axis off;
       text(10,20,{['score ' num2str(bbs(Idx,12))],['azimuth ' num2str(bbs(Idx,10))]},'BackgroundColor',[.7 .9 .7]);
       subplot(233); imagesc(HM{templateIdx}); %caxis([100 200]); 
       colorbar; axis equal; axis tight; 

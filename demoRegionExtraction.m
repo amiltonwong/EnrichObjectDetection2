@@ -15,7 +15,7 @@ addpath([VOC_PATH, 'VOCcode']);
 % Computing Mode  = 0, CPU
 %                 = 1, GPU
 %                 = 2, Combined
-COMPUTING_MODE = 1;
+COMPUTING_MODE = 0;
 CLASS = 'bicycle';
 TYPE = 'val';
 mkdir('Result',[CLASS '_' TYPE]);
@@ -24,6 +24,9 @@ if COMPUTING_MODE > 0
   gdevice = gpuDevice(1);
   reset(gdevice);
   cos(gpuArray(1));
+  
+  % Debug
+  param.gpu = gdevice;
 end
 daz = 45;
 del = 20;
@@ -76,7 +79,6 @@ end
 % For Debuggin purpose only
 param.detectors              = detectors;
 param.detect_pyramid_padding = 10;
-param.gpu = gdevice;
 
 renderings = cellfun(@(x) x.rendering, detectors, 'UniformOutput', false);
 
