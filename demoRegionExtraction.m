@@ -74,7 +74,7 @@ detector_name = sprintf('%s_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
 if exist(detector_name,'file')
   load(detector_name);
 else
-  [detectors, detector_table, param] = dwot_make_detectors(renderer, azs, els, yaws, fovs, param, visualize_detector);
+  [detectors, detector_table] = dwot_make_detectors(renderer, azs, els, yaws, fovs, param, visualize_detector);
   if sum(cellfun(@(x) isempty(x), detectors))
     error('Detector Not Completed');
   end
@@ -143,9 +143,9 @@ for imgIdx = 1:N_IMAGE
     gt(imgIdx).diff=[recs(imgIdx).objects(clsinds).difficult];
     gt(imgIdx).det=false(length(clsinds),1);
     
-%     if isempty(clsinds)
-%       continue;
-%     end
+    if isempty(clsinds)
+      continue;
+    end
     
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
     imSz = size(im);
@@ -163,10 +163,18 @@ for imgIdx = 1:N_IMAGE
     end
     fprintf(' time to convolution: %0.4f', toc(imgTic));
     
+    bbsNMS_clip = clip_to_image(bbsNMS, [1 1 imSz(2) imSz(1)]);
+    [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
+    bbsNMS(:,9) = bbsNMS_clip(:,9);
+    
     if visualize_detection && ~isempty(clsinds)
       figure(2);
       dwot_draw_overlap_detection(im, bbsNMS, renderings, n_proposals, 50, visualize_detection);
       drawnow;
+      save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.jpg',...
+        CLASS,TYPE,models_name{1}, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
+      print('-djpeg','-r100',['Result/' CLASS '_' TYPE '/' save_name])
+      
       %  waitforbuttonpress;
     end
     n_mcmc = min(n_proposals, size(bbsNMS,1));
@@ -186,8 +194,7 @@ for imgIdx = 1:N_IMAGE
 %       waitforbuttonpress
 %     end
     
-    bbsNMS_clip = clip_to_image(bbsNMS, [1 1 imSz(2) imSz(1)]);
-    [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
+
 
     % dwot_bfgs_proposal_region(hog_region_pyramid, im_region, detectors, param); 
 %     mcmc_score = cellfun(@(x) x.score, best_proposals);
@@ -229,9 +236,9 @@ for imgIdx = 1:N_IMAGE
 
       % disp('Press any button to continue');
       
-      % save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.jpg',...
-      %   CLASS,TYPE,model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
-      % print('-djpeg','-r100',['Result/' CLASS '_' TYPE '/' save_name])
+      save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d_mcmc.jpg',...
+        CLASS,TYPE,models_name{1}, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
+      print('-djpeg','-r100',['Result/' CLASS '_' TYPE '/' save_name])
       
       % waitforbuttonpress;
     end
@@ -313,7 +320,7 @@ precision_prop = tpSort_prop./(fpSort_prop + tpSort_prop);
 % aprecision = atpSort./(afpSort + atpSort);
 ap_prop = VOCap(recall_prop', precision_prop');
 % aa = VOCap(arecall', aprecision');
-fprintf('AP = %.4f\n', ap);
+fprintf('AP = %.4f\n', ap_prop);
 
 clf;
 plot(recall_prop, precision_prop, 'r', 'LineWidth',3);

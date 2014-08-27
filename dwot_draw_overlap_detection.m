@@ -60,10 +60,12 @@ if box_text
   for bbsIdx = NDrawBox:-1:1
     
     bnd = bbsNMS(bbsIdx, 1:4) + drawPadding;
-    titler = {['score ' num2str( bbsNMS(bbsIdx,12))], ...
-              [' overlap ' num2str( bbsNMS(bbsIdx,9))], ...
-              [' detector ' num2str( bbsNMS(bbsIdx,11))] };
-    plot_bbox(bnd,cell2mat(titler),[1 1 1]);
+    titler = sprintf('s:%0.2f o:%0.2f',bbsNMS(bbsIdx,12),bbsNMS(bbsIdx,9));
+    plot_bbox(bnd,titler,[1 1 1]);
+%     titler = {['s:' num2str( bbsNMS(bbsIdx,12))], ...
+%               [' o:' num2str( bbsNMS(bbsIdx,9))], ...
+%               [' detector ' num2str( bbsNMS(bbsIdx,11))] };
+%    plot_bbox(bnd,cell2mat(titler),[1 1 1]);
   end
   axis equal;
   axis tight;

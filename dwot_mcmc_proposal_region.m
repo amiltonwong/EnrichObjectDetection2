@@ -111,7 +111,7 @@ else
     [y1, x1] = dwot_hog_to_img_fft(y_coord, x_coord, [1 1], param.sbin, hog_pyramid.pyramid(max_level).scale);
     [y2, x2] = dwot_hog_to_img_fft(y_coord+ template_size(1),...
                                     x_coord + template_size(2),...
-                                    [0 0], param.sbin, hog_pyramid.pyramid(max_level).scale);
+                                    [1 1], param.sbin, hog_pyramid.pyramid(max_level).scale);
   else
     error('Computing mode not supported');
   end
