@@ -1,14 +1,14 @@
 function resultIm = dwot_draw_overlap_detection(im, bbsNMS, renderings, maxNDrawBox, drawPadding, box_text)
 
-if nargin < 3
+if nargin < 4
   maxNDrawBox = 5;
 end
 
-if nargin  < 4
+if nargin  < 5
   drawPadding = 25;
 end
 
-if nargin < 5
+if nargin < 6
   box_text = false;
 end
 
@@ -51,14 +51,18 @@ end
 if box_text
   cla;
   imagesc(resultIm);
-
+  
+%   if size(bbsNMS,2) < 12
+%     bbsNMS(:,12) = 0;
+%   end
+  
   % Draw bounding box.
   for bbsIdx = NDrawBox:-1:1
+    
     bnd = bbsNMS(bbsIdx, 1:4) + drawPadding;
     titler = {['score ' num2str( bbsNMS(bbsIdx,12))], ...
-      [' overlap ' num2str( bbsNMS(bbsIdx,9))], ...
-      [' detector ' num2str( bbsNMS(bbsIdx,11))] };
-
+              [' overlap ' num2str( bbsNMS(bbsIdx,9))], ...
+              [' detector ' num2str( bbsNMS(bbsIdx,11))] };
     plot_bbox(bnd,cell2mat(titler),[1 1 1]);
   end
   axis equal;

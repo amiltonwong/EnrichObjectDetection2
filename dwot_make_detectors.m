@@ -1,20 +1,11 @@
-function [detectors, detector_name]= dwot_make_detectors(mesh_path, azs, els, yaws, fovs, param, visualize)
+function [detectors, detector_table]= dwot_make_detectors(renderer, azs, els, yaws, fovs, param, visualize)
 
 if nargin < 7
   visualize = false;
 end
 
 %  Container class for fast query. Hash table k
-param.detector_table = containers.Map;
-
-
-if ~isfield(param, 'renderer')
-  renderer = Renderer();
-  if ~renderer.initialize([mesh_path], 700, 700, 0, 0, 0, 0, 25)
-    error('fail to load model');
-  end
-  param.renderer = renderer;
-end
+detector_table = containers.Map;
 
 i = 1;
 detectors = cell(1,numel(azs) * numel(els) * numel(fovs));
@@ -29,10 +20,10 @@ try
           fovGT = fovs(fovIdx);
           
           tic
-          detector = dwot_get_detector(azGT, elGT, yawGT, fovGT, [1], 'not_supported_model_class', param);
+          detector = dwot_get_detector(renderer, azGT, elGT, yawGT, fovGT, [1], 'not_supported_model_class', param);
           toc;
           detectors{i} = detector;
-          param.detector_table( dwot_detector_key(azGT, elGT, yawGT, fovGT) ) = i;
+          detector_table( dwot_detector_key(azGT, elGT, yawGT, fovGT) ) = i;
 
           if visualize
             figure(1); subplot(131);

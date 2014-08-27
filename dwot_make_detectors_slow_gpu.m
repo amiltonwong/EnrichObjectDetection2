@@ -1,4 +1,4 @@
-function [detectors, detector_name]= dwot_make_detectors_slow_gpu(mesh_path, azs, els, yaws, fovs, param, visualize)
+function [detectors, param]= dwot_make_detectors_slow_gpu(mesh_path, azs, els, yaws, fovs, param, visualize)
 
 if nargin < 7
   visualize = false;

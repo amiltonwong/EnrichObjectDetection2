@@ -1,11 +1,7 @@
-function [best_proposals]= dwot_binary_search_proposal_region(hog_region_pyramid, im_region, detectors, param, im)
+function [best_proposals]= dwot_binary_search_proposal_region(hog_region_pyramid, im_region, detectors, detector_table, param, im)
 
 if ~isfield(param, 'renderer')
-  renderer = Renderer();
-  if ~renderer.initialize([mesh_path], 700, 700, 0, 0, 0, 0, 25)
-    error('fail to load model');
-  end
-  param.renderer = renderer;
+  error('Renderer not found');
 end
 
 
@@ -24,52 +20,44 @@ try
     best_state = struct('az', detectors{template_idx}.az,...
                     'el', detectors{template_idx}.el,...
                     'yaw', detectors{template_idx}.yaw,...
-                    'fov', detectors{template_idx}.fov],...
+                    'fov', detectors{template_idx}.fov,...
                     'models_idx', cell(1, n_batch),... % there can be multiple models and renderings 
                     'template_size', cell(1, n_batch),...
-                    'rendering_image', detectors{template_idx}.rendering,...
+                    'rendering_image', detectors{template_idx}.rendering_image,...
                     'image_bbox', hog_region_pyramid{region_idx}.image_bbox,...
                     'score', hog_region_pyramid{region_idx}.det_score);
     daz = param.azimuth_discretization;
     del = param.elevation_discretization;
     dyaw = param.yaw_discretization;
     dfov = param.fov_discretization;
-    for depth_idx = 1:param.binar_search_max_depth
+    for depth_idx = 1:param.binary_search_max_depth
       [azs, els, yaws, fovs] = proposal_viewpoints(best_state.az,  best_state.el,  best_state.yaw,  best_state.fov,...
-                          daz del, dyaw, dfov,...
-                          2, 2, 2, 2, param);
-      detectors_subset = dwot_find_detector(detectors, azs, els, yaws, fovs, [1], 'not_yet_supported', param);
+                          daz, del, dyaw, dfov,...
+                          1, 1, 1, 0, param);
+      fprintf('%d templates selected\n',numel(azs));
+      detectors_subset = dwot_find_detector(detectors, detector_table, azs, els, yaws, fovs, [1], 'not_yet_supported', param);
 
       update_idx = mod( mcmc_iter - 1, 4) + 1;
-      for chain_idx = 1:n_batch
-        proposal_x = current_state(chain_idx).x;
-        proposal_x(update_idx) = proposal_x(update_idx) + 5 * randn(1);
-        models_idx = current_state(chain_idx).models_idx;
-        [max_score, template, template_size, rendering_image, image_bbox] = dwot_detect_using_instant_detector(renderer, hog_region_pyramid{region_idx}, proposal_x(1), proposal_x(2), proposal_x(3), proposal_x(4), models_idx, param, im_region{region_idx});
-        if max_score > best_state(chain_idx).score
-          fprintf(sprintf('region %d iter %d : %f\n',region_idx, mcmc_iter, max_score));
-          best_state(chain_idx).score = max_score;
-          best_state(chain_idx).template_size = template_size;
-          best_state(chain_idx).x = proposal_x;
-          best_state(chain_idx).image_bbox = image_bbox;
-          best_state(chain_idx).rendering_image = rendering_image;
-        end
-        
-        if 1
-          figure(1);
-          subplot(121);
-          dwot_draw_overlap_detection(im, image_bbox, rendering_image, 5, 50, true);
-          subplot(122);
-          dwot_draw_overlap_detection(im, best_state(chain_idx).image_bbox, best_state(chain_idx).rendering_image, 5, 50, true);
-          drawnow;
-        end
-        % Metropolis Hastings
-        acc = min(1, probability_from_score((max_score - current_state(chain_idx).score)/param.n_cell_limit * 100));
-        if rand(1) < acc
-          fprintf('.');
-          current_state(chain_idx).x = proposal_x;
-          current_state(chain_idx).score = max_score;
-        end
+      proposal_x = current_state(chain_idx).x;
+      proposal_x(update_idx) = proposal_x(update_idx) + 5 * randn(1);
+      models_idx = current_state(chain_idx).models_idx;
+      [max_score, template, template_size, rendering_image, image_bbox] = dwot_detect_using_instant_detector(renderer, hog_region_pyramid{region_idx}, proposal_x(1), proposal_x(2), proposal_x(3), proposal_x(4), models_idx, param, im_region{region_idx});
+      if max_score > best_state(chain_idx).score
+        fprintf(sprintf('region %d iter %d : %f\n',region_idx, mcmc_iter, max_score));
+        best_state(chain_idx).score = max_score;
+        best_state(chain_idx).template_size = template_size;
+        best_state(chain_idx).x = proposal_x;
+        best_state(chain_idx).image_bbox = image_bbox;
+        best_state(chain_idx).rendering_image = rendering_image;
+      end
+
+      if 1
+        figure(1);
+        subplot(121);
+        dwot_draw_overlap_detection(im, image_bbox, rendering_image, 5, 50, true);
+        subplot(122);
+        dwot_draw_overlap_detection(im, best_state(chain_idx).image_bbox, best_state(chain_idx).rendering_image, 5, 50, true);
+        drawnow;
       end
 
       daz = daz / 2;

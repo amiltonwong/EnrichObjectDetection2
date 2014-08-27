@@ -1,10 +1,4 @@
-function detectors = dwot_find_detector(detectors_bulk, azimuth, elevation, yaw, fov, model_index, model_class, param)
-if isfield(param,'detector_table')
-	detector_table = param.detector_table;
-else
-	error('No detector hashtable found');
-end
-
+function detectors = dwot_find_detector(detectors_bulk, detector_table, azimuth, elevation, yaw, fov, model_index, model_class, param)
 % azs  = param.azs;
 % els  = param.els;
 % yaws = param.yaws;

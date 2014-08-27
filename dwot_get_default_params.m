@@ -125,7 +125,7 @@ param.computing_mode = COMPUTING_MODE;
 
 %% Region Extraction
 param.region_extraction_padding_ratio = 0.2;
-param.region_extraction_levels = 2;
+param.region_extraction_levels = 0;
 % MCMC Setting
 param.mcmc_max_iter = 50;
 

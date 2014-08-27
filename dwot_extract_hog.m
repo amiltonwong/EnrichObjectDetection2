@@ -41,17 +41,18 @@ hog_region_pyramid = cell(1,n_regions);
 for region_idx = 1:n_regions
 
   % For the level that the detection occured,
-  imgVIdx1 = bbs_nms(region_idx, 1); % y1
-  imgVIdx2 = bbs_nms(region_idx, 3); % y1
+  img_x1 = bbs_nms(region_idx, 1); % x1
+  img_x2 = bbs_nms(region_idx, 3); % y1
 
-  imgUIdx1 = bbs_nms(region_idx, 2); % y1
-  imgUIdx2 = bbs_nms(region_idx, 4); % y1
+  img_y1 = bbs_nms(region_idx, 2); % y1
+  img_y2 = bbs_nms(region_idx, 4); % y2
 
   detScale = bbs_nms(region_idx, 5); % scale
   detLevel = bbs_nms(region_idx, 6); % level
   detUIdx  = bbs_nms(region_idx, 7); % uus
   detVIdx  = bbs_nms(region_idx, 8); % uus
   detTemplateIdx = bbs_nms(region_idx, 11); % template Id
+  detTemplateSize = size(templates{detTemplateIdx});
   detScore = bbs_nms(region_idx, 12);
   
   startLevel = max(1, detLevel - region_extraction_levels);
@@ -60,7 +61,7 @@ for region_idx = 1:n_regions
   
   hog_region_pyramid{region_idx}.image_bbox = bbs_nms(region_idx,1:4);
   hog_region_pyramid{region_idx}.template_idx = detTemplateIdx;
-  hog_region_pyramid{region_idx}.template_size = size(templates{detTemplateIdx});
+  hog_region_pyramid{region_idx}.template_size = detTemplateSize;
   hog_region_pyramid{region_idx}.det_score = detScore;
   hog_region_pyramid{region_idx}.models_path = {};
   hog_region_pyramid{region_idx}.models_idx = {};
@@ -80,13 +81,13 @@ for region_idx = 1:n_regions
     
     % U is row idx, V is col idx
     if param.computing_mode == 0
-      [hog_y1, hog_x1] = dwot_img_to_hog_conv(imgUIdx1, imgVIdx1, sbin, scale, padder);
-      [hog_y2, hog_x2] = dwot_img_to_hog_conv(imgUIdx2, imgVIdx2, sbin, scale, padder);
+      [hog_y1, hog_x1] = dwot_img_to_hog_conv(img_y1, img_x1, sbin, scale, padder);
+      [hog_y2, hog_x2] = dwot_img_to_hog_conv(img_y2, img_x2, sbin, scale, padder);
     elseif param.computing_mode == 1
-      [hog_y1, hog_x1] = dwot_img_to_hog_fft(imgUIdx1, imgVIdx1, sbin, scale);
-      [hog_y2, hog_x2] = dwot_img_to_hog_fft(imgUIdx2, imgVIdx2, sbin, scale);
+      [hog_y1, hog_x1] = dwot_img_to_hog_fft(img_y1, img_x1, sbin, scale);
+      [hog_y2, hog_x2] = dwot_img_to_hog_fft(img_y2, img_x2, sbin, scale);
     else
-      error('computing mode not defined');
+      error('computing mode not supported');
     end
     hog_y1 = floor(hog_y1);
     hog_x1 = floor(hog_x1);
@@ -130,13 +131,24 @@ for region_idx = 1:n_regions
     if 0
       figure(1);
       subplot(221);
+      % Confirmed correct
+      if param.computing_mode == 0
+        [img_y1_d, img_x1_d] = dwot_hog_to_img_conv(hog_y1, hog_x1, sbin, scale, padder);
+        [img_y2_d, img_x2_d] = dwot_hog_to_img_conv(hog_y2 + 1, hog_x2 + 1, sbin, scale, padder);
+      elseif param.computing_mode == 1
+        [img_y1_d, img_x1_d] = dwot_hog_to_img_fft(hog_y1, hog_x1, [1 1], sbin, scale);
+        [img_y2_d, img_x2_d] = dwot_hog_to_img_fft(hog_y2, hog_x2, [0 0], sbin, scale);
+      else
+        error('computing mode not supported');
+      end
+    
       imagesc(im);
-      rectangle('position',[imgVIdx1, imgUIdx1, imgVIdx2-imgVIdx1, imgUIdx2-imgUIdx1]);
+      rectangle('position',[img_x1_d, img_y1_d, img_x2_d-img_x1_d, img_y2_d-img_y1_d]);
       
       subplot(222);
       hogSize = 20;
       imagesc(HOGpicture(hog{level},hogSize));
-      dwot_draw_hog_bounding_box(hog_x1, hog_y1, hog_x2, hog_y2, hogSize);
+      dwot_draw_hog_bounding_box(hog_x1,        hog_y1,         hog_x2,       hog_y2,        hogSize);
       dwot_draw_hog_bounding_box(padded_hog_x1, padded_hog_y1, padded_hog_x2, padded_hog_y2, hogSize);
       title(['level : ' num2str(level) ' detlevel : ' num2str(detLevel)]);
       
@@ -175,7 +187,8 @@ if nargout > 1
   end
 end
 
-% Padding. index off by one error.
+
+%%%%%%%% Confirmed correct 
 function pad_hog = pad_hog_region(hog,...
                               hog_x1, hog_y1, hog_x2, hog_y2,...
                               padded_clip_x1, padded_clip_y1, padded_clip_x2, padded_clip_y2,...
@@ -183,7 +196,6 @@ function pad_hog = pad_hog_region(hog,...
                               param)
 pad_hog = zeros(hog_y2 - hog_y1 + 1 + 2 * ypadding, hog_x2 - hog_x1 + 1 + 2 * xpadding, param.feature_dim, 'single');
 
-%%%%%%%%%%%%%%%% Check this for tuning the localization
 u_start = padded_clip_y1 - hog_y1 + 1 + ypadding;
 v_start = padded_clip_x1 - hog_x1 + 1 + xpadding;
 if u_start < 1

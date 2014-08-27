@@ -1,12 +1,4 @@
-function [best_proposals]= dwot_mcmc_proposal_region(hog_region_pyramid, im_region, detectors, param, im)
-
-if ~isfield(param,'renderer')
-  renderer = Renderer();
-  if ~renderer.initialize([param.models_path{1} '.3ds'], 700, 700, 0, 0, 0, 0, 25)
-    error('fail to load model');
-  end
-  param.renderer = renderer;
-end
+function [best_proposals]= dwot_mcmc_proposal_region(renderer, hog_region_pyramid, im_region, detectors, param, im)
 
 n_proposal_region = numel(hog_region_pyramid);
 
@@ -22,7 +14,7 @@ try
     best_state = struct('x', [detectors{template_idx}.az, detectors{template_idx}.el, detectors{template_idx}.yaw, detectors{template_idx}.fov],...
                     'models_idx', cell(1, n_batch),... % there can be multiple models and renderings 
                     'template_size', cell(1, n_batch),...
-                    'rendering_image', detectors{template_idx}.rendering,...
+                    'rendering_image', detectors{template_idx}.rendering_image,...
                     'image_bbox', hog_region_pyramid{region_idx}.image_bbox,...
                     'score', hog_region_pyramid{region_idx}.det_score);
 
@@ -47,12 +39,15 @@ try
           best_state(chain_idx).rendering_image = rendering_image;
         end
         
-        if 1
+        if 0
           figure(1);
           subplot(121);
+          image_bbox(:,12) = max_score;
           dwot_draw_overlap_detection(im, image_bbox, rendering_image, 5, 50, true);
           subplot(122);
-          dwot_draw_overlap_detection(im, best_state(chain_idx).image_bbox, best_state(chain_idx).rendering_image, 5, 50, true);
+          bestBox = best_state(chain_idx).image_bbox;
+          bestBox(:,12) = best_state(chain_idx).score;
+          dwot_draw_overlap_detection(im, bestBox, best_state(chain_idx).rendering_image, 5, 50, true);
           drawnow;
         end
         % Metropolis Hastings
@@ -106,18 +101,19 @@ if max_level == -1
 else
   data_size = size(c{max_level});
   [y_coord, x_coord] = ind2sub(data_size(1:2), max_idx);
-  y_coord = y_coord + hog_pyramid.pyramid(max_level).padded_hog_bbox(2) - 2;
-  x_coord = x_coord + hog_pyramid.pyramid(max_level).padded_hog_bbox(1) - 2;
+  y_coord = y_coord + hog_pyramid.pyramid(max_level).padded_hog_bbox(2) - 1;
+  x_coord = x_coord + hog_pyramid.pyramid(max_level).padded_hog_bbox(1) - 1;
+
   if param.computing_mode == 0
     [y1, x1] = dwot_hog_to_img_conv(y_coord, x_coord, param.sbin, hog_pyramid.pyramid(max_level).scale, param.detect_pyramid_padding);
     [y2, x2] = dwot_hog_to_img_conv(y_coord + template_size(1), x_coord + template_size(2), param.sbin, hog_pyramid.pyramid(max_level).scale, param.detect_pyramid_padding);
+  elseif param.computing_mode == 1
+    [y1, x1] = dwot_hog_to_img_fft(y_coord, x_coord, [1 1], param.sbin, hog_pyramid.pyramid(max_level).scale);
+    [y2, x2] = dwot_hog_to_img_fft(y_coord+ template_size(1),...
+                                    x_coord + template_size(2),...
+                                    [0 0], param.sbin, hog_pyramid.pyramid(max_level).scale);
   else
-    [y1, x1] = dwot_hog_to_img_fft(y_coord + hog_pyramid.template_size(1),...
-                                    x_coord + hog_pyramid.template_size(2), ...
-                                    template_size, param.sbin, hog_pyramid.pyramid(max_level).scale);
-    [y2, x2] = dwot_hog_to_img_fft(y_coord + hog_pyramid.template_size(1) + template_size(1),...
-                                    x_coord + hog_pyramid.template_size(2) + template_size(2),...
-                                    template_size, param.sbin, hog_pyramid.pyramid(max_level).scale);
+    error('Computing mode not supported');
   end
   image_bbox = [x1 y1, x2, y2];
   max_score = double(max_score);
