@@ -61,7 +61,7 @@ models_name = cellfun(@(x) strrep(x, '/', '_'), models_path, 'UniformOutput', fa
 
 dwot_get_default_params;
 param.models_path = models_path;
-if ~isfield(param,'renderer')
+if ~exist('renderer','var')
   renderer = Renderer();
   if ~renderer.initialize([param.models_path{1} '.3ds'], 700, 700, 0, 0, 0, 0, 25)
     error('fail to load model');
@@ -74,7 +74,7 @@ detector_name = sprintf('%s_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
 if exist(detector_name,'file')
   load(detector_name);
 else
-  [detectors, detector_table] = dwot_make_detectors(renderer, azs, els, yaws, fovs, param, visualize_detector);
+  [detectors, detectors_kdtree] = dwot_make_detectors_kdtree(renderer, azs, els, yaws, fovs, param, visualize_detector);
   if sum(cellfun(@(x) isempty(x), detectors))
     error('Detector Not Completed');
   end
@@ -89,11 +89,11 @@ param.detect_pyramid_padding = 10;
 renderings = cellfun(@(x) x.rendering_image, detectors, 'UniformOutput', false);
 
 if COMPUTING_MODE == 0
-  templates = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
+  templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
 elseif COMPUTING_MODE == 1
-  templates = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
+  templates_gpu = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
 elseif COMPUTING_MODE == 2
-  templates = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
+  templates_gpu = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
   templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
 else
   error('Computing mode undefined');
@@ -150,14 +150,14 @@ for imgIdx = 1:N_IMAGE
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
     imSz = size(im);
     if COMPUTING_MODE == 0
-      [bbsNMS, hog, scales] = dwot_detect( im, templates, param);
+      [bbsNMS, hog, scales] = dwot_detect( im, templates_cpu, param);
       % [hog_region_pyramid, im_region] = dwot_extract_region_conv(im, hog, scales, bbsNMS, param);
       % [bbsNMS_MCMC] = dwot_mcmc_proposal_region(im, hog, scale, hog_region_pyramid, param);
     elseif COMPUTING_MODE == 1
       % [bbsNMS ] = dwot_detect_gpu_and_cpu( im, templates, templates_cpu, param);
-      [bbsNMS, hog, scales] = dwot_detect_gpu( im, templates, param);
+      [bbsNMS, hog, scales] = dwot_detect_gpu( im, templates_gpu, param);
     elseif COMPUTING_MODE == 2
-      [bbsNMS, hog, scales] = dwot_detect_combined( im, templates, templates_cpu, param);
+      [bbsNMS, hog, scales] = dwot_detect_combined( im, templates_gpu, templates_cpu, param);
     else
       error('Computing Mode Undefined');
     end
@@ -179,9 +179,9 @@ for imgIdx = 1:N_IMAGE
     end
     n_mcmc = min(n_proposals, size(bbsNMS,1));
     [hog_region_pyramid, im_region] = dwot_extract_hog(hog, scales, templates, bbsNMS(1:n_mcmc,:), param, im);
-    % [best_proposals] = dwot_binary_search_proposal_region(hog_region_pyramid, im_region, detectors, detector_table, param, im);
-    [best_proposals] = dwot_mcmc_proposal_region(renderer, hog_region_pyramid, im_region, detectors, param, im);
+    [best_proposals] = dwot_breadth_first_search_proposal_region(hog_region_pyramid, im_region, detectors, detector_table, param, im);
 
+%    [best_proposals] = dwot_mcmc_proposal_region(renderer, hog_region_pyramid, im_region, detectors, param, im);
 %     for proposal_idx = 1:n_mcmc
 %       subplot(121);
 %       dwot_draw_overlap_detection(im, bbsNMS, renderings, n_mcmc, 50, true);
@@ -196,7 +196,7 @@ for imgIdx = 1:N_IMAGE
     
 
 
-    % dwot_bfgs_proposal_region(hog_region_pyramid, im_region, detectors, param); 
+%     dwot_bfgs_proposal_region(hog_region_pyramid, im_region, detectors, param); 
 %     mcmc_score = cellfun(@(x) x.score, best_proposals);
 %     mcmc_score ./ bbsNMS_clip(1:n_mcmc,end)'
 %     bbsNMS_clip(1:n_mcmc,end) = mcmc_score';
@@ -288,7 +288,7 @@ tit = sprintf('Average Precision = %.1f', 100*ap);
 title(tit);
 axis([0 1 0 1]);
 set(gcf,'color','w');
-save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%D.png',...
+save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%d.png',...
         CLASS, TYPE, models_name{1}, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),N_IMAGE);
 
 print('-dpng','-r150',['Result/' CLASS '_' TYPE '/' save_name])
@@ -337,4 +337,11 @@ set(gcf,'color','w');
 save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%d_mcmc.png',...
         CLASS, TYPE, models_name{1}, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),N_IMAGE);
 
-print('-dpng','-r150',['Result/' CLASS '_' TYPE '/' save_name])
+print('-dpng','-r150',['Result/' CLASS '_' TYPE '/' save_name]);
+
+
+%% Cleanup Memory
+if exist('renderer','var')
+  rederer.delete();
+  clean renderer;
+end

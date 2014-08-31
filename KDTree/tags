@@ -1,0 +1,90 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+Bmax	KDTree.h	/^	private: Point Bmax;  		      \/\/ bounding box upper bound$/;"	m	class:KDTree
+Bmin	KDTree.h	/^	private: Point Bmin;  		 	  \/\/ bounding box lower bound$/;"	m	class:KDTree
+HeapEmptyException	MyHeaps.h	/^	HeapEmptyException(const string &message) : out_of_range(message) {;}$/;"	f	class:HeapEmptyException
+HeapEmptyException	MyHeaps.h	/^class HeapEmptyException : public out_of_range{$/;"	c
+InvalidIndexException	MyHeaps.h	/^	InvalidIndexException(const string &message) : out_of_range(message) {;}	$/;"	f	class:InvalidIndexException
+InvalidIndexException	MyHeaps.h	/^class InvalidIndexException : public out_of_range{$/;"	c
+InvalidKeyIncreaseException	MyHeaps.h	/^	InvalidKeyIncreaseException(const string &message) : out_of_range(message) {;}$/;"	f	class:InvalidKeyIncreaseException
+InvalidKeyIncreaseException	MyHeaps.h	/^class InvalidKeyIncreaseException : public out_of_range{$/;"	c
+KDTree	KDTree.h	/^	public: KDTree(const vector<Point>& points){$/;"	f	class:KDTree
+KDTree	KDTree.h	/^class KDTree {$/;"	c
+LEFT	MyHeaps.h	23;"	d
+LIdx	KDTree.h	/^    int			LIdx;		\/\/ the index to the left cell  (-1 if none)$/;"	m	class:Node
+MYHEAPS_H_	MyHeaps.h	9;"	d
+MaxHeap	MyHeaps.h	/^	MaxHeap( int Nindex ){$/;"	f	class:MaxHeap
+MaxHeap	MyHeaps.h	/^	MaxHeap(){$/;"	f	class:MaxHeap
+MaxHeap	MyHeaps.h	/^class MaxHeap{$/;"	c
+MinHeap	MyHeaps.h	/^	MinHeap( int Nindex ){$/;"	f	class:MinHeap
+MinHeap	MyHeaps.h	/^	MinHeap(){$/;"	f	class:MinHeap
+MinHeap	MyHeaps.h	/^class MinHeap{$/;"	c
+Node	KDTree.h	/^	Node(){$/;"	f	class:Node
+Node	KDTree.h	/^class Node{$/;"	c
+PARENT	MyHeaps.h	22;"	d
+Point	KDTree.h	/^typedef vector<double> Point;$/;"	t
+RIGHT	MyHeaps.h	24;"	d
+RIdx	KDTree.h	/^	int			RIdx;		\/\/ the index to the right cell (-1 if none)$/;"	m	class:Node
+ROOT	KDTree.h	19;"	d
+_KDTREE_H_	KDTree.h	3;"	d
+backIdx	MyHeaps.h	/^	vector< int > backIdx;$/;"	m	class:MaxHeap
+backIdx	MyHeaps.h	/^	vector< int > backIdx;$/;"	m	class:MinHeap
+ball_bbox_query	KDTree.h	/^	public: void ball_bbox_query(int nodeIdx, Point& pmin, Point& pmax, vector<int>& inrange_idxs, vector<double>& distances, const Point& point, const double& radiusSquared, int dim=0){$/;"	f	class:KDTree
+ball_query	KDTree.h	/^	public: void ball_query( const Point& point, const double radius, vector<int>& idxsInRange, vector<double>& distances ){$/;"	f	class:KDTree
+ball_within_bounds	KDTree.h	/^	private: bool ball_within_bounds(const Point& Xq){$/;"	f	class:KDTree
+bounds_overlap_ball	KDTree.h	/^	private: double bounds_overlap_ball(const Point& Xq){$/;"	f	class:KDTree
+build_recursively	KDTree.h	/^	private: int build_recursively(vector< vector<int> >& sortidx, vector<int>& pidx, int dim){$/;"	f	class:KDTree
+check_border_distance	KDTree.h	/^	private: void check_border_distance(int nodeIdx, int dim, Point pnt, double& cdistsq, int& idx){$/;"	f	class:KDTree
+closest_point	KDTree.h	/^	public: int closest_point(Point p){$/;"	f	class:KDTree
+distance_squared	KDTree.h	/^	inline double distance_squared( const vector<double>& a, const vector<double>& b){$/;"	f	class:KDTree
+empty	MyHeaps.h	/^	bool empty(){$/;"	f	class:MaxHeap
+empty	MyHeaps.h	/^	bool empty(){$/;"	f	class:MinHeap
+heap	MyHeaps.h	/^	vector< pair<Tkey,int> > heap;$/;"	m	class:MaxHeap
+heap	MyHeaps.h	/^	vector< pair<Tkey,int> > heap;$/;"	m	class:MinHeap
+heapDecreaseKey	MyHeaps.h	/^	void heapDecreaseKey( int currIdx, Tkey key ){$/;"	f	class:MinHeap
+heapIncreaseKey	MyHeaps.h	/^	void heapIncreaseKey( int currIdx, Tkey key ){$/;"	f	class:MaxHeap
+heapsort	KDTree.h	/^	int heapsort(int dim, vector<int>& idx, int len) {$/;"	f	class:KDTree
+heapsort	MyHeaps.h	/^	void heapsort(vector<int>& indexes){$/;"	f	class:MinHeap
+isLeaf	KDTree.h	/^	inline bool isLeaf() const{$/;"	f	class:Node
+k	KDTree.h	/^	private: int k;					  \/\/ number of records to search for$/;"	m	class:KDTree
+k_closest_points	KDTree.h	/^	public: void k_closest_points(const Point& Xq, int k, vector<int>& idxs, vector<double>& distances){$/;"	f	class:KDTree
+key	KDTree.h	/^    double		key;		\/\/ the key (value along k-th dimension) of the split$/;"	m	class:Node
+knn_search	KDTree.h	/^	private: void knn_search( const Point& Xq, int nodeIdx = 0, int dim = 0){$/;"	f	class:KDTree
+leaves_of_node	KDTree.h	/^	private: void leaves_of_node( int nodeIdx, vector<int>& indexes ){$/;"	f	class:KDTree
+left_depth_first_print	KDTree.h	/^	public: void left_depth_first_print( int nodeIdx = 0 ){$/;"	f	class:KDTree
+lies_in_range	KDTree.h	/^	private: bool lies_in_range( const Point& p, const Point& pMin, const Point& pMax ){$/;"	f	class:KDTree
+linear_tree_print	KDTree.h	/^	private: void linear_tree_print(){$/;"	f	class:KDTree
+maxHeapify	MyHeaps.h	/^	void maxHeapify(int currIdx){$/;"	f	class:MaxHeap
+minHeapify	MyHeaps.h	/^	void minHeapify(int currIdx){$/;"	f	class:MinHeap
+ndim	KDTree.h	/^	private: int ndim;                \/\/ Data dimensionality$/;"	m	class:KDTree
+ndims	KDTree.h	/^	public: inline int ndims(){ return ndim; }$/;"	f	class:KDTree
+nodesPtrs	KDTree.h	/^	private: vector<Node*> nodesPtrs; \/\/ Memory to keep nodes$/;"	m	class:KDTree
+npoints	KDTree.h	/^	private: int npoints;             \/\/ Number of points$/;"	m	class:KDTree
+pIdx	KDTree.h	/^	int			pIdx;$/;"	m	class:Node
+points	KDTree.h	/^	private: vector<Point> points;    \/\/ Points data$/;"	m	class:KDTree
+pop	MyHeaps.h	/^	void pop() throw(HeapEmptyException){$/;"	f	class:MaxHeap
+pop	MyHeaps.h	/^	void pop() throw(HeapEmptyException){$/;"	f	class:MinHeap
+pq	KDTree.h	/^	private: MaxHeap<double> pq;  	  \/\/ <key,idx> = <distance, node idx>$/;"	m	class:KDTree
+print	MyHeaps.h	/^	public: void print() {$/;"	f	class:MinHeap
+print	MyHeaps.h	/^	void print() {$/;"	f	class:MaxHeap
+print_tree	KDTree.h	/^	void print_tree( int index = 0, int level = 0 ){$/;"	f	class:KDTree
+push	MyHeaps.h	/^	void push( Tkey key, int index ){$/;"	f	class:MaxHeap
+push	MyHeaps.h	/^	void push( Tkey key, int index ){$/;"	f	class:MinHeap
+range_query	KDTree.h	/^	public: void range_query( const Point& pmin, const Point& pmax, vector<int>& inrange_idxs, int nodeIdx=0, int dim=0 ){$/;"	f	class:KDTree
+size	KDTree.h	/^	public: inline int size(){ return points.size(); }$/;"	f	class:KDTree
+size	MyHeaps.h	/^	int size(){ $/;"	f	class:MaxHeap
+size	MyHeaps.h	/^	int size(){ $/;"	f	class:MinHeap
+swap	MyHeaps.h	/^	void swap(int pos1, int pos2){$/;"	f	class:MaxHeap
+swap	MyHeaps.h	/^	void swap(int pos1, int pos2){$/;"	f	class:MinHeap
+terminate_search	KDTree.h	/^	private: bool terminate_search;   \/\/ true if k points have been found$/;"	m	class:KDTree
+top	MyHeaps.h	/^	const pair<Tkey,int>& top() throw(HeapEmptyException){$/;"	f	class:MaxHeap
+top	MyHeaps.h	/^	const pair<Tkey,int>& top() throw(HeapEmptyException){$/;"	f	class:MinHeap
+useBackIdx	MyHeaps.h	/^	bool useBackIdx;$/;"	m	class:MaxHeap
+useBackIdx	MyHeaps.h	/^	bool useBackIdx;$/;"	m	class:MinHeap
+verifyHeap	MyHeaps.h	/^	bool verifyHeap(  ){$/;"	f	class:MaxHeap
+workarray	KDTree.h	/^	private: vector<int>   workarray; \/\/ Used in tree construction$/;"	m	class:KDTree
+~KDTree	KDTree.h	/^	public: ~KDTree(){$/;"	f	class:KDTree

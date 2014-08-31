@@ -1,4 +1,4 @@
-function [ WHOTemplate, HOGTemplate, r_hist, residual] = WHOTemplateCG( im, param)
+function [ WHOTemplate, HOGTemplate, scale, r_hist, residual] = WHOTemplateCG( im, param)
 %WHOTEMPLATEDECOMP Summary of this function goes here
 %   Detailed explanation goes here
 % Nrow = N1
@@ -15,17 +15,17 @@ CG_MAX_ITER         = param.cg_max_iter;
 %%%%%%%% Get HOG template
 
 % create white background padding
-paddedIm = padarray(im2double(im), [padding, padding, 0]);
-paddedIm(:,1:padding,:) = 1;
-paddedIm(:,end-padding+1 : end, :) = 1;
-paddedIm(1:padding,:,:) = 1;
-paddedIm(end-padding+1 : end, :, :) = 1;
+paddedIm = padarray(im2double(im), [padding, padding, 0], 1);
+% paddedIm(:,1:padding,:) = 1;
+% paddedIm(:,end-padding+1 : end, :) = 1;
+% paddedIm(1:padding,:,:) = 1;
+% paddedIm(end-padding+1 : end, :, :) = 1;
 
 % bounding box coordinate x1, y1, x2, y2
 bbox = [1 1 size(im,2) size(im,1)] + padding;
 
 % TODO replace it
-HOGTemplate = dwot_initialize_template(paddedIm, bbox, param);
+[HOGTemplate, scale] = dwot_initialize_template(paddedIm, bbox, param);
 
 %%%%%%%% WHO conversion using matrix decomposition
 

@@ -5,7 +5,6 @@ end
 
 addpath('HoG');
 addpath('HoG/features');
-addpath('KDTree');
 addpath('Util');
 addpath('DecorrelateFeature/');
 addpath('../MatlabRenderer/');
@@ -29,16 +28,16 @@ if COMPUTING_MODE > 0
   % Debug
   param.gpu = gdevice;
 end
-daz = 45;
-del = 20;
-dfov = 10;
-dyaw = 10;
+daz = 15;
+del = 15;
+dfov = 30;
+dyaw = 15;
 
-azs = 0:45:315; % azs = [azs , azs - 10, azs + 10];
-els = 0:20:20;
-fovs = [25];
-yaws = [-10:10:10];
-n_cell_limit = [190];
+azs = 0:daz:345; % azs = [azs , azs - 10, azs + 10];
+els = 0:del:45;
+fovs = 15:dfov:45;
+yaws = -45:dyaw:45;
+n_cell_limit = [200];
 lambda = [0.015];
 
 % azs = 0:15:345
@@ -62,7 +61,7 @@ models_name = cellfun(@(x) strrep(x, '/', '_'), models_path, 'UniformOutput', fa
 
 dwot_get_default_params;
 param.models_path = models_path;
-if ~isfield(param,'renderer')
+if ~exist('renderer','var')
   renderer = Renderer();
   if ~renderer.initialize([param.models_path{1} '.3ds'], 700, 700, 0, 0, 0, 0, 25)
     error('fail to load model');
@@ -76,10 +75,11 @@ if exist(detector_name,'file')
   load(detector_name);
 else
   [detectors] = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, param, visualize_detector);
+  [detectors, detector_table]= dwot_make_table_from_detectors(detectors);
   if sum(cellfun(@(x) isempty(x), detectors))
     error('Detector Not Completed');
   end
-  eval(sprintf(['save ' detector_name ' detectors']));
+  eval(sprintf(['save ' detector_name ' detectors detector_table']));
 end
 
 
@@ -90,11 +90,11 @@ param.detect_pyramid_padding = 10;
 renderings = cellfun(@(x) x.rendering_image, detectors, 'UniformOutput', false);
 
 if COMPUTING_MODE == 0
-  templates = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
+  templates = cellfun(@(x) (single(x.whow)), detectors,'UniformOutput',false);
 elseif COMPUTING_MODE == 1
-  templates = cellfun(@(x) single(x.whow(end:-1:1,end:-1:1,:)), detectors,'UniformOutput',false);
+  templates = cellfun(@(x) (single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
 elseif COMPUTING_MODE == 2
-  templates = cellfun(@(x) single(x.whow(end:-1:1,end:-1:1,:)), detectors,'UniformOutput',false);
+  templates = cellfun(@(x) (single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
   templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
 else
   error('Computing mode undefined');
@@ -144,9 +144,9 @@ for imgIdx = 1:N_IMAGE
     gt(imgIdx).diff=[recs(imgIdx).objects(clsinds).difficult];
     gt(imgIdx).det=false(length(clsinds),1);
     
-    if isempty(clsinds)
-      continue;
-    end
+%     if isempty(clsinds)
+%       continue;
+%     end
     
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
     imSz = size(im);
@@ -172,15 +172,16 @@ for imgIdx = 1:N_IMAGE
       figure(2);
       dwot_draw_overlap_detection(im, bbsNMS, renderings, n_proposals, 50, visualize_detection);
       drawnow;
-      save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.jpg',...
+      save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.png',...
         CLASS,TYPE,models_name{1}, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
-      print('-djpeg','-r100',['Result/' CLASS '_' TYPE '/' save_name])
+      print('-dpng','-r100',['Result/' CLASS '_' TYPE '/' save_name])
       
       %  waitforbuttonpress;
     end
     n_mcmc = min(n_proposals, size(bbsNMS,1));
-    [hog_region_pyramid, im_region] = dwot_extract_hog(hog, scales, templates, bbsNMS(1:n_mcmc,:), param, im);
-    [best_proposals] = dwot_mcmc_proposal_region(renderer, hog_region_pyramid, im_region, detectors, param, im);
+    [hog_region_pyramid, im_region] = dwot_extract_hog(hog, scales, detectors, bbsNMS(1:n_mcmc,:), param, im);
+    [best_proposals, detectors, detector_table] = dwot_binary_search_proposal_region(hog_region_pyramid, im_region, detectors, detector_table, renderer, param, im);
+%    [best_proposals] = dwot_mcmc_proposal_region(renderer, hog_region_pyramid, im_region, detectors, param, im);
 
 %     for proposal_idx = 1:n_mcmc
 %       subplot(121);
@@ -236,9 +237,9 @@ for imgIdx = 1:N_IMAGE
 
       % disp('Press any button to continue');
       
-      save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d_mcmc.jpg',...
+      save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d_binary.png',...
         CLASS,TYPE,models_name{1}, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
-      print('-djpeg','-r100',['Result/' CLASS '_' TYPE '/' save_name])
+      print('-dpng','-r100',['Result/' CLASS '_' TYPE '/' save_name])
       
       % waitforbuttonpress;
     end
@@ -334,7 +335,14 @@ tit = sprintf('Average Precision = %.1f', 100*ap_prop);
 title(tit);
 axis([0 1 0 1]);
 set(gcf,'color','w');
-save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%d_mcmc.png',...
+save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%d_binary.png',...
         CLASS, TYPE, models_name{1}, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),N_IMAGE);
 
-print('-dpng','-r150',['Result/' CLASS '_' TYPE '/' save_name])
+print('-dpng','-r150',['Result/' CLASS '_' TYPE '/' save_name]);
+
+
+%% Cleanup Memory
+if exist('renderer','var')
+  renderer.delete();
+  clean renderer;
+end

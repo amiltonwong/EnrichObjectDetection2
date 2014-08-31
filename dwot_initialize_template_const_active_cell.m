@@ -1,7 +1,7 @@
-function curfeats = dwot_initialize_template_const_active_cell(I, bbox, param)
+function [curfeats, im_scale] = dwot_initialize_template_const_active_cell(I, bbox, param)
 
 hog_cell_threshold = param.hog_cell_threshold;
-sbin = 4;
+sbin = param.rendering_sbin;
 
 %Expand the bbox to have some minimum and maximum aspect ratio
 %constraints (if it it too horizontal, expand vertically, etc)
@@ -56,6 +56,7 @@ for i = 1:MAXLEVELS
 %   bndY(2) = ceil(bndY(2));
   
   if N_NonEmptyCells <= N_CELL_THRESHOLD
+    im_scale = scale(i);
     curfeats = feat{i}(bndY(1):bndY(2),bndX(1):bndX(2),:);
     % fprintf(1,'initialized with HOG_size = [%d %d]\n',range(bndY) + 1, range(bndX) + 1);
     return;

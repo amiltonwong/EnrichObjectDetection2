@@ -1,5 +1,5 @@
-function curfeats = dwot_initialize_template(I, bbox, param)
-sbin = 8;
+function [curfeats, im_scale] = dwot_initialize_template(I, bbox, param)
+sbin = param.rendering_sbin;
 ncell = param.n_cell_limit;
 
 %Expand the bbox to have some minimum and maximum aspect ratio
@@ -13,8 +13,8 @@ bboxHeight = bbox(3) - bbox(1);
 
 %Create a blank image with the exemplar inside
 imSize = size(I);
-Ibox = zeros(size(I,1), size(I,2));    
-Ibox(bbox(2):bbox(4), bbox(1):bbox(3)) = 1;
+% Ibox = zeros(size(I,1), size(I,2));    
+% Ibox(bbox(2):bbox(4), bbox(1):bbox(3)) = 1;
 
 %Get the hog feature pyramid for the entire image
 interval = 15;
@@ -50,6 +50,7 @@ for i = 1:MAXLEVELS
 %   bndY(2) = ceil(bndY(2));
   
   if (bndX(2) - bndX(1) + 1) * (bndY(2) - bndY(1) + 1) <= ncell
+    im_scale = scale(i);
     curfeats = feat{i}(bndY(1):bndY(2),bndX(1):bndX(2),:);
     % fprintf(1,'initialized with HOG_size = [%d %d]\n',range(bndY) + 1, range(bndX) + 1);
     return;

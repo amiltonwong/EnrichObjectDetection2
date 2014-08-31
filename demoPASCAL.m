@@ -6,6 +6,7 @@ end
 addpath('HoG');
 addpath('HoG/features');
 addpath('Util');
+addpath('DecorrelateFeature/');
 addpath('../MatlabRenderer/');
 addpath('../MatlabCUDAConv/');
 addpath(VOC_PATH);
@@ -21,19 +22,23 @@ if COMPUTING_MODE > 0
   reset(gdevice);
   cos(gpuArray(1));
 end
+daz = 45;
+del = 20;
+dfov = 10;
+dyaw = 10;
 
 azs = 0:45:315; % azs = [azs , azs - 10, azs + 10];
-els = 0:30:30;
-fovs = [15, 45];
-yaws = [-30:30:30];
-n_cell_limit = [110];
+els = 0:20:20;
+fovs = [25];
+yaws = [-10:10:10];
+n_cell_limit = [190];
 lambda = [0.015];
 
-% azs = 0:10:350
+% azs = 0:45:345
 % els = 0 : 10 : 40
 % fovs = [15, 45]
 % yaws = -40:10:40
-% n_cell_limit = 130
+% n_cell_limit = 190
 % lambda = 0.015
 
 visualize_detection = true;
@@ -44,33 +49,41 @@ sbin = 4;
 n_level = 10;
 detection_threshold = 120;
 
-model_file = 'Mesh/Bicycle/road_bike';
-model_name = strrep(model_file, '/', '_');
+models_path = {'Mesh/Bicycle/road_bike'};
+models_name = cellfun(@(x) strrep(x, '/', '_'), models_path, 'UniformOutput', false);
 
 
 %%%%%%%%%%%%%%% Set Parameters %%%%%%%%%%%%
 dwot_get_default_params;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+param.models_path = models_path;
+
+if ~isfield(param,'renderer')
+  renderer = Renderer();
+  if ~renderer.initialize([param.models_path{1} '.3ds'], 700, 700, 0, 0, 0, 0, 25)
+    error('fail to load model');
+  end
+end
 
 
-%%%%% For Debuggin purpose only
-param.detectors              = detectors;
-param.detect_pyramid_padding = 10;
-%%%%%%%%%%%%
 
-detector_name = sprintf('%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
-    model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
+
+detector_name = sprintf('%s_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
+    CLASS, numel(models_path), n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
 
 if exist(detector_name,'file')
   load(detector_name);
 else
-  detectors = dwot_make_detectors_slow_gpu([model_file '.3ds'], azs, els, yaws, fovs, param, visualize_detector);
+  detectors = dwot_make_detectors(renderer, azs, els, yaws, fovs, param, visualize_detector);
   if sum(cellfun(@(x) isempty(x), detectors))
     error('Detector Not Completed');
   end
   eval(sprintf(['save ' detector_name ' detectors']));
 end
-
+%%%%% For Debuggin purpose only
+param.detectors              = detectors;
+param.detect_pyramid_padding = 10;
+%%%%%%%%%%%%
 renderings = cellfun(@(x) x.rendering_image, detectors, 'UniformOutput', false);
 
 if COMPUTING_MODE == 0
@@ -96,7 +109,7 @@ eval(['cd ' curDir]);
 [gtids,t] = textread(sprintf(VOCopts.imgsetpath,[CLASS '_' TYPE]),'%s %d');
 
 N_IMAGE = length(gtids);
-N_IMAGE = 500;
+N_IMAGE = 1000;
 % extract ground truth objects
 npos = 0;
 tp = cell(1,N_IMAGE);
@@ -109,7 +122,7 @@ detIdx = 0;
 
 
 gt(length(gtids))=struct('BB',[],'diff',[],'det',[]);
-for imgIdx=233:N_IMAGE
+for imgIdx=1:N_IMAGE
     fprintf('%d/%d ',imgIdx,N_IMAGE);
     imgTic = tic;
     % read annotation
@@ -120,9 +133,9 @@ for imgIdx=233:N_IMAGE
     gt(imgIdx).diff=[recs(imgIdx).objects(clsinds).difficult];
     gt(imgIdx).det=false(length(clsinds),1);
     
-    if isempty(clsinds)
-      continue;
-    end
+%     if isempty(clsinds)
+%       continue;
+%     end
     
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
     imSz = size(im);
@@ -254,7 +267,7 @@ tit = sprintf('Average Precision = %.1f', 100*ap);
 title(tit);
 axis([0 1 0 1]);
 set(gcf,'color','w');
-save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.jpg',...
-        CLASS, TYPE, model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
+save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%d_.png',...
+        CLASS, TYPE, models_name{1}, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), N_IMAGE);
 
 print('-dpng','-r150',['Result/' CLASS '_' TYPE '/' save_name])

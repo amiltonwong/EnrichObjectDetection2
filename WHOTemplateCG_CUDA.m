@@ -1,4 +1,4 @@
-function [ WHOTemplate_CG, HOGTemplate, residual] = WHOTemplateCG_CUDA(im, param)
+function [ WHOTemplate_CG, HOGTemplate, scale, residual] = WHOTemplateCG_CUDA(im, param)
   % ( im, scrambleKernel, Mu, Gamma_GPU, gammaDim, n_cell_limit, lambda, padding, hog_cell_threshold, CG_THREASHOLD, CG_MAX_ITER, N_THREAD_H, N_THREAD_W)
 %WHOTEMPLATEDECOMP Summary of this function goes here
 %   Detailed explanation goes here
@@ -40,20 +40,16 @@ CG_MAX_ITER         = param.cg_max_iter;
 %%%%%%%% Get HOG template
 
 % create white background padding
-paddedIm = padarray(im2double(im), [padding, padding, 0]);
-paddedIm(:,1:padding,:) = 1;
-paddedIm(:,end-padding+1 : end, :) = 1;
-paddedIm(1:padding,:,:) = 1;
-paddedIm(end-padding+1 : end, :, :) = 1;
+paddedIm = padarray(im2double(im), [padding, padding, 0], 1);
 
 % bounding box coordinate x1, y1, x2, y2
 bbox = [1 1 size(im,2) size(im,1)] + padding;
 
 % TODO replace it
 if (param.template_initialization_mode == 0)
-  HOGTemplate = dwot_initialize_template(paddedIm, bbox, param);
+  [HOGTemplate, scale] = dwot_initialize_template(paddedIm, bbox, param);
 else
-  HOGTemplate = dwot_initialize_template_const_active_cell(paddedIm, bbox, param);
+  [HOGTemplate, scale] = dwot_initialize_template_const_active_cell(paddedIm, bbox, param);
 end
 
 %%%%%%%% WHO conversion using matrix decomposition
@@ -83,7 +79,7 @@ WHOTemplate_CG(onlyNonEmptyIdx) = WHO_ACTIVE_CELLS;
 WHOTemplate_CG =  reshape(WHOTemplate_CG,[HOGDim, wHeight, wWidth]);
 WHOTemplate_CG = permute(WHOTemplate_CG,[2,3,1]);
 
-if nargout > 3
+if nargout > 4
   residual = norm(b-AGPU*x);
 end
 

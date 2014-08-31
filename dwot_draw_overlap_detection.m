@@ -18,26 +18,27 @@ resultIm = paddedIm;
 NDrawBox = min(size(bbsNMS, 1),maxNDrawBox);
 
 % Create overlap image
+clipBBox = zeros(NDrawBox,4);
 for bbsIdx = NDrawBox:-1:1
   if iscell(renderings)
     rendering = renderings{bbsNMS(bbsIdx, 11)};
   else
     rendering = renderings;
   end
-  bnd = round(bbsNMS(bbsIdx, 1:4)) + drawPadding;
-  bboxWidth  = bnd(3) - bnd(1);
-  bboxHeight = bnd(4) - bnd(2);
+  box_position = round(bbsNMS(bbsIdx, 1:4)) + drawPadding;
+  bboxWidth  = box_position(3) - box_position(1);
+  bboxHeight = box_position(4) - box_position(2);
   szPadIm  = size(paddedIm);
-  clip_bnd = [ min(bnd(1),szPadIm(2)),...
-      min(bnd(2), szPadIm(1)),...
-      min(bnd(3), szPadIm(2)),...
-      min(bnd(4), szPadIm(1))];
+  clip_bnd = [ min(box_position(1),szPadIm(2)),...
+      min(box_position(2), szPadIm(1)),...
+      min(box_position(3), szPadIm(2)),...
+      min(box_position(4), szPadIm(1))];
   clip_bnd = [max(clip_bnd(1),1),...
       max(clip_bnd(2),1),...
       max(clip_bnd(3),1),...
       max(clip_bnd(4),1)];
   renderingSz = size(rendering);
-  cropRegion = round((bnd - clip_bnd) ./ [bboxWidth, bboxHeight, bboxWidth, bboxHeight] .* [renderingSz(2), renderingSz(1), renderingSz(2), renderingSz(1)]);
+  cropRegion = round((box_position - clip_bnd) ./ [bboxWidth, bboxHeight, bboxWidth, bboxHeight] .* [renderingSz(2), renderingSz(1), renderingSz(2), renderingSz(1)]);
   resizeRendering = imresize(rendering(...
               (1 - cropRegion(2)):(end - cropRegion(4)),...
               (1 - cropRegion(1)):(end - cropRegion(3)),:),...
@@ -46,6 +47,7 @@ for bbsIdx = NDrawBox:-1:1
   bndIm = paddedIm( clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3), :);
   blendIm = bndIm/3 + im2double(resizeRendering)/3 + resultIm( clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3), :)/3;
   resultIm(clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3),:) = blendIm;
+  clipBBox(bbsIdx,:) = clip_bnd;
 end
 
 if box_text
@@ -57,17 +59,17 @@ if box_text
 %   end
   
   % Draw bounding box.
+  color_map = hot(NDrawBox);
   for bbsIdx = NDrawBox:-1:1
     
-    bnd = bbsNMS(bbsIdx, 1:4) + drawPadding;
-    titler = sprintf('s:%0.2f o:%0.2f',bbsNMS(bbsIdx,12),bbsNMS(bbsIdx,9));
-    plot_bbox(bnd,titler,[1 1 1]);
-%     titler = {['s:' num2str( bbsNMS(bbsIdx,12))], ...
-%               [' o:' num2str( bbsNMS(bbsIdx,9))], ...
-%               [' detector ' num2str( bbsNMS(bbsIdx,11))] };
-%    plot_bbox(bnd,cell2mat(titler),[1 1 1]);
+    box_position = clipBBox(bbsIdx, 1:4) + [0 0 -clipBBox(bbsIdx, 1:2)];
+    box_text = sprintf(' s:%0.2f o:%0.2f ',bbsNMS(bbsIdx,12),bbsNMS(bbsIdx,9));
+    rectangle('position', box_position,'edgecolor',[0.5 0.5 0.5],'LineWidth',3);
+    rectangle('position', box_position,'edgecolor',color_map(bbsIdx,:),'LineWidth',1);
+    text(box_position(1) + 1 , box_position(2), box_text, 'BackgroundColor', color_map( bbsIdx ,:),'EdgeColor',[0.5 0.5 0.5]);
   end
   axis equal;
   axis tight;
+  axis off;
   drawnow;
 end

@@ -14,6 +14,8 @@ param.detect_add_flip = 0;
 
 
 param.sbin = sbin;
+param.rendering_sbin = 8;
+
 %Levels-per-octave defines how many levels between 2x sizes in pyramid
 %(denser pyramids will have more windows and thus be slower for
 %detection/training)
@@ -127,7 +129,7 @@ param.computing_mode = COMPUTING_MODE;
 param.region_extraction_padding_ratio = 0.2;
 param.region_extraction_levels = 0;
 % MCMC Setting
-param.mcmc_max_iter = 50;
+param.mcmc_max_iter = 20;
 
 %% Cuda Convolution Params
 % THREAD_PER_BLOCK_H, THREAD_PER_BLOCK_W, THREAD_PER_BLOCK_D, THREAD_PER_BLOCK_2D
@@ -135,4 +137,4 @@ param.cuda_conv_n_threads = [8, 8, 4, 8];
 
 
 %% Binary Search params
-param.binary_search_max_depth = 4;
+param.binary_search_max_depth = 1;
