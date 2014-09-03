@@ -1,4 +1,4 @@
-function [detectors]= dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, param, visualize)
+function [detectors]= dwot_make_average_detectors_grid(renderer, azs, els, yaws, fovs, model_indexes, model_class, param, visualize)
 
 if nargin < 7
   visualize = false;
@@ -27,7 +27,7 @@ try
           fovGT = fovs(fovIdx);
           
           tic
-          detector = dwot_get_detector(renderer, azGT, elGT, yawGT, fovGT, [1], 'not_supported_model_class', param);
+          detector = dwot_get_avg_detector(renderer, azGT, elGT, yawGT, fovGT, model_indexes, model_class, param);
           toc;
           detectors{i} = detector;
           % param.detector_table( dwot_detector_key(azGT, elGT, yawGT, fovGT) ) = i;

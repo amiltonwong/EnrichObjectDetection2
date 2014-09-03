@@ -24,15 +24,14 @@ for region_idx = 1:n_proposal_region
   dyaw = param.yaw_discretization;
   dfov = param.fov_discretization;
   
-  daz = daz / 3;
-  del = del / 3;
-  dyaw = dyaw / 3;
+  daz = daz / 2;
+  del = del / 2;
+  dyaw = dyaw / 2;
   dfov = dfov / 2;
   for depth_idx = 1:param.binary_search_max_depth
     [azs, els, yaws, fovs] = dwot_proposal_viewpoint_grid(best_state.az,  best_state.el,  best_state.yaw,  best_state.fov,...
                         daz, del, dyaw, dfov,...
-                        2, 2, 2, 1, param);
-    fprintf('%d templates selected\n',numel(azs));
+                        1, 1, 1, 1, param);
     [detectors_subset, detector_subset_indexes] = dwot_find_detector(detectors, detector_table, azs, els, yaws, fovs, [1], 'not_yet_supported', param);
     % Create detectors that was not found in the pool of detectors
     empty_detectors_indexes = find(cellfun(@(x) isempty(x), detectors_subset));
@@ -43,6 +42,7 @@ for region_idx = 1:n_proposal_region
               param);
     detector_subset_indexes(empty_detectors_indexes) = numel(detectors) + (1:numel(empty_detectors_indexes));
 
+    fprintf('%d/%d templates created\n', numel(empty_detectors_indexes), numel(azs));
     % Add detectors to the variable
     [detectors, detector_table]= dwot_make_table_from_detectors([detectors, detectors_subset(empty_detectors_indexes)], detector_table);
     [max_score, max_template_subset_index, image_bbox] = dwot_detect_region(hog_region_pyramid{region_idx}, cellfun(@(x) x.whow, detectors_subset,'UniformOutput',false), param, im_region{region_idx});
@@ -68,7 +68,7 @@ for region_idx = 1:n_proposal_region
       drawnow;
     end
 
-    daz = daz / 4;
+    daz = daz / 2;
     del = del / 2;
     dyaw = dyaw / 2;
     dfov = dfov / 2;

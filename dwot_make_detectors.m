@@ -11,9 +11,7 @@ detectors = cell(1,n_templates);
 
 for i = 1:n_templates
 
-  tic
   detector = dwot_get_detector(renderer, azs(i), els(i), yaws(i), fovs(i), [1], 'not_supported_model_class', param);
-  toc;
 
   detectors{i} = detector;
 

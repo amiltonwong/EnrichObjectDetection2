@@ -1,8 +1,7 @@
-%% Cleanup Memory
-if exist('renderer','var')
-  renderer.delete();
-  clear renderer;
-end
+% Tests average model
+% The average template is generated using multiple renderings
+% 
+% see dwot_avg_model.m
 
 
 VOC_PATH = '/home/chrischoy/Dataset/VOCdevkit/';
@@ -70,7 +69,7 @@ dwot_get_default_params;
 param.models_path = models_path;
 if ~exist('renderer','var')
   renderer = Renderer();
-  if ~renderer.initialize({[param.models_path{1} '.3ds']}, 700, 700, 0, 0, 0, 0, 25)
+  if ~renderer.initialize([param.models_path{1} '.3ds'], 700, 700, 0, 0, 0, 0, 25)
     error('fail to load model');
   end
 end

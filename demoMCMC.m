@@ -29,17 +29,19 @@ if COMPUTING_MODE > 0
   % Debug
   param.gpu = gdevice;
 end
-daz = 45;
-del = 20;
-dfov = 10;
-dyaw = 10;
 
-azs = 0:45:315; % azs = [azs , azs - 10, azs + 10];
-els = 0:20:20;
-fovs = [25];
-yaws = [-10:10:10];
-n_cell_limit = [190];
+daz = 15;
+del = 15;
+dyaw = 15;
+dfov = 20;
+
+azs = 0:daz:345; % azs = [azs , azs - 10, azs + 10];
+els = 0:del:45;
+fovs = 20:20:40;
+yaws = -45:dyaw:45;
+n_cell_limit = [200];
 lambda = [0.015];
+
 
 % azs = 0:15:345
 % els = 0 : 15 :30
@@ -144,9 +146,9 @@ for imgIdx = 1:N_IMAGE
     gt(imgIdx).diff=[recs(imgIdx).objects(clsinds).difficult];
     gt(imgIdx).det=false(length(clsinds),1);
     
-    if isempty(clsinds)
-      continue;
-    end
+%     if isempty(clsinds)
+%       continue;
+%     end
     
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
     imSz = size(im);
@@ -172,9 +174,9 @@ for imgIdx = 1:N_IMAGE
       figure(2);
       dwot_draw_overlap_detection(im, bbsNMS, renderings, n_proposals, 50, visualize_detection);
       drawnow;
-      save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.jpg',...
+      save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d_a.png',...
         CLASS,TYPE,models_name{1}, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
-      print('-djpeg','-r100',['Result/' CLASS '_' TYPE '/' save_name])
+      print('-dpng','-r100',['Result/' CLASS '_' TYPE '/' save_name])
       
       %  waitforbuttonpress;
     end
@@ -236,9 +238,9 @@ for imgIdx = 1:N_IMAGE
 
       % disp('Press any button to continue');
       
-      save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d_mcmc.jpg',...
+      save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d_mcmc.png',...
         CLASS,TYPE,models_name{1}, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
-      print('-djpeg','-r100',['Result/' CLASS '_' TYPE '/' save_name])
+      print('-dpng','-r100',['Result/' CLASS '_' TYPE '/' save_name])
       
       % waitforbuttonpress;
     end
@@ -288,7 +290,7 @@ tit = sprintf('Average Precision = %.1f', 100*ap);
 title(tit);
 axis([0 1 0 1]);
 set(gcf,'color','w');
-save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%d.png',...
+save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%d_a.png',...
         CLASS, TYPE, models_name{1}, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),N_IMAGE);
 
 print('-dpng','-r150',['Result/' CLASS '_' TYPE '/' save_name])
