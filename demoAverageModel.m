@@ -62,25 +62,35 @@ n_level = 10;
 detection_threshold = 120;
 n_proposals = 10;
 
-models_path = {'Mesh/Bicycle/road_bike'};
-models_name = cellfun(@(x) strrep(x, '/', '_'), models_path, 'UniformOutput', false);
+% Get all possible sub-classes
+model_pathes = 'Mesh/Bicycle/';
+model_names = {'road_bike','road_bike_2','road_bike_3','fixed_gear_road_bike','bmx_bike','brooklyn_machine_works_bike', 'glx_bike'};
+% model_names = {'road_bike','bmx_bike','brooklyn_machine_works_bike'};
+average_name = strjoin(model_names,'_');
+model_files = cellfun(@(x) [model_pathes strrep([x '.3ds'], '/', '_')], model_names, 'UniformOutput', false);
 
 dwot_get_default_params;
-param.models_path = models_path;
+
+% Cleanup Memory
+if exist('renderer','var')
+  renderer.delete();
+  clear renderer;
+end
+
 if ~exist('renderer','var')
   renderer = Renderer();
-  if ~renderer.initialize([param.models_path{1} '.3ds'], 700, 700, 0, 0, 0, 0, 25)
+  if ~renderer.initialize(model_files , 700, 700, 0, 0, 0, 0, 25)
     error('fail to load model');
   end
 end
 
-detector_name = sprintf('%s_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
-    CLASS, numel(models_path), n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
+detector_name = sprintf('%s_avg_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
+    CLASS, average_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
 
 if exist(detector_name,'file')
   load(detector_name);
 else
-  [detectors] = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, param, visualize_detector);
+  [detectors] = dwot_make_average_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_files), CLASS, param, visualize_detector);
   [detectors, detector_table]= dwot_make_table_from_detectors(detectors);
   if sum(cellfun(@(x) isempty(x), detectors))
     error('Detector Not Completed');
@@ -168,26 +178,33 @@ for imgIdx = 1:N_IMAGE
     else
       error('Computing Mode Undefined');
     end
-    fprintf(' time to convolution: %0.4f', toc(imgTic));
+    fprintf(' time to convolution: %0.4f\n', toc(imgTic));
     
+    nDet = size(bbsNMS,1);
     bbsNMS_clip = clip_to_image(bbsNMS, [1 1 imSz(2) imSz(1)]);
     [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
-    bbsNMS(:,9) = bbsNMS_clip(:,9);
+    
+    if nDet > 0
+      bbsNMS(:,9) = bbsNMS_clip(:,9);
+    end
     
     if visualize_detection && ~isempty(clsinds)
       figure(2);
       dwot_draw_overlap_detection(im, bbsNMS, renderings, n_proposals, 50, visualize_detection);
       drawnow;
       save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.png',...
-        CLASS,TYPE,models_name{1}, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
+        CLASS,TYPE, average_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
       print('-dpng','-r100',['Result/' CLASS '_' TYPE '/' save_name])
       
       %  waitforbuttonpress;
     end
-    n_mcmc = min(n_proposals, size(bbsNMS,1));
-    [hog_region_pyramid, im_region] = dwot_extract_hog(hog, scales, detectors, bbsNMS(1:n_mcmc,:), param, im);
-    [best_proposals, detectors, detector_table] = dwot_binary_search_proposal_region(hog_region_pyramid, im_region, detectors, detector_table, renderer, param, im);
-%    [best_proposals] = dwot_mcmc_proposal_region(renderer, hog_region_pyramid, im_region, detectors, param, im);
+    
+    
+%     n_mcmc = min(n_proposals, size(bbsNMS,1));
+    
+%     [hog_region_pyramid, im_region] = dwot_extract_hog(hog, scales, detectors, bbsNMS(1:n_mcmc,:), param, im);
+%     [best_proposals, detectors, detector_table] = dwot_binary_search_proposal_region(hog_region_pyramid, im_region, detectors, detector_table, renderer, param, im);
+%     [best_proposals] = dwot_mcmc_proposal_region(renderer, hog_region_pyramid, im_region, detectors, param, im);
 
 %     for proposal_idx = 1:n_mcmc
 %       subplot(121);
@@ -208,47 +225,47 @@ for imgIdx = 1:N_IMAGE
 %     mcmc_score ./ bbsNMS_clip(1:n_mcmc,end)'
 %     bbsNMS_clip(1:n_mcmc,end) = mcmc_score';
     
-    bbsNMS_proposal = bbsNMS;
-    for region_idx = 1:n_mcmc
-      bbsNMS_proposal(region_idx,1:4) = best_proposals{region_idx}.image_bbox;
-      bbsNMS_proposal(region_idx,12) = best_proposals{region_idx}.score;
-    end
-    [~, o] = sort(bbsNMS_proposal(:,12),'descend');
-    bbsNMS_proposal = bbsNMS_proposal(o,:); 
-    bbsNMS_proposal_clip = clip_to_image(bbsNMS_proposal, [1 1 imSz(2) imSz(1)]);
-    
-    fprintf(' time to mcmc: %0.4f', toc(imgTic));
-    nDet = size(bbsNMS,1);
-
-    [bbsNMS_proposal_clip, tp_prop{imgIdx}, fp_prop{imgIdx}, ~] = dwot_compute_positives(bbsNMS_proposal_clip, gt(imgIdx), param);
-    fprintf(' time : %0.4f\n', toc(imgTic));
+%     bbsNMS_proposal = bbsNMS;
+%     for region_idx = 1:n_mcmc
+%       bbsNMS_proposal(region_idx,1:4) = best_proposals{region_idx}.image_bbox;
+%       bbsNMS_proposal(region_idx,12) = best_proposals{region_idx}.score;
+%     end
+%     [~, o] = sort(bbsNMS_proposal(:,12),'descend');
+%     bbsNMS_proposal = bbsNMS_proposal(o,:); 
+%     bbsNMS_proposal_clip = clip_to_image(bbsNMS_proposal, [1 1 imSz(2) imSz(1)]);
+%     
+%     fprintf(' time to mcmc: %0.4f', toc(imgTic));
+% %    
+% 
+%     [bbsNMS_proposal_clip, tp_prop{imgIdx}, fp_prop{imgIdx}, ~] = dwot_compute_positives(bbsNMS_proposal_clip, gt(imgIdx), param);
+%     fprintf(' time : %0.4f\n', toc(imgTic));
 
     if nDet > 0
       detectorId{imgIdx} = bbsNMS(:,11)';
       detScore{imgIdx} = bbsNMS(:,end)';
-      detectorId_prop{imgIdx} = bbsNMS_proposal_clip(:,11)';
-      detScore_prop{imgIdx} = bbsNMS_proposal_clip(:,end)';
+%       detectorId_prop{imgIdx} = bbsNMS_proposal_clip(:,11)';
+%       detScore_prop{imgIdx} = bbsNMS_proposal_clip(:,end)';
     else
       detectorId{imgIdx} = [];
       detScore{imgIdx} = [];
-      detectorId_prop{imgIdx} = [];
-      detScore_prop{imgIdx} = [];
+%       detectorId_prop{imgIdx} = [];
+%       detScore_prop{imgIdx} = [];
     end
     % if visualize
-    if visualize_detection && ~isempty(clsinds)
-      figure(3);
-      
-      bbsNMS_proposal(:,9) = bbsNMS_proposal_clip(:,9);
-      dwot_draw_overlap_detection(im, bbsNMS_proposal, renderings, n_mcmc, 50, visualize_detection);
-
-      % disp('Press any button to continue');
-      
-      save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d_binary.png',...
-        CLASS,TYPE,models_name{1}, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
-      print('-dpng','-r100',['Result/' CLASS '_' TYPE '/' save_name])
-      
-      % waitforbuttonpress;
-    end
+%     if visualize_detection && ~isempty(clsinds)
+%       figure(3);
+%       
+%       bbsNMS_proposal(:,9) = bbsNMS_proposal_clip(:,9);
+%       dwot_draw_overlap_detection(im, bbsNMS_proposal, renderings, n_mcmc, 50, visualize_detection);
+% 
+%       % disp('Press any button to continue');
+%       
+%       save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d_binary.png',...
+%         CLASS,TYPE, average_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
+%       print('-dpng','-r100',['Result/' CLASS '_' TYPE '/' save_name])
+%       
+%       % waitforbuttonpress;
+%     end
       
     npos = npos + sum(~gt(imgIdx).diff);
 end
@@ -296,7 +313,7 @@ title(tit);
 axis([0 1 0 1]);
 set(gcf,'color','w');
 save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%d.png',...
-        CLASS, TYPE, models_name{1}, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),N_IMAGE);
+        CLASS, TYPE, average_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),N_IMAGE);
 
 print('-dpng','-r150',['Result/' CLASS '_' TYPE '/' save_name])
 
@@ -304,47 +321,47 @@ print('-dpng','-r150',['Result/' CLASS '_' TYPE '/' save_name])
 
 
 
-detScore_prop = cell2mat(detScore_prop);
-fp_prop = cell2mat(fp_prop);
-tp_prop = cell2mat(tp_prop);
-% atp = cell2mat(atp);
-% afp = cell2mat(afp);
-detectorId_prop = cell2mat(detectorId_prop);
-
-[sc, si] =sort(detScore_prop,'descend');
-fpSort_prop = cumsum(fp_prop(si));
-tpSort_prop = cumsum(tp_prop(si));
-
-% atpSort = cumsum(atp(si));
-% afpSort = cumsum(afp(si));
-
-detectorIdSort_prop = detectorId_prop(si);
-
-recall_prop = tpSort_prop/npos;
-precision_prop = tpSort_prop./(fpSort_prop + tpSort_prop);
-
-% arecall = atpSort/npos;
-% aprecision = atpSort./(afpSort + atpSort);
-ap_prop = VOCap(recall_prop', precision_prop');
-% aa = VOCap(arecall', aprecision');
-fprintf('AP = %.4f\n', ap_prop);
-
-clf;
-plot(recall_prop, precision_prop, 'r', 'LineWidth',3);
-% hold on;
-% plot(arecall, aprecision, 'g', 'LineWidth',3);
-xlabel('Recall');
-% ylabel('Precision/Accuracy');
-% tit = sprintf('Average Precision = %.1f / Average Accuracy = %1.1f', 100*ap,100*aa);
-
-tit = sprintf('Average Precision = %.1f', 100*ap_prop);
-title(tit);
-axis([0 1 0 1]);
-set(gcf,'color','w');
-save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%d_binary.png',...
-        CLASS, TYPE, models_name{1}, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),N_IMAGE);
-
-print('-dpng','-r150',['Result/' CLASS '_' TYPE '/' save_name]);
+% detScore_prop = cell2mat(detScore_prop);
+% fp_prop = cell2mat(fp_prop);
+% tp_prop = cell2mat(tp_prop);
+% % atp = cell2mat(atp);
+% % afp = cell2mat(afp);
+% detectorId_prop = cell2mat(detectorId_prop);
+% 
+% [sc, si] =sort(detScore_prop,'descend');
+% fpSort_prop = cumsum(fp_prop(si));
+% tpSort_prop = cumsum(tp_prop(si));
+% 
+% % atpSort = cumsum(atp(si));
+% % afpSort = cumsum(afp(si));
+% 
+% detectorIdSort_prop = detectorId_prop(si);
+% 
+% recall_prop = tpSort_prop/npos;
+% precision_prop = tpSort_prop./(fpSort_prop + tpSort_prop);
+% 
+% % arecall = atpSort/npos;
+% % aprecision = atpSort./(afpSort + atpSort);
+% ap_prop = VOCap(recall_prop', precision_prop');
+% % aa = VOCap(arecall', aprecision');
+% fprintf('AP = %.4f\n', ap_prop);
+% 
+% clf;
+% plot(recall_prop, precision_prop, 'r', 'LineWidth',3);
+% % hold on;
+% % plot(arecall, aprecision, 'g', 'LineWidth',3);
+% xlabel('Recall');
+% % ylabel('Precision/Accuracy');
+% % tit = sprintf('Average Precision = %.1f / Average Accuracy = %1.1f', 100*ap,100*aa);
+% 
+% tit = sprintf('Average Precision = %.1f', 100*ap_prop);
+% title(tit);
+% axis([0 1 0 1]);
+% set(gcf,'color','w');
+% save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%d_binary.png',...
+%         CLASS, TYPE, model_names{1}, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),N_IMAGE);
+% 
+% print('-dpng','-r150',['Result/' CLASS '_' TYPE '/' save_name]);
 
 
 %% Cleanup Memory

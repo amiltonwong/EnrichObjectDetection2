@@ -43,6 +43,9 @@ for bbsIdx = NDrawBox:-1:1
               (1 - cropRegion(2)):(end - cropRegion(4)),...
               (1 - cropRegion(1)):(end - cropRegion(3)),:),...
        [clip_bnd(4) - clip_bnd(2) + 1, clip_bnd(3) - clip_bnd(1) + 1]);
+  resizeRendering(resizeRendering(:)>1)=1;
+  resizeRendering(resizeRendering(:)<0)=0;
+  
   % resizeRendering = resizeRendering(1:(clip_bnd(4) - clip_bnd(2) + 1), 1:(clip_bnd(3) - clip_bnd(1) + 1), :);
   bndIm = paddedIm( clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3), :);
   blendIm = bndIm/3 + im2double(resizeRendering)/3 + resultIm( clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3), :)/3;
