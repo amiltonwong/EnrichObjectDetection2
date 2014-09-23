@@ -1,4 +1,4 @@
-function [bbsNMS, hog, scales] = dwot_detect(I, templates, param)
+function [bbsAllLevel, hog, scales] = dwot_detect(I, templates, param)
 
 doubleIm = im2double(I);
 [hog, scales] = esvm_pyramid(doubleIm, param);
@@ -80,4 +80,4 @@ for level = length(hog):-1:1
   bbsAll{level} = cell2mat(bbsTemplate);
 end
 
-bbsNMS = esvm_nms(cell2mat(bbsAll),0.5);
+bbsAllLevel = cell2mat(bbsAll);

@@ -38,9 +38,14 @@ param.detect_levels_per_octave = n_level;
 %If less than 1.0, then we apply nms to detections so that we don't have
 %too many redundant windows [defaults to 0.5]
 %NOTE: mining is much faster if this is turned off!
+
 param.nms_threshold = 0.5;
 
 param.min_overlap = 0.5;
+
+param.max_view_difference = 22.5; % degree
+
+
 
 %How much we pad the pyramid (to let detections fall outside the image)
 param.detect_pyramid_padding = 15;
@@ -89,7 +94,7 @@ param.init_params = init_params;
 %     Creates templates that have approxmiately same number of active cells
 % Active cells are the HOG cells whose absolute values is above the
 % HOG_CELL_THRESHOLD
-param.template_initialization_mode = 0; 
+param.template_initialization_mode = 1; 
 param.image_padding       = 50;
 param.lambda              = lambda;
 param.n_level_per_octave  = n_level;

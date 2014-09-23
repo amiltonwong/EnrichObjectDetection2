@@ -33,7 +33,7 @@ feat = {};
 for i = 1:MAXLEVELS
   scaler = 1 / sc^(i-1);
     
-  if ceil(bboxWidth * scaler / sbin) * ceil(bboxHeight * scaler / sbin) >= 5 * N_CELL_THRESHOLD
+  if ceil(bboxWidth * scaler / sbin) * ceil(bboxHeight * scaler / sbin) >= 5 * param.n_cell_limit
     continue;
   end
   
@@ -55,7 +55,7 @@ for i = 1:MAXLEVELS
 %   bndY(1) = floor(bndY(1));
 %   bndY(2) = ceil(bndY(2));
   
-  if N_NonEmptyCells <= N_CELL_THRESHOLD
+  if N_NonEmptyCells <= param.n_cell_limit
     im_scale = scale(i);
     curfeats = feat{i}(bndY(1):bndY(2),bndX(1):bndX(2),:);
     % fprintf(1,'initialized with HOG_size = [%d %d]\n',range(bndY) + 1, range(bndX) + 1);

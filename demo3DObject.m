@@ -2,12 +2,16 @@
 % The average template is generated using multiple renderings
 % 
 % see dwot_avg_model.m
-
-
-VOC_PATH = '/home/chrischoy/Dataset/VOCdevkit/';
+DATA_SET = '3DObject';
+DATA_PATH = '/home/chrischoy/Dataset/3DObject/';
 if ismac
-  VOC_PATH = '~/dataset/VOCdevkit/';
+  DATA_PATH = '~/dataset/3DObject';
 end
+
+% VOC_PATH = '/home/chrischoy/Dataset/VOCdevkit/';
+% if ismac
+%   VOC_PATH = '~/dataset/VOCdevkit/';
+% end
 
 addpath('HoG');
 addpath('HoG/features');
@@ -15,8 +19,7 @@ addpath('Util');
 addpath('DecorrelateFeature/');
 addpath('../MatlabRenderer/');
 addpath('../MatlabCUDAConv/');
-addpath(VOC_PATH);
-addpath([VOC_PATH, 'VOCcode']);
+addpath(DATA_PATH);
 
 % Computing Mode  = 0, CPU
 %                 = 1, GPU
@@ -35,15 +38,15 @@ if COMPUTING_MODE > 0
   param.gpu = gdevice;
 end
 daz = 45;
-del = 15;
+del = 30;
 dyaw = 15;
 dfov = 20;
 
 azs = 0:daz:315; % azs = [azs , azs - 10, azs + 10];
-els = 0:del:45;
-fovs = 20:20:40;
+els = 0:del:60;
+fovs = 20;
 yaws = -45:dyaw:45;
-n_cell_limit = [200];
+n_cell_limit = [150];
 lambda = [0.015];
 
 % azs = 0:15:345
@@ -59,45 +62,47 @@ visualize_detector = false;
 
 sbin = 4;
 n_level = 10;
-detection_threshold = 120;
+detection_threshold = 80;
 n_proposals = 10;
-
-% Get all possible sub-classes
-model_pathes = 'Mesh/Bicycle/';
-model_names = {'road_bike','road_bike_2','road_bike_3','fixed_gear_road_bike','bmx_bike','brooklyn_machine_works_bike', 'glx_bike'};
-% model_names = {'road_bike','bmx_bike','brooklyn_machine_works_bike'};
-average_name = strjoin(model_names,'_');
-model_files = cellfun(@(x) [model_pathes strrep([x '.3ds'], '/', '_')], model_names, 'UniformOutput', false);
-
 dwot_get_default_params;
 
-% Cleanup Memory
+% Get all possible sub-classes
+model_paths = 'Mesh/Bicycle/';
+% model_names = {'road_bike','road_bike_2','road_bike_3','fixed_gear_road_bike','bmx_bike','brooklyn_machine_works_bike', 'glx_bike'};
+model_names = {'road_bike'}; % ,'bmx_bike','brooklyn_machine_works_bike'};
+detector_model_name = ['each_' strjoin(strrep(model_names, '/','_'),'_')];
+model_files = cellfun(@(x) [model_paths strrep([x '.3ds'], '/', '_')], model_names, 'UniformOutput', false);
+
+
+param.models_path = model_paths;
+
+
 if exist('renderer','var')
   renderer.delete();
   clear renderer;
 end
 
+
 if ~exist('renderer','var')
   renderer = Renderer();
-  if ~renderer.initialize(model_files , 700, 700, 0, 0, 0, 0, 25)
+  if ~renderer.initialize(model_files, 700, 700, 0, 0, 0, 0, 25)
     error('fail to load model');
   end
 end
 
-detector_name = sprintf('%s_avg_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
-    CLASS, average_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
+detector_name = sprintf('%s_init_%d_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
+    CLASS, param.template_initialization_mode, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
 
 if exist(detector_name,'file')
   load(detector_name);
 else
-  [detectors] = dwot_make_average_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_files), CLASS, param, visualize_detector);
+  [detectors] = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_files), CLASS, param, visualize_detector);
   [detectors, detector_table]= dwot_make_table_from_detectors(detectors);
   if sum(cellfun(@(x) isempty(x), detectors))
     error('Detector Not Completed');
   end
   eval(sprintf(['save ' detector_name ' detectors detector_table']));
 end
-
 
 % For Debuggin purpose only
 param.detectors              = detectors;
@@ -116,16 +121,16 @@ else
   error('Computing mode undefined');
 end
 
-curDir = pwd;
-eval(['cd ' VOC_PATH]);
-VOCinit;
-eval(['cd ' curDir]);
+% curDir = pwd;
+% eval(['cd ' VOC_PATH]);
+% VOCinit;
+% eval(['cd ' curDir]);
+% 
+% read annotation
+[gt, image_path] = dwot_3d_object_dataset(DATA_PATH, CLASS);
 
-% load dataset
-[gtids,t] = textread(sprintf(VOCopts.imgsetpath,[CLASS '_' TYPE]),'%s %d');
+N_IMAGE = length(gt);
 
-N_IMAGE = length(gtids);
-N_IMAGE = 1000;
 % extract ground truth objects
 npos = 0;
 tp = cell(1,N_IMAGE);
@@ -146,25 +151,14 @@ detScore_prop = cell(1,N_IMAGE);
 detectorId_prop = cell(1,N_IMAGE);
 detIdx_prop = 0;
 
-gt(length(gtids))=struct('BB',[],'diff',[],'det',[]);
+
 % 138
 % 256
-for imgIdx = 1:N_IMAGE
+for imgIdx = 1:(N_IMAGE)
     fprintf('%d/%d ',imgIdx,N_IMAGE);
     imgTic = tic;
-    % read annotation
-    recs(imgIdx)=PASreadrecord(sprintf(VOCopts.annopath,gtids{imgIdx}));
-    
-    clsinds = strmatch(CLASS,{recs(imgIdx).objects(:).class},'exact');
-    gt(imgIdx).BB=cat(1,recs(imgIdx).objects(clsinds).bbox)';
-    gt(imgIdx).diff=[recs(imgIdx).objects(clsinds).difficult];
-    gt(imgIdx).det=false(length(clsinds),1);
-    
-%     if isempty(clsinds)
-%       continue;
-%     end
-    
-    im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
+
+    im = imread([image_path{imgIdx}]);
     imSz = size(im);
     if COMPUTING_MODE == 0
       [bbsAllLevel, hog, scales] = dwot_detect( im, templates, param);
@@ -185,18 +179,18 @@ for imgIdx = 1:N_IMAGE
     
     nDet = size(bbsNMS,1);
     bbsNMS_clip = clip_to_image(bbsNMS, [1 1 imSz(2) imSz(1)]);
-    [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
+    [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt{imgIdx}, param);
     
     if nDet > 0
       bbsNMS(:,9) = bbsNMS_clip(:,9);
     end
     
     if visualize_detection && ~isempty(clsinds)
-      figure(2);
+      % figure(2);
       dwot_draw_overlap_detection(im, bbsNMS, renderings, n_proposals, 50, visualize_detection);
       drawnow;
-      save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.png',...
-        CLASS,TYPE, average_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
+      save_name = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.png',...
+        DATA_SET, CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
       print('-dpng','-r100',['Result/' CLASS '_' TYPE '/' save_name])
       
       %  waitforbuttonpress;
@@ -270,7 +264,7 @@ for imgIdx = 1:N_IMAGE
 %       % waitforbuttonpress;
 %     end
       
-    npos = npos + sum(~gt(imgIdx).diff);
+    npos = npos + sum(~gt{imgIdx}.diff);
 end
 
 if isfield(param,'renderer')
@@ -315,8 +309,8 @@ tit = sprintf('Average Precision = %.1f', 100*ap);
 title(tit);
 axis([0 1 0 1]);
 set(gcf,'color','w');
-save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%d.png',...
-        CLASS, TYPE, average_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),N_IMAGE);
+save_name = sprintf('AP_%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%d.png',...
+        DATA_SET, CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),N_IMAGE);
 
 print('-dpng','-r150',['Result/' CLASS '_' TYPE '/' save_name])
 

@@ -127,17 +127,20 @@ for imgIdx = 312:N_IMAGE
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
     imSz = size(im);
     if COMPUTING_MODE == 0
-      [bbsNMS, hog, scales, voting_planes] = dwot_detect_voting( im, templates, param);
+      [bbsAllLevvel, hog, scales, voting_planes] = dwot_detect_voting( im, templates, param);
       % [hog_region_pyramid, im_region] = dwot_extract_region_conv(im, hog, scales, bbsNMS, param);
       % [bbsNMS_MCMC] = dwot_mcmc_proposal_region(im, hog, scale, hog_region_pyramid, param);
     elseif COMPUTING_MODE == 1
       % [bbsNMS ] = dwot_detect_gpu_and_cpu( im, templates, templates_cpu, param);
-      [bbsNMS, hog, scales] = dwot_detect_gpu( im, templates, param);
+      [bbsAllLevel, hog, scales] = dwot_detect_gpu( im, templates, param);
     elseif COMPUTING_MODE == 2
-      [bbsNMS, hog, scales] = dwot_detect_combined( im, templates, templates_cpu, param);
+      [bbsAllLevel, hog, scales] = dwot_detect_combined( im, templates, templates_cpu, param);
     else
       error('Computing Mode Undefined');
     end
+    
+    % Automatically sort them according to the score and apply NMS
+    bbsNMS = esvm_nms(bbsAllLevel,0.5);
     
     for template_index = 1:numel(templates)
       subplot(131);

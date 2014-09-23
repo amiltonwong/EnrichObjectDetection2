@@ -140,20 +140,23 @@ for imgIdx=1:N_IMAGE
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
     imSz = size(im);
     if COMPUTING_MODE == 0
-      [bbsNMS, hog, scales] = dwot_detect( im, templates_cpu, param);
+      [bbsAllLevel, hog, scales] = dwot_detect( im, templates_cpu, param);
 %       [hog_region_pyramid, im_region] = dwot_extract_region_conv(im, hog, scales, bbsNMS, param);
 %       [bbsNMS_MCMC] = dwot_mcmc_proposal_region(im, hog, scale, hog_region_pyramid, param);
     elseif COMPUTING_MODE == 1
       % [bbsNMS ] = dwot_detect_gpu_and_cpu( im, templates, templates_cpu, param);
-      [bbsNMS, hog, scales] = dwot_detect_gpu( im, templates_gpu, param);
+      [bbsAllLevel, hog, scales] = dwot_detect_gpu( im, templates_gpu, param);
 %       [hog_region_pyramid, im_region] = dwot_extract_region_fft(im, hog, scales, bbsNMS, param);
     elseif COMPUTING_MODE == 2
-      [bbsNMS, hog, scales] = dwot_detect_combined( im, templates_gpu, templates_cpu, param);
+      [bbsAllLevel, hog, scales] = dwot_detect_combined( im, templates_gpu, templates_cpu, param);
     else
       error('Computing Mode Undefined');
     end
     fprintf(' time to convolution: %0.4f', toc(imgTic));
-        
+    
+    % Automatically sort them according to the score and apply NMS
+    bbsNMS = esvm_nms(bbsAllLevel,0.5);
+    
     bbsNMS_clip = clip_to_image(bbsNMS, [1 1 imSz(2) imSz(1)]);
 
     nDet = size(bbsNMS_clip,1);

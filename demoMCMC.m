@@ -30,14 +30,14 @@ if COMPUTING_MODE > 0
   param.gpu = gdevice;
 end
 
-daz = 15;
+daz = 45;
 del = 15;
 dyaw = 15;
 dfov = 20;
 
 azs = 0:daz:345; % azs = [azs , azs - 10, azs + 10];
 els = 0:del:45;
-fovs = 20:20:40;
+fovs = 20;
 yaws = -45:dyaw:45;
 n_cell_limit = [200];
 lambda = [0.015];
@@ -59,25 +59,36 @@ n_level = 10;
 detection_threshold = 120;
 n_proposals = 5;
 
-models_path = {'Mesh/Bicycle/road_bike'};
-models_name = cellfun(@(x) strrep(x, '/', '_'), models_path, 'UniformOutput', false);
+
+% Get all possible sub-classes
+model_paths = 'Mesh/Bicycle/';
+% model_names = {'road_bike','road_bike_2','road_bike_3','fixed_gear_road_bike','bmx_bike','brooklyn_machine_works_bike', 'glx_bike'};
+model_names = {'road_bike'};
+detector_model_name = ['each_' strjoin(model_names,'_')];
+model_files = cellfun(@(x) [model_paths strrep([x '.3ds'], '/', '_')], model_names, 'UniformOutput', false);
 
 dwot_get_default_params;
-param.models_path = models_path;
+param.models_path = model_paths;
+% Cleanup Memory
+if exist('renderer','var')
+  renderer.delete();
+  clear renderer;
+end
+
 if ~isfield(param,'renderer')
   renderer = Renderer();
-  if ~renderer.initialize([param.models_path{1} '.3ds'], 700, 700, 0, 0, 0, 0, 25)
+  if ~renderer.initialize(model_files, 700, 700, 0, 0, 0, 0, 25)
     error('fail to load model');
   end
 end
 
-detector_name = sprintf('%s_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
-    CLASS, numel(models_path), n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
+detector_name = sprintf('%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
+    CLASS, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
 
 if exist(detector_name,'file')
   load(detector_name);
 else
-  [detectors] = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, param, visualize_detector);
+  [detectors] = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_files), CLASS, param, visualize_detector);
   if sum(cellfun(@(x) isempty(x), detectors))
     error('Detector Not Completed');
   end
@@ -153,19 +164,22 @@ for imgIdx = 1:N_IMAGE
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
     imSz = size(im);
     if COMPUTING_MODE == 0
-      [bbsNMS, hog, scales] = dwot_detect( im, templates, param);
+      [bbsAllLevel, hog, scales] = dwot_detect( im, templates, param);
       % [hog_region_pyramid, im_region] = dwot_extract_region_conv(im, hog, scales, bbsNMS, param);
       % [bbsNMS_MCMC] = dwot_mcmc_proposal_region(im, hog, scale, hog_region_pyramid, param);
     elseif COMPUTING_MODE == 1
       % [bbsNMS ] = dwot_detect_gpu_and_cpu( im, templates, templates_cpu, param);
-      [bbsNMS, hog, scales] = dwot_detect_gpu( im, templates, param);
+      [bbsAllLevel, hog, scales] = dwot_detect_gpu( im, templates, param);
     elseif COMPUTING_MODE == 2
-      [bbsNMS, hog, scales] = dwot_detect_combined( im, templates, templates_cpu, param);
+      [bbsAllLevel, hog, scales] = dwot_detect_combined( im, templates, templates_cpu, param);
     else
       error('Computing Mode Undefined');
     end
     fprintf(' time to convolution: %0.4f', toc(imgTic));
     
+    % Automatically sort them according to the score and apply NMS
+    bbsNMS = esvm_nms(bbsAllLevel,0.5);
+
     bbsNMS_clip = clip_to_image(bbsNMS, [1 1 imSz(2) imSz(1)]);
     [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
     bbsNMS(:,9) = bbsNMS_clip(:,9);

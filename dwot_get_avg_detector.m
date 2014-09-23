@@ -5,21 +5,19 @@ end
 
 n_models = numel(model_indexes);
 
-
 % Render the images and find optimal template size
 im_model = cell(1,n_models);
 im_size = zeros(n_models, 3);
 for model_index = model_indexes
     % Assume that the model_indexes are base 1
     renderer.setModelIndex(model_index);
-    
+
     % Assume that all models are viewpoint aligned
     renderer.setViewpoint(90-azimuth,elevation,yaw,0,fov);
     % model class and index are not supported yet
     im_model{model_index} = renderer.renderCrop();
     im_size(model_index, :) = size(im_model{model_index});
 end
-
 
 % Find optimal template size
 %

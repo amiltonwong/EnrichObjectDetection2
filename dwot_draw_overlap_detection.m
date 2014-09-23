@@ -21,9 +21,9 @@ NDrawBox = min(size(bbsNMS, 1),maxNDrawBox);
 clipBBox = zeros(NDrawBox,4);
 for bbsIdx = NDrawBox:-1:1
   if iscell(renderings)
-    rendering = renderings{bbsNMS(bbsIdx, 11)};
+    rendering = im2double(renderings{bbsNMS(bbsIdx, 11)});
   else
-    rendering = renderings;
+    rendering = im2double(renderings);
   end
   box_position = round(bbsNMS(bbsIdx, 1:4)) + drawPadding;
   bboxWidth  = box_position(3) - box_position(1);
@@ -64,9 +64,13 @@ if box_text
   % Draw bounding box.
   color_map = hot(NDrawBox);
   for bbsIdx = NDrawBox:-1:1
-    
     box_position = clipBBox(bbsIdx, 1:4) + [0 0 -clipBBox(bbsIdx, 1:2)];
-    box_text = sprintf(' s:%0.2f o:%0.2f ',bbsNMS(bbsIdx,12),bbsNMS(bbsIdx,9));
+    % if detector id id available print it
+    if bbsNMS(bbsIdx,11) > 0
+      box_text = sprintf(' s:%0.2f o:%0.2f t:%d',bbsNMS(bbsIdx,12),bbsNMS(bbsIdx,9),bbsNMS(bbsIdx,11));
+    else
+      box_text = sprintf(' s:%0.2f o:%0.2f ',bbsNMS(bbsIdx,12),bbsNMS(bbsIdx,9));
+    end
     rectangle('position', box_position,'edgecolor',[0.5 0.5 0.5],'LineWidth',3);
     rectangle('position', box_position,'edgecolor',color_map(bbsIdx,:),'LineWidth',1);
     text(box_position(1) + 1 , box_position(2), box_text, 'BackgroundColor', color_map( bbsIdx ,:),'EdgeColor',[0.5 0.5 0.5]);

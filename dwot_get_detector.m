@@ -18,6 +18,7 @@ detector.fov = fov;
 detector.sz = size(WHOTemplate);
 padding = round(param.rendering_sbin / scale / 2);
 detector.rendering_padding = padding;
+detector.model_index = model_index;
 
 if bool_get_image
   size_im = size(im);
