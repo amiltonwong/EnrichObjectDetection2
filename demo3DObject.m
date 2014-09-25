@@ -172,7 +172,7 @@ for imgIdx = 1:(N_IMAGE)
     else
       error('Computing Mode Undefined');
     end
-    fprintf(' time to convolution: %0.4f\n', toc(imgTic));
+    fprintf(' convolution time : %0.4f\n', toc(imgTic));
     
     % Automatically sort them according to the score and apply NMS
     bbsNMS = esvm_nms(bbsAllLevel,0.5);

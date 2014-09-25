@@ -3,9 +3,11 @@ if nargin < 9
   bool_get_image = true;
 end
 % model class and index are not supported yet
-renderer.setViewpoint(90-azimuth,elevation,yaw,0,fov);
+renderer.setViewpoint(180 + azimuth,elevation,yaw,0,fov);
 im = renderer.renderCrop();
-
+if isempty(im)
+  error('Rendering error');
+end
 % [ WHOTemplate, HOGTemplate] = WHOTemplateDecompNonEmptyCell( im, Mu, Gamma, n_cell_limit, lambda, 50);
 [ WHOTemplate, ~, scale] = WHOTemplateCG_CUDA( im, param);
 

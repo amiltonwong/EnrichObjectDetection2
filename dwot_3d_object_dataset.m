@@ -1,7 +1,7 @@
 function [label, image_path] = dwot_3d_object_dataset(DATA_PATH, CLASS)
 % bboxFormat = 'x1 y1 x2 y2'
 
-CLASS_PATH = [DATA_PATH '/' CLASS];
+CLASS_PATH = [DATA_PATH '/' lower(CLASS)];
 
 sub_dirs = dir(CLASS_PATH);
 sub_dirs = sub_dirs(3:end);
