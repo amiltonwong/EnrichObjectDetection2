@@ -26,9 +26,10 @@ addpath(DATA_PATH);
 %                 = 2, Combined
 COMPUTING_MODE = 1;
 CLASS = 'Car';
-LOWER_CLASS = lower(CLASS);
+SUB_CLASS = 'Sedan';
+LOWER_CASE_CLASS = lower(CLASS);
 TYPE = 'val';
-mkdir('Result',[LOWER_CLASS '_' TYPE]);
+mkdir('Result',[LOWER_CASE_CLASS '_' TYPE]);
 
 if COMPUTING_MODE > 0
   gdevice = gpuDevice(1);
@@ -80,8 +81,7 @@ dwot_get_default_params;
 
 % Get all possible sub-classes
 model_paths = fullfile('Mesh', CLASS);
-
-[ model_names, file_paths ] = dwot_get_cad_models('Mesh', CLASS, [], {'3ds'});
+[ model_names, file_paths ] = dwot_get_cad_models('Mesh', CLASS, SUB_CLASS, {'3ds'});
 
 % model_names = {'road_bike','bmx_bike', 'glx_bike'};
 % model_names = {'road_bike','road_bike_2','road_bike_3','fixed_gear_road_bike','bmx_bike','brooklyn_machine_works_bike', 'glx_bike'};
@@ -90,23 +90,17 @@ model_paths = fullfile('Mesh', CLASS);
 % model_names = model_names(AccordIdx);
 % file_paths = file_paths(AccordIdx);
 
-disp('Models to use : ');
-nModels = numel(model_names);
-for model_idx = 1:nModels
-  fprintf('%d/%d : %s\n', model_idx, nModels, model_names{model_idx});
-end
+% detector name
+[ detector_model_name ] = dwot_get_detector_name(model_names, param);
+detector_name = sprintf('%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
+     LOWER_CASE_CLASS,  detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
 
-
-detector_model_name = ['init_' num2str(param.template_initialization_mode) '_each_' strjoin(strrep(model_names, '/','_'),'_')];
-
-param.models_path = model_paths;
-
+param.model_paths = file_paths;
 
 if exist('renderer','var')
   renderer.delete();
   clear renderer;
 end
-
 
 if ~exist('renderer','var')
   renderer = Renderer();
@@ -115,13 +109,10 @@ if ~exist('renderer','var')
   end
 end
 
-detector_name = sprintf('%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
-    LOWER_CLASS,  detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
-
 if exist(detector_name,'file')
   load(detector_name);
 else
-  [detectors] = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_names), LOWER_CLASS, param, visualize_detector);
+  [detectors] = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_names), LOWER_CASE_CLASS, param, visualize_detector);
   [detectors, detector_table]= dwot_make_table_from_detectors(detectors);
   if sum(cellfun(@(x) isempty(x), detectors))
     error('Detector Not Completed');
@@ -252,7 +243,7 @@ for imgIdx = N_IMAGE/4:N_IMAGE/2
       drawnow;
       save_name = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.png',...
         DATA_SET, CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
-      print('-dpng','-r150',['Result/' LOWER_CLASS '_' TYPE '/' save_name])
+      print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name])
       
 %       waitforbuttonpress;
     end
@@ -398,9 +389,9 @@ title(tit);
 axis([0 1 0 1]);
 set(gcf,'color','w');
 save_name = sprintf('AP_view_nms_to_views_%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%d.png',...
-        DATA_SET, LOWER_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),N_IMAGE);
+        DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),N_IMAGE);
 
-print('-dpng','-r150',['Result/' LOWER_CLASS '_' TYPE '/' save_name])
+print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name])
 
 
 % figure(3);
@@ -437,7 +428,7 @@ print('-dpng','-r150',['Result/' LOWER_CLASS '_' TYPE '/' save_name])
 %   
 %   set(gcf,'color','w');
 %   save_name = sprintf('hist_%s_%s_%s_%s_lim_%d_lam_%0.4f_ID_%d.png',...
-%           DATA_SET, LOWER_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, template_idx);
+%           DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, template_idx);
 % 
 %   print('-dpng','-r100',['Result/' CLASS '_' TYPE '/' save_name])
 % end

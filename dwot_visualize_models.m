@@ -22,7 +22,10 @@ end
 if nargin > 5
     % Save images to the path
     for model_index = 1:n_models 
-        imagesc(im_model{model_index}); axis off;
+        imagesc(im_model{model_index}); 
+        axis equal;
+        axis off;
+
         title(strrep(model_files{model_index},'_',' '));
 
         save_name = sprintf('%s/%s.png',...
