@@ -3,7 +3,15 @@
 % 
 % see dwot_avg_model.m
 DATA_SET = '3DObject';
-DATA_PATH = '/home/chrischoy/Dataset/3DObject/';
+
+[~, sys_result] = system('hostname');
+server_id = regexp(sys_result, '^napoli(?<num>\d+).*','names');
+if isempty(server_id)
+  DATA_PATH = '/home/chrischoy/Dataset/3DObject/';
+else
+  DATA_PATH = '/scratch/chrischoy/Dataset/3DObject/';
+end
+
 if ismac
   DATA_PATH = '~/dataset/3DObject';
 end
@@ -91,7 +99,7 @@ model_paths = fullfile('Mesh', CLASS);
 % file_paths = file_paths(AccordIdx);
 
 % detector name
-[ detector_model_name ] = dwot_get_detector_name(model_names, param);
+[ detector_model_name ] = dwot_get_detector_name(CLASS, SUB_CLASS, model_names, param);
 detector_name = sprintf('%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
      LOWER_CASE_CLASS,  detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
 

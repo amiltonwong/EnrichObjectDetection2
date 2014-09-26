@@ -1,4 +1,11 @@
-VOC_PATH = '/home/chrischoy/Dataset/VOCdevkit/';
+[~, sys_result] = system('hostname');
+server_id = regexp(sys_result, '^napoli(?<num>\d+).*','names');
+if isempty(server_id)
+  VOC_PATH = '/home/chrischoy/Dataset/VOCdevkit/';
+else
+  VOC_PATH = '/scratch/chrischoy/Dataset/VOCdevkit/';
+end
+
 if ismac
   VOC_PATH = '~/dataset/VOCdevkit/';
 end
