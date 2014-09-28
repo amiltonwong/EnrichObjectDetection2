@@ -22,6 +22,7 @@ addpath([VOC_PATH, 'VOCcode']);
 DATA_SET = 'PASCAL';
 COMPUTING_MODE = 1;
 CLASS = 'Chair';
+SUB_CLASS = [];
 LOWER_CASE_CLASS = lower(CLASS);
 TYPE = 'val';
 mkdir('Result',[LOWER_CASE_CLASS '_' TYPE]);
@@ -84,7 +85,7 @@ if ~isfield(param,'renderer')
 end
 
 % detector name
-[ detector_model_name ] = dwot_get_detector_name(model_names, param);
+[ detector_model_name ] = dwot_get_detector_name(CLASS, SUB_CLASS, model_names, param);
 detector_name = sprintf('%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
     LOWER_CASE_CLASS,  detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
 
@@ -131,7 +132,7 @@ eval(['cd ' curDir]);
 [gtids,t] = textread(sprintf(VOCopts.imgsetpath,[LOWER_CASE_CLASS '_' TYPE]),'%s %d');
 
 N_IMAGE = length(gtids);
-N_IMAGE = 1000;
+N_IMAGE = 1;
 % extract ground truth objects
 npos = 0;
 tp = cell(1,N_IMAGE);
@@ -185,6 +186,7 @@ for imgIdx=1:N_IMAGE
     [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
     
     if nDet > 0
+      detScore{imgIdx} = bbsNMS_clip(:,end)';
       bbsNMS(:,9) = bbsNMS_clip(:,9);
     end
     
@@ -192,7 +194,7 @@ for imgIdx=1:N_IMAGE
       % figure(2);
       dwot_draw_overlap_detection(im, bbsNMS, renderings, n_proposals, 50, visualize_detection);
       drawnow;
-      save_name = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.png',...
+      save_name = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.jpg',...
         DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
       print('-djpeg','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name]);
       
@@ -207,7 +209,7 @@ fp = cell2mat(fp);
 tp = cell2mat(tp);
 % atp = cell2mat(atp);
 % afp = cell2mat(afp);
-detectorId = cell2mat(detectorId);
+% detectorId = cell2mat(detectorId);
 
 [sc, si] =sort(detScore,'descend');
 fpSort = cumsum(fp(si));
@@ -216,7 +218,7 @@ tpSort = cumsum(tp(si));
 % atpSort = cumsum(atp(si));
 % afpSort = cumsum(afp(si));
 
-detectorIdSort = detectorId(si);
+% detectorIdSort = detectorId(si);
 
 recall = tpSort/npos;
 precision = tpSort./(fpSort + tpSort);
@@ -240,6 +242,6 @@ title(tit);
 axis([0 1 0 1]);
 set(gcf,'color','w');
 save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%d_.png',...
-        LOWER_CASE_CLASS, TYPE, models_name{1}, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), N_IMAGE);
+        LOWER_CASE_CLASS, TYPE, detector_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), N_IMAGE);
 
 print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name])
