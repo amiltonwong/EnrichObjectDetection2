@@ -229,10 +229,10 @@ for imgIdx = floor(N_IMAGE/4):ceil(N_IMAGE/2)
     gt_mod.BB = BB';
     gt_mod.det = zeros(1,size(BB,1));
 
-    [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt_mod, param);
+    [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, detScore{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt_mod, param);
     
     if nDet > 0
-      detScore{imgIdx} = bbsNMS_clip(:,end)';
+%       detScore{imgIdx} = bbsNMS_clip(:,end)';
       bbsNMS(:,9) = bbsNMS_clip(:,9);
     end
     

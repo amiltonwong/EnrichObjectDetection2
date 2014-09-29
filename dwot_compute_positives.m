@@ -1,12 +1,11 @@
-function [bbsNMS_clip, tp, fp, gt] = dwot_compute_positives(bbsNMS_clip, gt, param)
+function [bbsNMS_clip, tp, fp, detScore, gt] = dwot_compute_positives(bbsNMS_clip, gt, param)
 
 nDet = size(bbsNMS_clip,1);
 tp = zeros(1,nDet);
 fp = zeros(1,nDet);
-
+detScore = zeros(1,nDet);
 for bbsIdx = 1:nDet
   ovmax=-inf;
-
   % search over all objects in the image
   for j=1:size(gt.BB,2)
       bbgt=gt.BB(:,j);
@@ -40,7 +39,8 @@ for bbsIdx = 1:nDet
   else
       fp(bbsIdx)=1;                    % false positive
   end
-
+  
+  detScore(bbsIdx) = bbsNMS_clip(bbsIdx,end);
   bbsNMS_clip(bbsIdx, 9) = ovmax;
 end
 

@@ -94,9 +94,9 @@ model_paths = fullfile('Mesh', CLASS);
 % model_names = {'road_bike','bmx_bike', 'glx_bike'};
 % model_names = {'road_bike','road_bike_2','road_bike_3','fixed_gear_road_bike','bmx_bike','brooklyn_machine_works_bike', 'glx_bike'};
 % model_names = {'road_bike'}; % ,'bmx_bike','brooklyn_machine_works_bike'};
-% AccordIdx = ismember(model_names,'Honda-Accord-3');
-% model_names = model_names(AccordIdx);
-% file_paths = file_paths(AccordIdx);
+AccordIdx = ismember(model_names,'Honda-Accord-3');
+model_names = model_names(AccordIdx);
+file_paths = file_paths(AccordIdx);
 
 % detector name
 [ detector_model_name ] = dwot_get_detector_name(CLASS, SUB_CLASS, model_names, param);
@@ -172,19 +172,13 @@ detectorId_view = cell(1,N_IMAGE);
 % After post-processing proposal regions
 tp_prop = cell(1,N_IMAGE);
 fp_prop = cell(1,N_IMAGE);
-% atp = cell(1,N_IMAGE);
-% afp = cell(1,N_IMAGE);
+
 detScore_prop = cell(1,N_IMAGE);
 detectorId_prop = cell(1,N_IMAGE);
 
 tp_per_template = cell(1,numel(templates));
 fp_per_template = cell(1,numel(templates));
 
-tp_per_template_view = cell(1,numel(templates));
-fp_per_template_view = cell(1,numel(templates));
-
-% 138
-% 256
 for imgIdx = N_IMAGE/4:N_IMAGE/2
     fprintf('%d/%d ',imgIdx,N_IMAGE);
     imgTic = tic;
@@ -208,32 +202,29 @@ for imgIdx = N_IMAGE/4:N_IMAGE/2
     % Automatically sort them according to the score and apply NMS
     % bbsNMS = esvm_nms(bbsAllLevel,0.5);
     % Per Viewpoint NMS
-    bbsNMS_per_template = dwot_per_view_nms(bbsAllLevel,0.5);
+    bbsNMS_per_template_nms = dwot_per_view_nms(bbsAllLevel,0.5);
+    bbsNMS_per_template_nms_mat = cell2mat(bbsNMS_per_template_nms);
+    bbsNMS_clip_per_template_mat = clip_to_image(bbsNMS_per_template_nms_mat, [1 1 imSz(2) imSz(1)]);
     
-    nDetectionTemplates = numel(bbsNMS_per_template);
-    bbsNMS_clip_per_template = cell(nDetectionTemplates, 1);
-    
-    for idx = 1:nDetectionTemplates
-        bbsNMS_clip_per_template{idx} = clip_to_image(bbsNMS_per_template{idx}, [1 1 imSz(2) imSz(1)]);
-        [bbsNMS_clip_per_template{idx}, ~, ~, ~] = dwot_compute_positives_view(bbsNMS_clip_per_template{idx}, gt{imgIdx}, detectors, param);
-    end
-    bbsNMS_per_template_mat = cell2mat(bbsNMS_per_template);
-    bbsNMS_clip_per_template_mat = cell2mat(bbsNMS_clip_per_template);
-    [~, I] = sort(bbsNMS_clip_per_template_mat(:,end),1,'descend');
-    bbsNMS_clip_per_template_mat= bbsNMS_clip_per_template_mat(I,:);
-    
-    bbsNMS_nms_all = esvm_nms(bbsAllLevel,0.5);
-    [bbsNMS_nms_all, tp{imgIdx}, fp{imgIdx}, ~] = dwot_compute_positives(bbsNMS_nms_all, gt{imgIdx}, param);
-    % [bbsNMS_clip_per_template, tp_view{imgIdx}, fp_view{imgIdx}, ~] = dwot_compute_positives_view(bbsNMS_clip_per_template_mat, gt{imgIdx}, detectors, param);
-    
-    
-    % Applying NMS dramatically reduce false positives
-    bbsNMS_clip_per_template_mat_nms = esvm_nms(bbsNMS_clip_per_template_mat,0.5);
-    [bbsNMS_clip_per_template_mat_nms, tp_view{imgIdx}, fp_view{imgIdx}, ~] = dwot_compute_positives_view(bbsNMS_clip_per_template_mat_nms, gt{imgIdx}, detectors, param);
+    % Compute overlap of per view nms detections
     [bbsNMS_clip_per_template_mat, ~, ~, ~] = dwot_compute_positives_view(bbsNMS_clip_per_template_mat, gt{imgIdx}, detectors, param);
+    bbsNMS_per_template_nms_mat(:,9) = bbsNMS_clip_per_template_mat(:,9); % copy overlap to original non-clipped detection
     
+    % Gather statistics
     [tp_per_template, fp_per_template] = dwot_gather_statistics(tp_per_template, fp_per_template, bbsNMS_clip_per_template_mat, 0.75);
-
+    
+    % NMS again
+    [bbsNMS_clip_per_template_nms_mat_nms, nms_idx] = esvm_nms(bbsNMS_clip_per_template_mat,0.5);
+    bbsNMS_per_template_nms_mat_nms = bbsNMS_per_template_nms_mat(nms_idx,:);
+    
+    % [bbsNMS_clip_per_template, tp_view{imgIdx}, fp_view{imgIdx}, ~] = dwot_compute_positives_view(bbsNMS_clip_per_template_mat, gt{imgIdx}, detectors, param);
+    % Applying NMS dramatically reduce false positives
+    % bbsNMS_nms_all = esvm_nms(bbsAllLevel,0.5);
+    [bbsNMS_clip_per_template_nms_mat_nms, tp{imgIdx}, fp{imgIdx}, detScore{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip_per_template_nms_mat_nms, gt{imgIdx}, param);
+    [bbsNMS_clip_per_template_nms_mat_nms, tp_view{imgIdx}, fp_view{imgIdx}, detScore_view{imgIdx}, ~] = dwot_compute_positives_view(bbsNMS_clip_per_template_nms_mat_nms, gt{imgIdx}, detectors, param);
+%     [bbsNMS_clip_per_template_mat, ~, ~, ~] = dwot_compute_positives_view(bbsNMS_clip_per_template_mat, gt{imgIdx}, detectors, param);
+    
+    
 
     % [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt{imgIdx}, param);
     
@@ -244,10 +235,10 @@ for imgIdx = N_IMAGE/4:N_IMAGE/2
 
     if visualize_detection
       % figure(2);
-      subplot(121);
-      dwot_draw_overlap_detection(im, bbsNMS_nms_all, renderings, n_proposals, 50, visualize_detection);
-      subplot(122);
-      dwot_draw_overlap_detection(im, bbsNMS_clip_per_template_mat_nms, renderings, n_proposals, 50, visualize_detection);
+%       subplot(121);
+%       dwot_draw_overlap_detection(im, bbsNMS_nms_all, renderings, n_proposals, 50, visualize_detection);
+%       subplot(122);
+      dwot_draw_overlap_detection(im, bbsNMS_per_template_nms_mat_nms, renderings, n_proposals, 50, visualize_detection);
       drawnow;
       save_name = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.png',...
         DATA_SET, CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
@@ -297,20 +288,6 @@ for imgIdx = N_IMAGE/4:N_IMAGE/2
 %     [bbsNMS_proposal_clip, tp_prop{imgIdx}, fp_prop{imgIdx}, ~] = dwot_compute_positives(bbsNMS_proposal_clip, gt(imgIdx), param);
 %     fprintf(' time : %0.4f\n', toc(imgTic));
 
-    if size(bbsNMS_nms_all) > 0
-      detectorId{imgIdx} = bbsNMS_nms_all(:,11)';
-      detScore{imgIdx} = bbsNMS_nms_all(:,end)';
-      detScore_view{imgIdx} = bbsNMS_clip_per_template_mat_nms(:,end)';
-%       detectorId_prop{imgIdx} = bbsNMS_proposal_clip(:,11)';
-%       detScore_prop{imgIdx} = bbsNMS_proposal_clip(:,end)';
-    else
-      detectorId{imgIdx} = [];
-      detScore{imgIdx} = [];
-      detScore_view{imgIdx} = [];
-%       detectorId_prop{imgIdx} = [];
-%       detScore_prop{imgIdx} = [];
-    end
-    % if visualize
 %     if visualize_detection && ~isempty(clsinds)
 %       figure(3);
 %       
@@ -339,16 +316,16 @@ fp = cell2mat(fp);
 tp = cell2mat(tp);
 % atp = cell2mat(atp);
 % afp = cell2mat(afp);
-detectorId = cell2mat(detectorId);
+% detectorId = cell2mat(detectorId);
 
-[sc, si] =sort(detScore,'descend');
+[~, si] =sort(detScore,'descend');
 fpSort = cumsum(fp(si));
 tpSort = cumsum(tp(si));
 
 % atpSort = cumsum(atp(si));
 % afpSort = cumsum(afp(si));
 
-detectorIdSort = detectorId(si);
+% detectorIdSort = detectorId(si);
 
 recall = tpSort/npos;
 precision = tpSort./(fpSort + tpSort);
@@ -396,7 +373,7 @@ tit = sprintf('Average Precision = %.1f View Precision = %.1f', 100*ap, 100*ap_v
 title(tit);
 axis([0 1 0 1]);
 set(gcf,'color','w');
-save_name = sprintf('AP_view_nms_to_views_%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%d.png',...
+save_name = sprintf('AP_view_nms_%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%d.png',...
         DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),N_IMAGE);
 
 print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name])

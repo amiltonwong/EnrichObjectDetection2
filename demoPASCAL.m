@@ -181,17 +181,16 @@ for imgIdx=1:N_IMAGE
     % Automatically sort them according to the score and apply NMS
     bbsNMS = esvm_nms(bbsAllLevel,0.5);
     
-    nDet = size(bbsNMS,1);
     bbsNMS_clip = clip_to_image(bbsNMS, [1 1 imSz(2) imSz(1)]);
-    [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
+    [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, detScore{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
     
-    if nDet > 0
-      detScore{imgIdx} = bbsNMS_clip(:,end)';
-      bbsNMS(:,9) = bbsNMS_clip(:,9);
-    end
-    
+
     if visualize_detection && ~isempty(clsinds)
       % figure(2);
+      nDet = size(bbsNMS,1);
+      if nDet > 0
+        bbsNMS(:,9) = bbsNMS_clip(:,9);
+      end
       dwot_draw_overlap_detection(im, bbsNMS, renderings, n_proposals, 50, visualize_detection);
       drawnow;
       save_name = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.jpg',...

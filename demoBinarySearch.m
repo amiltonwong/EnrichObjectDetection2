@@ -183,7 +183,7 @@ for imgIdx = 1:N_IMAGE
     bbsNMS = esvm_nms(bbsAllLevel,0.5);
     
     bbsNMS_clip = clip_to_image(bbsNMS, [1 1 imSz(2) imSz(1)]);
-    [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
+    [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, detScore{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
     bbsNMS(:,9) = bbsNMS_clip(:,9);
     
     if visualize_detection && ~isempty(clsinds)
@@ -237,12 +237,12 @@ for imgIdx = 1:N_IMAGE
 
     if nDet > 0
       detectorId{imgIdx} = bbsNMS(:,11)';
-      detScore{imgIdx} = bbsNMS(:,end)';
+%       detScore{imgIdx} = bbsNMS(:,end)';
       detectorId_prop{imgIdx} = bbsNMS_proposal_clip(:,11)';
       detScore_prop{imgIdx} = bbsNMS_proposal_clip(:,end)';
     else
       detectorId{imgIdx} = [];
-      detScore{imgIdx} = [];
+%       detScore{imgIdx} = [];
       detectorId_prop{imgIdx} = [];
       detScore_prop{imgIdx} = [];
     end
