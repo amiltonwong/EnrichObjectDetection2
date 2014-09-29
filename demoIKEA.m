@@ -227,6 +227,7 @@ for imgIdx = floor(N_IMAGE/4):ceil(N_IMAGE/2)
     end  
     gt_mod.diff = zeros(1,size(BB,1));
     gt_mod.BB = BB';
+    gt_mod.det = zeros(1,size(BB,1));
 
     [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt_mod, param);
     
