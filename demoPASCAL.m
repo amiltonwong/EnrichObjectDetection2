@@ -21,7 +21,7 @@ addpath([VOC_PATH, 'VOCcode']);
 
 DATA_SET = 'PASCAL';
 COMPUTING_MODE = 1;
-CLASS = 'Chair';
+CLASS = 'Car';
 SUB_CLASS = [];
 LOWER_CASE_CLASS = lower(CLASS);
 TYPE = 'val';
@@ -64,6 +64,18 @@ detection_threshold = 80;
 % models_path = {'Mesh/Bicycle/road_bike'};
 % models_name = cellfun(@(x) strrep(x, '/', '_'), models_path, 'UniformOutput', false);
 [ model_names, model_paths ] = dwot_get_cad_models('Mesh', CLASS, [], {'3ds','obj'});
+
+models_to_use = {'2012-VW-beetle-turbo',...
+              'Dodge_PowerRam_250_1990',...
+              'Kia_Spectra5_2006',...
+              '2008-Jeep-Cherokee',...
+              'Portugal_Racing_Junior',...
+              'Honda-Accord-3'};
+
+use_idx = ismember(model_names,models_to_use);
+
+model_names = model_names(use_idx);
+model_paths = model_paths(use_idx);
 
 %%%%%%%%%%%%%%% Set Parameters %%%%%%%%%%%%
 dwot_get_default_params;

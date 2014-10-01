@@ -319,6 +319,18 @@ confusion_rate = confusion_statistics;
 for view_idx = 1:n_views
   confusion_rate(:,view_idx) = confusion_rate(:,view_idx) / sum(confusion_rate(:,view_idx));
 end
+confusion_rate(isnan(confusion_rate)) = 0;
+
+imagesc(confusion_rate);
+colorbar;
+xlabel('Ground Truth Viewpoints');
+ylabel('Prediction Viewpoints');
+set(gcf,'color','w');
+save_name = sprintf('confusion_matrix_view_nms_%0.2f_%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%d.png',...
+        nms_threshold, DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),N_IMAGE);
+
+print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name]);
+clf;
 
 
 %% Confusion Matrix visualization
