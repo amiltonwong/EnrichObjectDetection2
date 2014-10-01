@@ -156,6 +156,7 @@ end
 [gt, image_path] = dwot_3d_object_dataset(DATA_PATH, CLASS);
 
 N_IMAGE = length(gt);
+N_IMAGE = ceil(N_IMAGE/4);
 
 npos = 0;
 npos_view = 0;
@@ -182,7 +183,7 @@ fp_per_template = cell(1,numel(templates));
 n_views = 8;
 confusion_statistics = zeros(n_views, n_views);
 
-for imgIdx = N_IMAGE/4:N_IMAGE/2
+for imgIdx = 1:N_IMAGE
     fprintf('%d/%d ',imgIdx,N_IMAGE);
     imgTic = tic;
 
@@ -222,94 +223,22 @@ for imgIdx = N_IMAGE/4:N_IMAGE/2
     
     % [bbsNMS_clip_per_template, tp_view{imgIdx}, fp_view{imgIdx}, ~] = dwot_compute_positives_view(bbsNMS_clip_per_template_mat, gt{imgIdx}, detectors, param);
     % Applying NMS dramatically reduce false positives
-    % bbsNMS_nms_all = esvm_nms(bbsAllLevel,0.5);
     [bbsNMS_clip_per_template_nms_mat_nms, tp{imgIdx}, fp{imgIdx}, detScore{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip_per_template_nms_mat_nms, gt{imgIdx}, param);
 
     % dwot_compute_positives_view will return GT index at the 10th column of bbsNMS
     [bbsNMS_clip_per_template_nms_mat_nms, tp_view{imgIdx}, fp_view{imgIdx}, detScore_view{imgIdx}, ~] = dwot_compute_positives_view(bbsNMS_clip_per_template_nms_mat_nms, gt{imgIdx}, detectors, param);
-%     [bbsNMS_clip_per_template_mat, ~, ~, ~] = dwot_compute_positives_view(bbsNMS_clip_per_template_mat, gt{imgIdx}, detectors, param);
-    
     
     % Confusion Matrix
-    confusion_statistics = dwot_gather_confusion_statistics(confusion_statistics, detectors, gt{imgIdx}, bbsNMS_clip_per_template_nms_mat_nms, param.min_overlap, n_views);
-    
-    % [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt{imgIdx}, param);
-    
-%     for idx = 1:numel(bbsNMS)
-%         dwot_draw_overlap_detection(im, bbsNMS{idx}, renderings, n_proposals, 50, visualize_detection);
-%         waitforbuttonpress;
-%     end
+    confusion_statistics = dwot_gather_confusion_statistics(confusion_statistics, detectors, gt{imgIdx}, bbsNMS_clip_per_template_nms_mat_nms, n_views);
 
     if visualize_detection
-      % figure(2);
-%       subplot(121);
-%       dwot_draw_overlap_detection(im, bbsNMS_nms_all, renderings, n_proposals, 50, visualize_detection);
-%       subplot(122);
       dwot_draw_overlap_detection(im, bbsNMS_per_template_nms_mat_nms, renderings, n_proposals, 50, visualize_detection);
       drawnow;
       save_name = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.png',...
         DATA_SET, CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
       print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name])
-      
-%       waitforbuttonpress;
     end
     
-    
-%     n_mcmc = min(n_proposals, size(bbsNMS,1));
-    
-%     [hog_region_pyramid, im_region] = dwot_extract_hog(hog, scales, detectors, bbsNMS(1:n_mcmc,:), param, im);
-%     [best_proposals, detectors, detector_table] = dwot_binary_search_proposal_region(hog_region_pyramid, im_region, detectors, detector_table, renderer, param, im);
-%     [best_proposals] = dwot_mcmc_proposal_region(renderer, hog_region_pyramid, im_region, detectors, param, im);
-
-%     for proposal_idx = 1:n_mcmc
-%       subplot(121);
-%       dwot_draw_overlap_detection(im, bbsNMS, renderings, n_mcmc, 50, true);
-%       subplot(122);
-%       bbox = best_proposals{proposal_idx}.image_bbox;
-%       bbox(12) = best_proposals{proposal_idx}.score;
-%       dwot_draw_overlap_detection(im, bbox, best_proposals{proposal_idx}.rendering_image, n_mcmc, 50, true);
-%       axis equal;
-%       fprintf('press any button to continue\n');
-%       waitforbuttonpress
-%     end
-    
-
-
-    % dwot_bfgs_proposal_region(hog_region_pyramid, im_region, detectors, param); 
-%     mcmc_score = cellfun(@(x) x.score, best_proposals);
-%     mcmc_score ./ bbsNMS_clip(1:n_mcmc,end)'
-%     bbsNMS_clip(1:n_mcmc,end) = mcmc_score';
-    
-%     bbsNMS_proposal = bbsNMS;
-%     for region_idx = 1:n_mcmc
-%       bbsNMS_proposal(region_idx,1:4) = best_proposals{region_idx}.image_bbox;
-%       bbsNMS_proposal(region_idx,12) = best_proposals{region_idx}.score;
-%     end
-%     [~, o] = sort(bbsNMS_proposal(:,12),'descend');
-%     bbsNMS_proposal = bbsNMS_proposal(o,:); 
-%     bbsNMS_proposal_clip = clip_to_image(bbsNMS_proposal, [1 1 imSz(2) imSz(1)]);
-%     
-%     fprintf(' time to mcmc: %0.4f', toc(imgTic));
-% %    
-% 
-%     [bbsNMS_proposal_clip, tp_prop{imgIdx}, fp_prop{imgIdx}, ~] = dwot_compute_positives(bbsNMS_proposal_clip, gt(imgIdx), param);
-%     fprintf(' time : %0.4f\n', toc(imgTic));
-
-%     if visualize_detection && ~isempty(clsinds)
-%       figure(3);
-%       
-%       bbsNMS_proposal(:,9) = bbsNMS_proposal_clip(:,9);
-%       dwot_draw_overlap_detection(im, bbsNMS_proposal, renderings, n_mcmc, 50, visualize_detection);
-% 
-%       % disp('Press any button to continue');
-%       
-%       save_name = sprintf('%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d_binary.png',...
-%         CLASS,TYPE, average_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
-%       print('-dpng','-r100',['Result/' CLASS '_' TYPE '/' save_name])
-%       
-%       % waitforbuttonpress;
-%     end
-      
     npos = npos + sum(~gt{imgIdx}.diff);
 end
 
@@ -386,89 +315,13 @@ save_name = sprintf('AP_view_nms_%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%
 print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name])
 
 
-% figure(3);
-% for template_idx = 1:numel(templates)
-%   subplot(131);
-%   cla;
-%   [y_tp,x_tp] = hist(tp_per_template{template_idx},5);
-%   tp_area = trapz(x_tp,y_tp);
-%   bar(x_tp,y_tp);
-%   hold on;
-%   [y_fp,x_fp] = hist(fp_per_template{template_idx});
-%   fp_area = trapz(x_fp,y_fp);
-%   bar(x_fp,y_fp);
-%   
-%   h = findobj(gca,'Type','patch');
-%   set(h(1),'Facecolor',[1 0 0],'EdgeColor','k','FaceAlpha',0.5);
-%   set(h(2),'Facecolor',[0 0 1],'EdgeColor','k');
-%   
-%   subplot(132);
-%   cla;
-%   bar(x_tp,y_tp/tp_area,'k');
-%   hold on;
-%   bar(x_fp,y_fp/fp_area,'r');
-%   
-%   h = findobj(gca,'Type','patch');
-%   set(h(1),'Facecolor',[1 0 0],'EdgeColor','k','FaceAlpha',0.5);
-%   set(h(2),'Facecolor',[0 0 1],'EdgeColor','k');
-%   
-%   
-%   subplot(133);
-%   imagesc(renderings{template_idx});  
-%   axis equal; axis off;
-%   drawnow;
-%   
-%   set(gcf,'color','w');
-%   save_name = sprintf('hist_%s_%s_%s_%s_lim_%d_lam_%0.4f_ID_%d.png',...
-%           DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, template_idx);
-% 
-%   print('-dpng','-r100',['Result/' CLASS '_' TYPE '/' save_name])
-% end
+confusion_rate = confusion_statistics;
+for view_idx = 1:n_views
+  confusion_rate(:,view_idx) = confusion_rate(:,view_idx) / sum(confusion_rate(:,view_idx));
+end
 
 
-
-% detScore_prop = cell2mat(detScore_prop);
-% fp_prop = cell2mat(fp_prop);
-% tp_prop = cell2mat(tp_prop);
-% % atp = cell2mat(atp);
-% % afp = cell2mat(afp);
-% detectorId_prop = cell2mat(detectorId_prop);
-% 
-% [sc, si] =sort(detScore_prop,'descend');
-% fpSort_prop = cumsum(fp_prop(si));
-% tpSort_prop = cumsum(tp_prop(si));
-% 
-% % atpSort = cumsum(atp(si));
-% % afpSort = cumsum(afp(si));
-% 
-% detectorIdSort_prop = detectorId_prop(si);
-% 
-% recall_prop = tpSort_prop/npos;
-% precision_prop = tpSort_prop./(fpSort_prop + tpSort_prop);
-% 
-% % arecall = atpSort/npos;
-% % aprecision = atpSort./(afpSort + atpSort);
-% ap_prop = VOCap(recall_prop', precision_prop');
-% % aa = VOCap(arecall', aprecision');
-% fprintf('AP = %.4f\n', ap_prop);
-% 
-% clf;
-% plot(recall_prop, precision_prop, 'r', 'LineWidth',3);
-% % hold on;
-% % plot(arecall, aprecision, 'g', 'LineWidth',3);
-% xlabel('Recall');
-% % ylabel('Precision/Accuracy');
-% % tit = sprintf('Average Precision = %.1f / Average Accuracy = %1.1f', 100*ap,100*aa);
-% 
-% tit = sprintf('Average Precision = %.1f', 100*ap_prop);
-% title(tit);
-% axis([0 1 0 1]);
-% set(gcf,'color','w');
-% save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%d_binary.png',...
-%         CLASS, TYPE, model_names{1}, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),N_IMAGE);
-% 
-% print('-dpng','-r150',['Result/' CLASS '_' TYPE '/' save_name]);
-
+%% Confusion Matrix visualization
 
 %% Cleanup Memory
 if exist('renderer','var')

@@ -10,7 +10,7 @@ detScore = zeros(1,nDet);
 for bbsIdx = 1:nDet
   ovmax_view = -inf;
   template_idx = bbsNMS_clip(bbsIdx,11);
-  % search over all objects in the imagejk
+  % search over all objects in the image
   for j=1:size(gt.BB,2)
       bbgt=gt.BB(:,j);
       bi=[max(bbsNMS_clip(bbsIdx,1),bbgt(1)) ; max(bbsNMS_clip(bbsIdx,2),bbgt(2)) ; min(bbsNMS_clip(bbsIdx,3),bbgt(3)) ; min(bbsNMS_clip(bbsIdx,4),bbgt(4))];
@@ -35,6 +35,10 @@ for bbsIdx = 1:nDet
             jmax_view = j;
           end
           
+          if ov > param.min_overlap
+            % For debugging purpose
+            bbsNMS_clip(bbsIdx, 10) =  j; 
+          end
       end
   end
 
@@ -48,9 +52,6 @@ for bbsIdx = 1:nDet
               fp(bbsIdx)=1;            % false positive (multiple detection)
           end
       end
-
-      % For debugging purpose
-      bbsNMS_clip(bbsIdx, 10) =  jmax_view; 
    else
       fp(bbsIdx)=1;                    % false positive
    end
