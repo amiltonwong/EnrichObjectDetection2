@@ -179,6 +179,9 @@ detectorId_prop = cell(1,N_IMAGE);
 tp_per_template = cell(1,numel(templates));
 fp_per_template = cell(1,numel(templates));
 
+n_views = 8;
+confusion_statistics = zeros(n_views, n_views);
+
 for imgIdx = N_IMAGE/4:N_IMAGE/2
     fprintf('%d/%d ',imgIdx,N_IMAGE);
     imgTic = tic;
@@ -211,7 +214,7 @@ for imgIdx = N_IMAGE/4:N_IMAGE/2
     bbsNMS_per_template_nms_mat(:,9) = bbsNMS_clip_per_template_mat(:,9); % copy overlap to original non-clipped detection
     
     % Gather statistics
-    [tp_per_template, fp_per_template] = dwot_gather_statistics(tp_per_template, fp_per_template, bbsNMS_clip_per_template_mat, 0.75);
+    [tp_per_template, fp_per_template] = dwot_gather_viewpoint_statistics(tp_per_template, fp_per_template, bbsNMS_clip_per_template_mat, 0.75);
     
     % NMS again
     [bbsNMS_clip_per_template_nms_mat_nms, nms_idx] = esvm_nms(bbsNMS_clip_per_template_mat,0.5);
@@ -221,11 +224,15 @@ for imgIdx = N_IMAGE/4:N_IMAGE/2
     % Applying NMS dramatically reduce false positives
     % bbsNMS_nms_all = esvm_nms(bbsAllLevel,0.5);
     [bbsNMS_clip_per_template_nms_mat_nms, tp{imgIdx}, fp{imgIdx}, detScore{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip_per_template_nms_mat_nms, gt{imgIdx}, param);
+
+    % dwot_compute_positives_view will return GT index at the 10th column of bbsNMS
     [bbsNMS_clip_per_template_nms_mat_nms, tp_view{imgIdx}, fp_view{imgIdx}, detScore_view{imgIdx}, ~] = dwot_compute_positives_view(bbsNMS_clip_per_template_nms_mat_nms, gt{imgIdx}, detectors, param);
 %     [bbsNMS_clip_per_template_mat, ~, ~, ~] = dwot_compute_positives_view(bbsNMS_clip_per_template_mat, gt{imgIdx}, detectors, param);
     
     
-
+    % Confusion Matrix
+    confusion_statistics = dwot_gather_confusion_statistics(confusion_statistics, detectors, gt{imgIdx}, bbsNMS_clip_per_template_nms_mat_nms, param.min_overlap, n_views);
+    
     % [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt{imgIdx}, param);
     
 %     for idx = 1:numel(bbsNMS)

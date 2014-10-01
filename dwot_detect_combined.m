@@ -61,6 +61,7 @@ for level = length(hog):-1:1
     bbs(:,7) = uus;
     bbs(:,8) = vvs;
 
+    % bbs(:,10) is designated for GT index
     % bbs(:,9) = boxoverlap(bbs, annotation.bbox + [0 0 annotation.bbox(1:2)]);
     % bbs(:,10) = abs(detectors{templateIdx}.az - azGT) < 30;
 

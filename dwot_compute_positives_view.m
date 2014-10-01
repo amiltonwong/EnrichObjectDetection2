@@ -34,6 +34,7 @@ for bbsIdx = 1:nDet
             ovmax_view = ov;
             jmax_view = j;
           end
+          
       end
   end
 
@@ -47,9 +48,12 @@ for bbsIdx = 1:nDet
               fp(bbsIdx)=1;            % false positive (multiple detection)
           end
       end
-  else
+
+      % For debugging purpose
+      bbsNMS_clip(bbsIdx, 10) =  jmax_view; 
+   else
       fp(bbsIdx)=1;                    % false positive
-  end
-  detScore(bbsIdx) = bbsNMS_clip(bbsIdx,end);
-  bbsNMS_clip(bbsIdx, 9) = ovmax_view;
+   end
+   detScore(bbsIdx) = bbsNMS_clip(bbsIdx,end);
+   bbsNMS_clip(bbsIdx, 9) = ovmax_view;
 end
