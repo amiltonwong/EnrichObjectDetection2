@@ -14,7 +14,9 @@ for model_index = 1:n_models
     % model class and index are not supported yet
     im_model{model_index} = renderer.renderCrop();
 
-    imagesc(im_model{model_index}); axis off;
+    imagesc(im_model{model_index}); 
+    axis equal;
+    axis off;
     title(strrep(model_files{model_index},'_',' '));
     waitforbuttonpress;
 end

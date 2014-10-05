@@ -39,10 +39,10 @@ dfov = 10;
 dyaw = 10;
 
 azs = 0:15:345; % azs = [azs , azs - 10, azs + 10];
-els = 0:20:60;
+els = 5:15:35;
 fovs = [25 50];
 yaws = 0;
-n_cell_limit = [300];
+n_cell_limit = [350];
 lambda = [0.015];
 
 % azs = 0:45:345
@@ -69,8 +69,10 @@ detection_threshold = 80;
 models_to_use = {'2012-VW-beetle-turbo',...
               'Kia_Spectra5_2006',...
               '2008-Jeep-Cherokee',...
-              'Portugal_Racing_Junior',...
-              'Honda-Accord-3'};
+              'Ford Ranger Updated',...
+              'BMW_X1_2013',...
+              'Honda_Accord_Coupe_2009',...
+              'Porsche_911'};
 
 use_idx = ismember(model_names,models_to_use);
 
@@ -101,8 +103,8 @@ end
 detector_name = sprintf('%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
     LOWER_CASE_CLASS,  detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
 
-detection_result_file = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.txt',...
-      DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
+detection_result_file = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_sbin_%d.txt',...
+      DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), sbin);
 
 
 if exist(detector_name,'file')
@@ -160,7 +162,7 @@ detScore = cell(1,N_IMAGE);
 detectorId = cell(1,N_IMAGE);
 detIdx = 0;
 
-
+clear gt;
 gt(length(gtids))=struct('BB',[],'diff',[],'det',[]);
 
 % Make empty detection save file
@@ -207,7 +209,7 @@ for imgIdx=1:N_IMAGE
     
     [~, img_file_name] = fileparts(recs(imgIdx).imgname);
     dwot_save_detection(bbsNMS_clip, 'Result', detection_result_file, img_file_name);
-    if visualize_detection && ~isempty(clsinds)
+ if visualize_detection && ~isempty(clsinds)
       % figure(2);
       nDet = size(bbsNMS,1);
       if nDet > 0
@@ -221,18 +223,22 @@ for imgIdx=1:N_IMAGE
       
       % True positives
       subplot(222);
-      dwot_draw_overlap_detection(im, bbsNMS(tpIdx,:), renderings, inf, 50, visualize_detection, [0.2, 0.8, 0] );
+      dwot_draw_overlap_detection(im, bbsNMS(tpIdx,:), renderings, 1, 50, visualize_detection, [0.3, 0.7, 0] );
+      
+      
+      subplot(223);
+      dwot_draw_overlap_detection(im, bbsNMS(tpIdx,:), renderings, 5, 50, visualize_detection, [0.3, 0.5, 0.2] );
       
       % False positives
-      subplot(223);
-      dwot_draw_overlap_detection(im, bbsNMS(~tpIdx,:), renderings, n_proposals, 50, visualize_detection);
+      subplot(224);
+      dwot_draw_overlap_detection(im, bbsNMS(~tpIdx,:), renderings, 5, 50, visualize_detection, [0.3, 0.7, 0]);
       
       drawnow;
       spaceplots();
       
       drawnow;
-      save_name = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.jpg',...
-        DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
+      save_name = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_sbin_%d_imgIdx_%d.jpg',...
+        DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),sbin,imgIdx);
       print('-djpeg','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name]);
       
       %  waitforbuttonpress;
@@ -266,7 +272,7 @@ ap = VOCap(recall', precision');
 % aa = VOCap(arecall', aprecision');
 fprintf('AP = %.4f\n', ap);
 
-clf;
+close all;
 plot(recall, precision, 'r', 'LineWidth',3);
 % hold on;
 % plot(arecall, aprecision, 'g', 'LineWidth',3);

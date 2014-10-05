@@ -57,6 +57,10 @@ end
 HOGTemplateSz = size(HOGTemplate);
 wHeight = HOGTemplateSz(1);
 wWidth = HOGTemplateSz(2);
+if wHeight > param.hog_gamma_cell_size(1) || wWidth > param.hog_gamma_cell_size(2)
+  error('Template dimension too large, create large Gamma matrix or decrese the number of cells per template');
+end
+
 HOGDim = HOGTemplateSz(3);
 nonEmptyCells = (sum(HOGTemplate,3) > hog_cell_threshold);
 idxNonEmptyCells = find(nonEmptyCells);

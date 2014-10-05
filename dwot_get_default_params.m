@@ -112,6 +112,7 @@ param.hog_mu          = stats.mu;
 param.hog_gamma       = stats.Gamma;
 param.hog_gamma_gpu   = gpuArray(single(stats.Gamma));
 param.hog_gamma_dim   = size(stats.Gamma);
+param.hog_gamma_cell_size = size(stats.Gamma)/31;
 
 %% CG setting
 param.N_THREAD_H = 32;
