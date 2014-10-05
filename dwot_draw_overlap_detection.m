@@ -1,4 +1,4 @@
-function resultIm = dwot_draw_overlap_detection(im, bbsNMS, renderings, maxNDrawBox, drawPadding, box_text)
+function resultIm = dwot_draw_overlap_detection(im, bbsNMS, renderings, maxNDrawBox, drawPadding, box_text, drawing_weights)
 
 if nargin < 4
   maxNDrawBox = 5;
@@ -10,6 +10,10 @@ end
 
 if nargin < 6
   box_text = false;
+end
+
+if nargin < 7
+  drawing_weights = ones(1,3)/3;
 end
 
 paddedIm = pad_image(im2double(im), drawPadding, 1);
@@ -48,7 +52,10 @@ for bbsIdx = NDrawBox:-1:1
   
   % resizeRendering = resizeRendering(1:(clip_bnd(4) - clip_bnd(2) + 1), 1:(clip_bnd(3) - clip_bnd(1) + 1), :);
   bndIm = paddedIm( clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3), :);
-  blendIm = bndIm/3 + im2double(resizeRendering)/3 + resultIm( clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3), :)/3;
+  blendIm = bndIm * drawing_weights(1) +...
+            im2double(resizeRendering) * drawing_weights(2)...
+            + resultIm( clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3), :) * drawing_weights(3);
+          
   resultIm(clip_bnd(2):clip_bnd(4), clip_bnd(1):clip_bnd(3),:) = blendIm;
   clipBBox(bbsIdx,:) = clip_bnd;
 end

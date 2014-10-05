@@ -28,6 +28,7 @@ addpath('DecorrelateFeature/');
 addpath('../MatlabRenderer/');
 addpath('../MatlabCUDAConv/');
 addpath(DATA_PATH);
+addpath('3rdParty/SpacePlot');
 
 % Computing Mode  = 0, CPU
 %                 = 1, GPU
@@ -232,8 +233,21 @@ for imgIdx = 1:N_IMAGE
     confusion_statistics = dwot_gather_confusion_statistics(confusion_statistics, detectors, gt{imgIdx}, bbsNMS_clip_per_template_nms_mat_nms, n_views);
 
     if visualize_detection
-      dwot_draw_overlap_detection(im, bbsNMS_per_template_nms_mat_nms, renderings, n_proposals, 50, visualize_detection);
+      tpIdx = bbsNMS_clip_per_template_nms_mat_nms(:, 9) > param.min_overlap;
+      % Original images
+      subplot(221);
+      imagesc(im); axis off; axis equal;
+      
+      % True positives
+      subplot(222);
+      dwot_draw_overlap_detection(im, bbsNMS_per_template_nms_mat_nms(tpIdx,:), renderings, inf, 50, visualize_detection, [0.2, 0.8, 0] );
+      
+      % False positives
+      subplot(223);
+      dwot_draw_overlap_detection(im, bbsNMS_per_template_nms_mat_nms(~tpIdx,:), renderings, n_proposals, 50, visualize_detection);
+      
       drawnow;
+      spaceplots();
       save_name = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.png',...
         DATA_SET, CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
       print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name])

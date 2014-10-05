@@ -18,6 +18,7 @@ addpath('../MatlabRenderer/');
 addpath('../MatlabCUDAConv/');
 addpath(VOC_PATH);
 addpath([VOC_PATH, 'VOCcode']);
+addpath('3rdParty/SpacePlot');
 
 DATA_SET = 'PASCAL';
 COMPUTING_MODE = 1;
@@ -57,7 +58,7 @@ visualize_detector = false;
 
 sbin = 4;
 n_level = 10;
-n_proposals = 10;
+n_proposals = 5;
 detection_threshold = 80;
 
 % Load models
@@ -66,8 +67,8 @@ detection_threshold = 80;
 [ model_names, model_paths ] = dwot_get_cad_models('Mesh', CLASS, [], {'3ds','obj'});
 
 models_to_use = {'2012-VW-beetle-turbo',...
-              'Dodge_PowerRam_250_1990',...
               'Kia_Spectra5_2006',...
+              '2008-Jeep-Cherokee',...
               'Portugal_Racing_Junior',...
               'Honda-Accord-3'};
 
@@ -212,11 +213,27 @@ for imgIdx=1:N_IMAGE
       if nDet > 0
         bbsNMS(:,9) = bbsNMS_clip(:,9);
       end
-      dwot_draw_overlap_detection(im, bbsNMS, renderings, n_proposals, 50, visualize_detection);
+      
+      tpIdx = bbsNMS(:, 9) > param.min_overlap;
+      % Original images
+      subplot(221);
+      imagesc(im); axis off; axis equal;
+      
+      % True positives
+      subplot(222);
+      dwot_draw_overlap_detection(im, bbsNMS(tpIdx,:), renderings, inf, 50, visualize_detection, [0.2, 0.8, 0] );
+      
+      % False positives
+      subplot(223);
+      dwot_draw_overlap_detection(im, bbsNMS(~tpIdx,:), renderings, n_proposals, 50, visualize_detection);
+      
       drawnow;
-%       save_name = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.jpg',...
-%         DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
-%       print('-djpeg','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name]);
+      spaceplots();
+      
+      drawnow;
+      save_name = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.jpg',...
+        DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
+      print('-djpeg','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name]);
       
       %  waitforbuttonpress;
     end
