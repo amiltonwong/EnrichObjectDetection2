@@ -39,9 +39,9 @@ dyaw = 10;
 
 azs = 0:15:345; % azs = [azs , azs - 10, azs + 10];
 els = 0:20:60;
-fovs = [25];
+fovs = [25 50];
 yaws = 0;
-n_cell_limit = [150];
+n_cell_limit = [300];
 lambda = [0.015];
 
 % azs = 0:45:345
@@ -68,7 +68,6 @@ detection_threshold = 80;
 models_to_use = {'2012-VW-beetle-turbo',...
               'Dodge_PowerRam_250_1990',...
               'Kia_Spectra5_2006',...
-              '2008-Jeep-Cherokee',...
               'Portugal_Racing_Junior',...
               'Honda-Accord-3'};
 
@@ -100,6 +99,9 @@ end
 [ detector_model_name ] = dwot_get_detector_name(CLASS, SUB_CLASS, model_names, param);
 detector_name = sprintf('%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
     LOWER_CASE_CLASS,  detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
+
+detection_result_file = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.txt',...
+      DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
 
 
 if exist(detector_name,'file')
@@ -134,6 +136,8 @@ else
   error('Computing mode undefined');
 end
 
+
+% Addpath doesn't work why?
 curDir = pwd;
 eval(['cd ' VOC_PATH]);
 VOCinit;
@@ -144,7 +148,7 @@ eval(['cd ' curDir]);
 [gtids,t] = textread(sprintf(VOCopts.imgsetpath,[LOWER_CASE_CLASS '_' TYPE]),'%s %d');
 
 N_IMAGE = length(gtids);
-N_IMAGE = 1;
+% N_IMAGE = 1;
 % extract ground truth objects
 npos = 0;
 tp = cell(1,N_IMAGE);
@@ -157,6 +161,10 @@ detIdx = 0;
 
 
 gt(length(gtids))=struct('BB',[],'diff',[],'det',[]);
+
+% Make empty detection save file
+dwot_save_detection([], 'Result', detection_result_file, [], true);
+
 for imgIdx=1:N_IMAGE
     fprintf('%d/%d ',imgIdx,N_IMAGE);
     imgTic = tic;
@@ -196,7 +204,8 @@ for imgIdx=1:N_IMAGE
     bbsNMS_clip = clip_to_image(bbsNMS, [1 1 imSz(2) imSz(1)]);
     [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, detScore{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
     
-
+    [~, img_file_name] = fileparts(recs(imgIdx).imgname);
+    dwot_save_detection(bbsNMS_clip, 'Result', detection_result_file, img_file_name);
     if visualize_detection && ~isempty(clsinds)
       % figure(2);
       nDet = size(bbsNMS,1);
@@ -205,9 +214,9 @@ for imgIdx=1:N_IMAGE
       end
       dwot_draw_overlap_detection(im, bbsNMS, renderings, n_proposals, 50, visualize_detection);
       drawnow;
-      save_name = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.jpg',...
-        DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
-      print('-djpeg','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name]);
+%       save_name = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.jpg',...
+%         DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
+%       print('-djpeg','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name]);
       
       %  waitforbuttonpress;
     end
