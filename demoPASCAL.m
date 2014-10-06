@@ -26,7 +26,7 @@ CLASS = 'Car';
 % CLASS = 'Bicycle';
 SUB_CLASS = [];
 LOWER_CASE_CLASS = lower(CLASS);
-TYPE = 'test';
+TYPE = 'val';
 mkdir('Result',[LOWER_CASE_CLASS '_' TYPE]);
 
 if COMPUTING_MODE > 0
@@ -85,10 +85,13 @@ use_idx = ismember(model_names,models_to_use);
 model_names = model_names(use_idx);
 model_paths = model_paths(use_idx);
 
+
+skip_criteria = {'empty','difficult','truncated'};
+skip_name = cellfun(@(x) x(1), skip_criteria);
 %%%%%%%%%%%%%%% Set Parameters %%%%%%%%%%%%
 dwot_get_default_params;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-param.template_initialization_mode = 1; 
+param.template_initialization_mode = 0; 
 param.nms_threshold = 0.4;
 param.model_paths = model_paths;
 
@@ -108,22 +111,25 @@ end
 
 % detector name
 [ detector_model_name ] = dwot_get_detector_name(CLASS, SUB_CLASS, model_names, param);
-detector_name = sprintf('%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
+detector_name = sprintf('%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d',...
     LOWER_CASE_CLASS,  detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
 
-detection_result_file = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_sbin_%d_nms_%0.2f.txt',...
-      DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), sbin, param.nms_threshold);
+detector_file_name = sprintf('%s.mat', detector_name);
+
+detection_result_file = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_sbin_%d_nms_%0.2f_skp_%s.txt',...
+      DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), sbin, param.nms_threshold, skip_name);
 
 
-if exist(detector_name,'file')
-  load(detector_name);
+if exist(detector_file_name,'file')
+  load(detector_file_name);
 else
   [detectors] = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_names), LOWER_CASE_CLASS, param, visualize_detector);
   [detectors, detector_table]= dwot_make_table_from_detectors(detectors);
+  detectors = dwot_calibrate_detectors(detectors, image_set);
   if sum(cellfun(@(x) isempty(x), detectors))
     error('Detector Not Completed');
   end
-  eval(sprintf(['save -v7.3 ' detector_name ' detectors detector_table']));
+  eval(sprintf(['save -v7.3 ' detector_file_name ' detectors detector_table']));
   % detectors = dwot_make_detectors(renderer, azs, els, yaws, fovs, param, visualize_detector);
   % eval(sprintf(['save ' detector_name ' detectors']));
 end
@@ -159,7 +165,7 @@ eval(['cd ' curDir]);
 [gtids,t] = textread(sprintf(VOCopts.imgsetpath,[LOWER_CASE_CLASS '_' TYPE]),'%s %d');
 
 N_IMAGE = length(gtids);
-N_IMAGE = 1500;
+% N_IMAGE = 1500;
 % extract ground truth objects
 npos = 0;
 tp = cell(1,N_IMAGE);
@@ -183,16 +189,13 @@ for imgIdx=1:N_IMAGE
     recs(imgIdx)=PASreadrecord(sprintf(VOCopts.annopath,gtids{imgIdx}));
     
     clsinds = strmatch(LOWER_CASE_CLASS,{recs(imgIdx).objects(:).class},'exact');
+
+    if dwot_skip_criteria(recs(imgIdx).objects(clsinds), skip_criteria); continue; end
+
     gt(imgIdx).BB=cat(1,recs(imgIdx).objects(clsinds).bbox)';
     gt(imgIdx).diff=[recs(imgIdx).objects(clsinds).difficult];
     gt(imgIdx).det=false(length(clsinds),1);
     
-    
-    b_skip = dwot_skip_criterion(recs(imgIdx).objects(clsinds), 'non_difficult','non_occluded','non_truncated');
-    
-%     if isempty(clsinds)
-%       continue;
-%     end
     
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
     imSz = size(im);
@@ -296,7 +299,7 @@ tit = sprintf('Average Precision = %.1f', 100*ap);
 title(tit);
 axis([0 1 0 1]);
 set(gcf,'color','w');
-save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_sbin_%d_nms_%0.2f_N_IM_%d.png',...
-        LOWER_CASE_CLASS, TYPE, detector_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), sbin, param.nms_threshold, N_IMAGE);
+save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_sbin_%d_nms_%0.2f_skp_%s_N_IM_%d.png',...
+        LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), sbin, param.nms_threshold, skip_name, N_IMAGE);
 
 print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name])
