@@ -23,9 +23,10 @@ addpath('3rdParty/SpacePlot');
 DATA_SET = 'PASCAL';
 COMPUTING_MODE = 1;
 CLASS = 'Car';
+% CLASS = 'Bicycle';
 SUB_CLASS = [];
 LOWER_CASE_CLASS = lower(CLASS);
-TYPE = 'val';
+TYPE = 'test';
 mkdir('Result',[LOWER_CASE_CLASS '_' TYPE]);
 
 if COMPUTING_MODE > 0
@@ -39,10 +40,10 @@ dfov = 10;
 dyaw = 10;
 
 azs = 0:15:345; % azs = [azs , azs - 10, azs + 10];
-els = 5:15:35;
+els = 0:20:40;
 fovs = [25 50];
 yaws = 0;
-n_cell_limit = [350];
+n_cell_limit = [300];
 lambda = [0.015];
 
 % azs = 0:45:345
@@ -66,6 +67,11 @@ detection_threshold = 80;
 % models_name = cellfun(@(x) strrep(x, '/', '_'), models_path, 'UniformOutput', false);
 [ model_names, model_paths ] = dwot_get_cad_models('Mesh', CLASS, [], {'3ds','obj'});
 
+% models_to_use = {'bmx_bike',...
+%               'fixed_gear_road_bike',...
+%               'glx_bike',...
+%               'road_bike'};
+            
 models_to_use = {'2012-VW-beetle-turbo',...
               'Kia_Spectra5_2006',...
               '2008-Jeep-Cherokee',...
@@ -82,6 +88,8 @@ model_paths = model_paths(use_idx);
 %%%%%%%%%%%%%%% Set Parameters %%%%%%%%%%%%
 dwot_get_default_params;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+param.template_initialization_mode = 1; 
+param.nms_threshold = 0.4;
 param.model_paths = model_paths;
 
 
@@ -103,8 +111,8 @@ end
 detector_name = sprintf('%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d.mat',...
     LOWER_CASE_CLASS,  detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
 
-detection_result_file = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_sbin_%d.txt',...
-      DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), sbin);
+detection_result_file = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_sbin_%d_nms_%0.2f.txt',...
+      DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), sbin, param.nms_threshold);
 
 
 if exist(detector_name,'file')
@@ -151,7 +159,7 @@ eval(['cd ' curDir]);
 [gtids,t] = textread(sprintf(VOCopts.imgsetpath,[LOWER_CASE_CLASS '_' TYPE]),'%s %d');
 
 N_IMAGE = length(gtids);
-% N_IMAGE = 1;
+N_IMAGE = 1500;
 % extract ground truth objects
 npos = 0;
 tp = cell(1,N_IMAGE);
@@ -166,7 +174,7 @@ clear gt;
 gt(length(gtids))=struct('BB',[],'diff',[],'det',[]);
 
 % Make empty detection save file
-dwot_save_detection([], 'Result', detection_result_file, [], true);
+detection_result_file = dwot_save_detection([], 'Result', detection_result_file, [], true);
 
 for imgIdx=1:N_IMAGE
     fprintf('%d/%d ',imgIdx,N_IMAGE);
@@ -178,6 +186,9 @@ for imgIdx=1:N_IMAGE
     gt(imgIdx).BB=cat(1,recs(imgIdx).objects(clsinds).bbox)';
     gt(imgIdx).diff=[recs(imgIdx).objects(clsinds).difficult];
     gt(imgIdx).det=false(length(clsinds),1);
+    
+    
+    b_skip = dwot_skip_criterion(recs(imgIdx).objects(clsinds), 'non_difficult','non_occluded','non_truncated');
     
 %     if isempty(clsinds)
 %       continue;
@@ -202,14 +213,15 @@ for imgIdx=1:N_IMAGE
     
     
     % Automatically sort them according to the score and apply NMS
-    bbsNMS = esvm_nms(bbsAllLevel,0.5);
+    bbsNMS = esvm_nms(bbsAllLevel, param.nms_threshold);
     
     bbsNMS_clip = clip_to_image(bbsNMS, [1 1 imSz(2) imSz(1)]);
     [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, detScore{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
     
     [~, img_file_name] = fileparts(recs(imgIdx).imgname);
     dwot_save_detection(bbsNMS_clip, 'Result', detection_result_file, img_file_name);
- if visualize_detection && ~isempty(clsinds)
+    
+    if visualize_detection && ~isempty(clsinds)
       % figure(2);
       nDet = size(bbsNMS,1);
       if nDet > 0
@@ -237,8 +249,8 @@ for imgIdx=1:N_IMAGE
       spaceplots();
       
       drawnow;
-      save_name = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_sbin_%d_imgIdx_%d.jpg',...
-        DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),sbin,imgIdx);
+      save_name = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_sbin_%d_nms_%0.2f_imgIdx_%d.jpg',...
+        DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), sbin, param.nms_threshold, imgIdx);
       print('-djpeg','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name]);
       
       %  waitforbuttonpress;
@@ -284,7 +296,7 @@ tit = sprintf('Average Precision = %.1f', 100*ap);
 title(tit);
 axis([0 1 0 1]);
 set(gcf,'color','w');
-save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_N_IM_%d_.png',...
-        LOWER_CASE_CLASS, TYPE, detector_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), N_IMAGE);
+save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_sbin_%d_nms_%0.2f_N_IM_%d.png',...
+        LOWER_CASE_CLASS, TYPE, detector_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), sbin, param.nms_threshold, N_IMAGE);
 
 print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name])

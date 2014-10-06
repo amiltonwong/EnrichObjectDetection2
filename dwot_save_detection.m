@@ -1,4 +1,4 @@
-function dwot_save_detection(detection_result, save_path, file_name, image_name, b_new_file)
+function new_file_name = dwot_save_detection(detection_result, save_path, file_name, image_name, b_new_file)
 
 if ~exist('b_new_file','var')
   b_new_file = false;
@@ -29,6 +29,8 @@ else
   f = fopen(fullfile(save_path, file_name),'a');
 end
 
+new_file_name = file_name;
+
 n_detection = size(detection_result,1);
 for det_idx = 1:n_detection
   % The read detection uses the following line to read data
@@ -38,5 +40,4 @@ for det_idx = 1:n_detection
                     detection_result(det_idx, end),...
                     detection_result(det_idx, 1:4)));
 end
-
 fclose(f);
