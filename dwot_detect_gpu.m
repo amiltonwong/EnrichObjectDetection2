@@ -29,7 +29,14 @@ for level = length(hog):-1:1
   bbsTemplate = cell(nTemplates,1);
   
   for templateIdx = 1:nTemplates
+    
+    % Use calibration
+    if param.b_calibrate
+      HM{templateIdx} = param.detectors{templateIdx}.a * HM{templateIdx} + param.detectors{templateIdx}.b;
+    end
+    
     [idx] = find(HM{templateIdx}(:) > param.detection_threshold);
+   
     if isempty(idx)
       continue;
     end

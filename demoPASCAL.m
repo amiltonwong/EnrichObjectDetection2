@@ -19,6 +19,15 @@ addpath('../MatlabCUDAConv/');
 addpath(VOC_PATH);
 addpath([VOC_PATH, 'VOCcode']);
 addpath('3rdParty/SpacePlot');
+addpath('3rdParty/MinMaxSelection');
+
+% Addpath doesn't work pwd in the code uses current directory so move to
+% the directory.
+curDir = pwd;
+eval(['cd ' VOC_PATH]);
+VOCinit;
+eval(['cd ' curDir]);
+
 
 DATA_SET = 'PASCAL';
 COMPUTING_MODE = 1;
@@ -40,11 +49,12 @@ dfov = 10;
 dyaw = 10;
 
 azs = 0:15:345; % azs = [azs , azs - 10, azs + 10];
-els = 0:20:40;
+els = 0:20:20;
 fovs = [25 50];
 yaws = 0;
 n_cell_limit = [300];
 lambda = [0.015];
+detection_threshold = 80;
 
 % azs = 0:45:345
 % els = 0 : 10 : 40
@@ -60,7 +70,6 @@ visualize_detector = false;
 sbin = 4;
 n_level = 10;
 n_proposals = 5;
-detection_threshold = 80;
 
 % Load models
 % models_path = {'Mesh/Bicycle/road_bike'};
@@ -86,7 +95,7 @@ model_names = model_names(use_idx);
 model_paths = model_paths(use_idx);
 
 
-skip_criteria = {'empty','difficult','truncated'};
+skip_criteria = {'empty'};
 skip_name = cellfun(@(x) x(1), skip_criteria);
 %%%%%%%%%%%%%%% Set Parameters %%%%%%%%%%%%
 dwot_get_default_params;
@@ -94,7 +103,9 @@ dwot_get_default_params;
 param.template_initialization_mode = 0; 
 param.nms_threshold = 0.4;
 param.model_paths = model_paths;
-
+param.b_calibrate = true;
+param.n_calibration_images = 100;
+param.detection_threshold = 0;
 
 if exist('renderer','var')
   renderer.delete();
@@ -125,13 +136,23 @@ if exist(detector_file_name,'file')
 else
   [detectors] = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_names), LOWER_CASE_CLASS, param, visualize_detector);
   [detectors, detector_table]= dwot_make_table_from_detectors(detectors);
-  detectors = dwot_calibrate_detectors(detectors, image_set);
   if sum(cellfun(@(x) isempty(x), detectors))
     error('Detector Not Completed');
   end
   eval(sprintf(['save -v7.3 ' detector_file_name ' detectors detector_table']));
   % detectors = dwot_make_detectors(renderer, azs, els, yaws, fovs, param, visualize_detector);
   % eval(sprintf(['save ' detector_name ' detectors']));
+end
+
+if param.b_calibrate
+  calibrated_detector_file_name = sprintf('%s_cal.mat', detector_name);
+  if exist(calibrated_detector_file_name,'file')
+    load(calibrated_detector_file_name);
+  else
+    detectors = dwot_calibrate_detectors(detectors, LOWER_CASE_CLASS, VOCopts, param);
+    eval(sprintf(['save -v7.3 ' calibrated_detector_file_name ' detectors']));
+  end
+  param.detectors = detectors;
 end
 
 %%%%% For Debuggin purpose only
@@ -152,13 +173,6 @@ elseif COMPUTING_MODE == 2
 else
   error('Computing mode undefined');
 end
-
-
-% Addpath doesn't work why?
-curDir = pwd;
-eval(['cd ' VOC_PATH]);
-VOCinit;
-eval(['cd ' curDir]);
 
 
 % load dataset
@@ -231,7 +245,9 @@ for imgIdx=1:N_IMAGE
         bbsNMS(:,9) = bbsNMS_clip(:,9);
       end
       
-      tpIdx = bbsNMS(:, 9) > param.min_overlap;
+      tpIdx = logical(tp{imgIdx});
+      % tpIdx = bbsNMS(:, 9) > param.min_overlap;
+      
       % Original images
       subplot(221);
       imagesc(im); axis off; axis equal;
@@ -240,20 +256,19 @@ for imgIdx=1:N_IMAGE
       subplot(222);
       dwot_draw_overlap_detection(im, bbsNMS(tpIdx,:), renderings, 1, 50, visualize_detection, [0.3, 0.7, 0] );
       
-      
       subplot(223);
-      dwot_draw_overlap_detection(im, bbsNMS(tpIdx,:), renderings, 5, 50, visualize_detection, [0.3, 0.5, 0.2] );
+      dwot_draw_overlap_detection(im, bbsNMS(tpIdx,:), renderings, inf, 50, visualize_detection, [0.3, 0.5, 0.2] );
       
       % False positives
       subplot(224);
-      dwot_draw_overlap_detection(im, bbsNMS(~tpIdx,:), renderings, 5, 50, visualize_detection, [0.3, 0.7, 0]);
+      dwot_draw_overlap_detection(im, bbsNMS(~tp{imgIdx},:), renderings, 4, 50, visualize_detection, [0.3, 0.7, 0]);
       
       drawnow;
       spaceplots();
       
       drawnow;
-      save_name = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_sbin_%d_nms_%0.2f_imgIdx_%d.jpg',...
-        DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), sbin, param.nms_threshold, imgIdx);
+      save_name = sprintf('%s_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_sbin_%d_nms_%0.2f_imgIdx_%d.jpg',...
+        DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, param.b_calibrate,  n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), sbin, param.nms_threshold, imgIdx);
       print('-djpeg','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name]);
       
       %  waitforbuttonpress;
@@ -299,7 +314,7 @@ tit = sprintf('Average Precision = %.1f', 100*ap);
 title(tit);
 axis([0 1 0 1]);
 set(gcf,'color','w');
-save_name = sprintf('AP_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_sbin_%d_nms_%0.2f_skp_%s_N_IM_%d.png',...
-        LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), sbin, param.nms_threshold, skip_name, N_IMAGE);
+save_name = sprintf('AP_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_sbin_%d_nms_%0.2f_skp_%s_N_IM_%d.png',...
+        LOWER_CASE_CLASS, TYPE, detector_model_name, param.b_calibrate, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), sbin, param.nms_threshold, skip_name, N_IMAGE);
 
 print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name])
