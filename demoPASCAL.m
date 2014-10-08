@@ -56,19 +56,11 @@ n_cell_limit = [300];
 lambda = [0.015];
 detection_threshold = 80;
 
-% azs = 0:45:345
-% els = 0 : 10 : 40
-% fovs = [15, 45]
-% yaws = -40:10:40
-% n_cell_limit = 190
-% lambda = 0.015
-
 visualize_detection = true;
 visualize_detector = false;
-% visualize = false;
 
-sbin = 4;
-n_level = 10;
+sbin = 6;
+n_level = 15;
 n_proposals = 5;
 
 % Load models
@@ -80,7 +72,7 @@ n_proposals = 5;
 %               'fixed_gear_road_bike',...
 %               'glx_bike',...
 %               'road_bike'};
-            
+
 models_to_use = {'2012-VW-beetle-turbo',...
               'Kia_Spectra5_2006',...
               '2008-Jeep-Cherokee',...
@@ -94,31 +86,21 @@ use_idx = ismember(model_names,models_to_use);
 model_names = model_names(use_idx);
 model_paths = model_paths(use_idx);
 
-
+% skip_criteria = {'empty', 'truncated','difficult'};
 skip_criteria = {'empty'};
 skip_name = cellfun(@(x) x(1), skip_criteria);
+
 %%%%%%%%%%%%%%% Set Parameters %%%%%%%%%%%%
 dwot_get_default_params;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 param.template_initialization_mode = 0; 
 param.nms_threshold = 0.4;
 param.model_paths = model_paths;
-param.b_calibrate = true;
+param.b_calibrate = 0;
 param.n_calibration_images = 100;
-param.detection_threshold = 0;
-
-if exist('renderer','var')
-  renderer.delete();
-  clear renderer;
-end
-
-% Initialize renderer
-if ~isfield(param,'renderer')
-  renderer = Renderer();
-  if ~renderer.initialize(model_paths, 700, 700, 0, 0, 0, 0, 25)
-    error('fail to load model');
-  end
-end
+param.detection_threshold = 100;
+param.image_scale_factor = 2;
+% param.gather_
 
 % detector name
 [ detector_model_name ] = dwot_get_detector_name(CLASS, SUB_CLASS, model_names, param);
@@ -127,13 +109,26 @@ detector_name = sprintf('%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d',...
 
 detector_file_name = sprintf('%s.mat', detector_name);
 
-detection_result_file = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_sbin_%d_nms_%0.2f_skp_%s.txt',...
-      DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), sbin, param.nms_threshold, skip_name);
+detection_result_file = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_%0.2f_sbin_%d_n_scale_%d_nms_%0.2f_skp_%s.txt',...
+      DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level, param.nms_threshold, skip_name);
 
-
+%% Make Detectors
 if exist(detector_file_name,'file')
   load(detector_file_name);
 else
+  if exist('renderer','var')
+    renderer.delete();
+    clear renderer;
+  end
+
+  % Initialize renderer
+  if ~isfield(param,'renderer')
+    renderer = Renderer();
+    if ~renderer.initialize(model_paths, 700, 700, 0, 0, 0, 0, 25)
+      error('fail to load model');
+    end
+  end
+
   [detectors] = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_names), LOWER_CASE_CLASS, param, visualize_detector);
   [detectors, detector_table]= dwot_make_table_from_detectors(detectors);
   if sum(cellfun(@(x) isempty(x), detectors))
@@ -161,6 +156,9 @@ param.detect_pyramid_padding = 10;
 %%%%%%%%%%%%
 renderings = cellfun(@(x) x.rendering_image, detectors, 'UniformOutput', false);
 
+%% Make templates, these are just pointers to the templates in the detectors,
+% The following code copies variables to GPU or make pointers to memory
+% according to the computing mode.
 if COMPUTING_MODE == 0
   % for CPU convolution, use fconvblas which handles template inversion
   templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
@@ -175,7 +173,7 @@ else
 end
 
 
-% load dataset
+%% Set variables for detection
 [gtids,t] = textread(sprintf(VOCopts.imgsetpath,[LOWER_CASE_CLASS '_' TYPE]),'%s %d');
 
 N_IMAGE = length(gtids);
@@ -206,12 +204,13 @@ for imgIdx=1:N_IMAGE
 
     if dwot_skip_criteria(recs(imgIdx).objects(clsinds), skip_criteria); continue; end
 
-    gt(imgIdx).BB=cat(1,recs(imgIdx).objects(clsinds).bbox)';
-    gt(imgIdx).diff=[recs(imgIdx).objects(clsinds).difficult];
-    gt(imgIdx).det=false(length(clsinds),1);
+    gt(imgIdx).BB = param.image_scale_factor * cat(1, recs(imgIdx).objects(clsinds).bbox)';
+    gt(imgIdx).diff = [recs(imgIdx).objects(clsinds).difficult];
+    gt(imgIdx).det = false(length(clsinds),1);
     
     
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
+    im = imresize(im,param.image_scale_factor);
     imSz = size(im);
     if COMPUTING_MODE == 0
       [bbsAllLevel, hog, scales] = dwot_detect( im, templates_cpu, param);
@@ -228,7 +227,6 @@ for imgIdx=1:N_IMAGE
     end
     fprintf(' time to convolution: %0.4f\n', toc(imgTic));
     
-    
     % Automatically sort them according to the score and apply NMS
     bbsNMS = esvm_nms(bbsAllLevel, param.nms_threshold);
     
@@ -236,7 +234,7 @@ for imgIdx=1:N_IMAGE
     [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, detScore{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
     
     [~, img_file_name] = fileparts(recs(imgIdx).imgname);
-    dwot_save_detection(bbsNMS_clip, 'Result', detection_result_file, img_file_name);
+    dwot_save_detection(bbsNMS_clip, 'Result', detection_result_file, img_file_name, false, 1); % save mode != 0 to save template index
     
     if visualize_detection && ~isempty(clsinds)
       % figure(2);
@@ -255,7 +253,7 @@ for imgIdx=1:N_IMAGE
       % True positives
       subplot(222);
       dwot_draw_overlap_detection(im, bbsNMS(tpIdx,:), renderings, 1, 50, visualize_detection, [0.3, 0.7, 0] );
-      
+
       subplot(223);
       dwot_draw_overlap_detection(im, bbsNMS(tpIdx,:), renderings, inf, 50, visualize_detection, [0.3, 0.5, 0.2] );
       
@@ -267,8 +265,8 @@ for imgIdx=1:N_IMAGE
       spaceplots();
       
       drawnow;
-      save_name = sprintf('%s_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_sbin_%d_nms_%0.2f_imgIdx_%d.jpg',...
-        DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, param.b_calibrate,  n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), sbin, param.nms_threshold, imgIdx);
+      save_name = sprintf('%s_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_%0.2f_sbin_%d_n_scale_%d_nms_%0.2f_imgIdx_%d.jpg',...
+        DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, param.b_calibrate,  n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level, param.nms_threshold, imgIdx);
       print('-djpeg','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name]);
       
       %  waitforbuttonpress;
@@ -280,41 +278,28 @@ end
 detScore = cell2mat(detScore);
 fp = cell2mat(fp);
 tp = cell2mat(tp);
-% atp = cell2mat(atp);
-% afp = cell2mat(afp);
-% detectorId = cell2mat(detectorId);
 
 [sc, si] =sort(detScore,'descend');
 fpSort = cumsum(fp(si));
 tpSort = cumsum(tp(si));
 
-% atpSort = cumsum(atp(si));
-% afpSort = cumsum(afp(si));
 
-% detectorIdSort = detectorId(si);
 
 recall = tpSort/npos;
 precision = tpSort./(fpSort + tpSort);
 
-% arecall = atpSort/npos;
-% aprecision = atpSort./(afpSort + atpSort);
 ap = VOCap(recall', precision');
-% aa = VOCap(arecall', aprecision');
 fprintf('AP = %.4f\n', ap);
 
 close all;
 plot(recall, precision, 'r', 'LineWidth',3);
-% hold on;
-% plot(arecall, aprecision, 'g', 'LineWidth',3);
 xlabel('Recall');
-% ylabel('Precision/Accuracy');
-% tit = sprintf('Average Precision = %.1f / Average Accuracy = %1.1f', 100*ap,100*aa);
 
-tit = sprintf('Average Precision = %.1f', 100*ap);
+tit = sprintf('Average Precision = %.3f', 100*ap);
 title(tit);
 axis([0 1 0 1]);
 set(gcf,'color','w');
-save_name = sprintf('AP_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_sbin_%d_nms_%0.2f_skp_%s_N_IM_%d.png',...
-        LOWER_CASE_CLASS, TYPE, detector_model_name, param.b_calibrate, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), sbin, param.nms_threshold, skip_name, N_IMAGE);
+save_name = sprintf('AP_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_%0.2f_sbin_%d_n_scale_%d_nms_%0.2f_skp_%s_N_IM_%d.png',...
+        LOWER_CASE_CLASS, TYPE, detector_model_name, param.b_calibrate, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level, param.nms_threshold, skip_name, N_IMAGE);
 
 print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name])

@@ -40,7 +40,7 @@ end
 MAXLEVELS = 200;
 
 %Hardcoded minimum dimension of smallest (coarsest) pyramid level
-MINDIMENSION = 5;
+MINDIMENSION = 10;
 
 %Get the levels per octave from the parameters
 interval = params.detect_levels_per_octave;

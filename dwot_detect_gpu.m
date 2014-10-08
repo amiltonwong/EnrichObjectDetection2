@@ -54,10 +54,11 @@ for level = length(hog):-1:1
     bbs(:,8) = x_coord;
 
     % bbs(:,9) is designated for overlap
-    % bbs(:,10) is designated for GT index
+    % bbs(:,10) is designated for GT index / obsolete
     
     % bbs(:,9) = boxoverlap(bbs, annotation.bbox + [0 0 annotation.bbox(1:2)]);
-    % bbs(:,10) = abs(detectors{templateIdx}.az - azGT) < 30;
+    % bbs(:,10) = abs(detectors{templateIdx}.az - azGT) < 30; for 3D object
+    % dataset
 
     bbs(:,11) = templateIdx;
     bbs(:,12) = HM{templateIdx}(idx);

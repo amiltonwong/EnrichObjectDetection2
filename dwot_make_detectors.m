@@ -1,5 +1,6 @@
 function [detectors]= dwot_make_detectors(renderer, azs, els, yaws, fovs, param, visualize)
-
+% for each of the viewpoint specified, create detectors, 
+% the vectors, azs, els, yaws, fovs, all have the same length
 if nargin < 7
   visualize = false;
 end

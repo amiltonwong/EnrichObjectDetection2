@@ -15,9 +15,9 @@ if b_new_file
   file_list = dir(save_path);
   file_list = file_list(~[file_list.isdir]);
   
-  if exist(file_name,'file')
+  if exist(fullfile(save_path,file_name),'file')
     warning('file name exists, appending temporary number');
-    temp_numbers = cellfun(@(x) regexp(x, [file_name '_(?<num>\d+)(.txt)?'],'names'),{file_list.name},'UniformOutput',false);
+    temp_numbers = cellfun(@(x) regexp(x, [file_name 'tmp_(?<num>\d+)(.txt)?'],'names'),{file_list.name},'UniformOutput',false);
     temp_numbers = temp_numbers(cellfun(@(x) ~isempty(x), temp_numbers));
     temp_numbers = cellfun(@(x) str2double(x.num), temp_numbers);
     if isempty(temp_numbers)
@@ -25,8 +25,8 @@ if b_new_file
     else
       curr_temp_idx = max(temp_numbers) + 1;
     end
-
-    file_name = fprintf('%s_%d',file_name,curr_temp_idx);
+    [~, file_name_wo_ext, ext] = fileparts(file_name);
+    file_name = sprintf('%s_tmp_%d%s',file_name_wo_ext,curr_temp_idx, ext);
   end
   f = fopen(fullfile(save_path, file_name),'w+');
 else
@@ -45,12 +45,11 @@ for det_idx = 1:n_detection
                       detection_result(det_idx, end),...
                       detection_result(det_idx, 1:4)));
   else
-    fwrite(f,sprintf('%s %f %f %f %f %f %d %f\n',...
+    fwrite(f,sprintf('%s %f %f %f %f %f %d\n',...
                       image_name,...
-                      detection_result(det_idx, end),...
-                      detection_result(det_idx, 1:4),...
-                      detection_result(det_idx, 9 ),...
-                      detection_result(det_idx, 11)));
+                      detection_result(det_idx, end),... % detection score
+                      detection_result(det_idx, 1:4),... % bbox
+                      detection_result(det_idx, 11)));  % templateIdx
   end
 end
 fclose(f);

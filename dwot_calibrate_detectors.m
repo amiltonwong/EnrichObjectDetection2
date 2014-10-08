@@ -19,7 +19,7 @@ for imgIdx = 1:param.n_calibration_images
     recs(imgIdx)=PASreadrecord(sprintf(VOCopts.annopath,gtids{imgIdx}));
     clsinds = strmatch(LOWER_CASE_CLASS,{recs(imgIdx).objects(:).class},'exact');
     
-    % Make sure that image of the same class goes into the calibration
+    % Make sure that image of the same class does not go into the calibration
     if ~isempty(clsinds)
         continue;
     end

@@ -80,7 +80,7 @@ if box_text
     end
     rectangle('position', box_position,'edgecolor',[0.5 0.5 0.5],'LineWidth',3);
     rectangle('position', box_position,'edgecolor',color_map(bbsIdx,:),'LineWidth',1);
-    text(box_position(1) + 1 , box_position(2), box_text, 'BackgroundColor', color_map( bbsIdx ,:),'EdgeColor',[0.5 0.5 0.5]);
+    text(box_position(1) + 1 , box_position(2), box_text, 'BackgroundColor', color_map( bbsIdx ,:),'EdgeColor',[0.5 0.5 0.5],'VerticalAlignment','bottom');
   end
   axis equal;
   axis tight;
