@@ -101,7 +101,7 @@ param.n_level_per_octave  = n_level;
 param.detection_threshold = detection_threshold;
 param.n_cell_limit        = n_cell_limit;
 param.class               = CLASS;
-param.type                = TYPE;
+param.type                = TEST_TYPE;
 param.hog_cell_threshold  = 1.0;
 param.feature_dim         = 31;
 

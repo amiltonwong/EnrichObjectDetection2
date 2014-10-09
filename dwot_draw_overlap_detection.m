@@ -72,8 +72,8 @@ if box_text
   color_map = hot(NDrawBox);
   for bbsIdx = NDrawBox:-1:1
     box_position = clipBBox(bbsIdx, 1:4) + [0 0 -clipBBox(bbsIdx, 1:2)];
-    % if detector id id available print it
-    if bbsNMS(bbsIdx,11) > 0
+    % if detector id available (positive number), print it
+    if bbsNMS(bbsIdx,11) > 0 
       box_text = sprintf(' s:%0.2f o:%0.2f t:%d',bbsNMS(bbsIdx,12),bbsNMS(bbsIdx,9),bbsNMS(bbsIdx,11));
     else
       box_text = sprintf(' s:%0.2f o:%0.2f ',bbsNMS(bbsIdx,12),bbsNMS(bbsIdx,9));

@@ -31,10 +31,12 @@ for bbsIdx = 1:nDet
       if ~gt.diff(jmax)
           if ~gt.det(jmax)
               tp(bbsIdx)=1;            % true positive
-              gt.det(jmax)=true;
+              gt.det(jmax)=bbsIdx;
           else
               fp(bbsIdx)=1;            % false positive (multiple detection)
           end
+      % else % for difficult object, do not treat them as neither false
+      % positive nor true positive
       end
   else
       fp(bbsIdx)=1;                    % false positive

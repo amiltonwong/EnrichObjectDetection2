@@ -1,5 +1,5 @@
-[~, sys_result] = system('hostname');
-server_id = regexp(sys_result, '^napoli(?<num>\d+).*','names');
+[~, sys_host_name] = system('hostname');
+server_id = regexp(sys_host_name, '^napoli(?<num>\d+).*','names');
 if isempty(server_id)
   VOC_PATH = '/home/chrischoy/Dataset/VOCdevkit/';
 else
@@ -20,6 +20,7 @@ addpath(VOC_PATH);
 addpath([VOC_PATH, 'VOCcode']);
 addpath('3rdParty/SpacePlot');
 addpath('3rdParty/MinMaxSelection');
+addpath('Diagnosis');
 
 % Addpath doesn't work pwd in the code uses current directory so move to
 % the directory.
@@ -35,8 +36,8 @@ CLASS = 'Car';
 % CLASS = 'Bicycle';
 SUB_CLASS = [];
 LOWER_CASE_CLASS = lower(CLASS);
-TYPE = 'val';
-mkdir('Result',[LOWER_CASE_CLASS '_' TYPE]);
+TEST_TYPE = 'val';
+mkdir('Result',[LOWER_CASE_CLASS '_' TEST_TYPE]);
 
 if COMPUTING_MODE > 0
   gdevice = gpuDevice(1);
@@ -60,7 +61,7 @@ visualize_detection = true;
 visualize_detector = false;
 
 sbin = 6;
-n_level = 15;
+n_level = 10;
 n_proposals = 5;
 
 % Load models
@@ -79,7 +80,8 @@ models_to_use = {'2012-VW-beetle-turbo',...
               'Ford Ranger Updated',...
               'BMW_X1_2013',...
               'Honda_Accord_Coupe_2009',...
-              'Porsche_911'};
+              'Porsche_911',...
+              '2009 Toyota Cargo'};
 
 use_idx = ismember(model_names,models_to_use);
 
@@ -108,9 +110,10 @@ detector_name = sprintf('%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d',...
     LOWER_CASE_CLASS,  detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
 
 detector_file_name = sprintf('%s.mat', detector_name);
+fprintf('\nThe result will be saved on %s\n',detector_file_name);
 
-detection_result_file = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_%0.2f_sbin_%d_n_scale_%d_nms_%0.2f_skp_%s.txt',...
-      DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level, param.nms_threshold, skip_name);
+detection_result_file = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_%0.2f_sbin_%d_level_%d_nms_%0.2f_skp_%s.txt',...
+      DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level, param.nms_threshold, skip_name);
 
 %% Make Detectors
 if exist(detector_file_name,'file')
@@ -174,7 +177,7 @@ end
 
 
 %% Set variables for detection
-[gtids,t] = textread(sprintf(VOCopts.imgsetpath,[LOWER_CASE_CLASS '_' TYPE]),'%s %d');
+[gtids,t] = textread(sprintf(VOCopts.imgsetpath,[LOWER_CASE_CLASS '_' TEST_TYPE]),'%s %d');
 
 N_IMAGE = length(gtids);
 % N_IMAGE = 1500;
@@ -206,7 +209,7 @@ for imgIdx=1:N_IMAGE
 
     gt(imgIdx).BB = param.image_scale_factor * cat(1, recs(imgIdx).objects(clsinds).bbox)';
     gt(imgIdx).diff = [recs(imgIdx).objects(clsinds).difficult];
-    gt(imgIdx).det = false(length(clsinds),1);
+    gt(imgIdx).det = zeros(length(clsinds),1);
     
     
     im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
@@ -234,7 +237,7 @@ for imgIdx=1:N_IMAGE
     [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, detScore{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
     
     [~, img_file_name] = fileparts(recs(imgIdx).imgname);
-    dwot_save_detection(bbsNMS_clip, 'Result', detection_result_file, img_file_name, false, 1); % save mode != 0 to save template index
+    dwot_save_detection(bbsNMS, 'Result', detection_result_file, img_file_name, false, 1); % save mode != 0 to save template index
     
     if visualize_detection && ~isempty(clsinds)
       % figure(2);
@@ -259,15 +262,15 @@ for imgIdx=1:N_IMAGE
       
       % False positives
       subplot(224);
-      dwot_draw_overlap_detection(im, bbsNMS(~tp{imgIdx},:), renderings, 4, 50, visualize_detection, [0.3, 0.7, 0]);
+      dwot_draw_overlap_detection(im, bbsNMS(~tpIdx,:), renderings, 5, 50, visualize_detection, [0.3, 0.7, 0]);
       
       drawnow;
       spaceplots();
       
       drawnow;
-      save_name = sprintf('%s_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_%0.2f_sbin_%d_n_scale_%d_nms_%0.2f_imgIdx_%d.jpg',...
-        DATA_SET, LOWER_CASE_CLASS, TYPE, detector_model_name, param.b_calibrate,  n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level, param.nms_threshold, imgIdx);
-      print('-djpeg','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name]);
+      save_name = sprintf('%s_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_%0.2f_sbin_%d_level_%d_nms_%0.2f_imgIdx_%d.jpg',...
+        DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, param.b_calibrate,  n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level, param.nms_threshold, imgIdx);
+      print('-djpeg','-r150',['Result/' LOWER_CASE_CLASS '_' TEST_TYPE '/' save_name]);
       
       %  waitforbuttonpress;
     end
@@ -299,7 +302,7 @@ tit = sprintf('Average Precision = %.3f', 100*ap);
 title(tit);
 axis([0 1 0 1]);
 set(gcf,'color','w');
-save_name = sprintf('AP_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_%0.2f_sbin_%d_n_scale_%d_nms_%0.2f_skp_%s_N_IM_%d.png',...
-        LOWER_CASE_CLASS, TYPE, detector_model_name, param.b_calibrate, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level, param.nms_threshold, skip_name, N_IMAGE);
+save_name = sprintf('AP_%s_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_%0.2f_sbin_%d_level_%d_nms_%0.2f_skp_%s_N_IM_%d_%s.png',...
+        DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, param.b_calibrate, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level, param.nms_threshold, skip_name, N_IMAGE, sys_host_name);
 
-print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name])
+print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TEST_TYPE '/' save_name])
