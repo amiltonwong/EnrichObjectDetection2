@@ -1,4 +1,4 @@
-function resultIm = dwot_draw_overlap_detection(im, bbsNMS, renderings, maxNDrawBox, drawPadding, box_text, drawing_weights)
+function resultIm = dwot_draw_overlap_detection(im, bbsNMS, renderings, maxNDrawBox, drawPadding, box_text, drawing_weights, color_range)
 
 if nargin < 4
   maxNDrawBox = 5;
@@ -14,6 +14,10 @@ end
 
 if nargin < 7
   drawing_weights = ones(1,3)/3;
+end
+
+if nargin < 8
+  color_range = false;
 end
 
 paddedIm = pad_image(im2double(im), drawPadding, 1);
@@ -69,18 +73,33 @@ if box_text
 %   end
   
   % Draw bounding box.
-  color_map = hot(NDrawBox);
+  if ~color_range
+    color_map = hot(NDrawBox);
+  else
+    n_color = numel(color_range);
+    color_map = jet(n_color);
+  end
+  
   for bbsIdx = NDrawBox:-1:1
+    if ~color_range
+      curr_color = color_map( bbsIdx ,:);
+    else
+      [~, color_idx] = histc(bbsNMS(bbsIdx,12), color_range);
+      curr_color = color_map(color_idx, :);
+    end
+    
     box_position = clipBBox(bbsIdx, 1:4) + [0 0 -clipBBox(bbsIdx, 1:2)];
+    
     % if detector id available (positive number), print it
     if bbsNMS(bbsIdx,11) > 0 
       box_text = sprintf(' s:%0.2f o:%0.2f t:%d',bbsNMS(bbsIdx,12),bbsNMS(bbsIdx,9),bbsNMS(bbsIdx,11));
     else
       box_text = sprintf(' s:%0.2f o:%0.2f ',bbsNMS(bbsIdx,12),bbsNMS(bbsIdx,9));
     end
+    
     rectangle('position', box_position,'edgecolor',[0.5 0.5 0.5],'LineWidth',3);
-    rectangle('position', box_position,'edgecolor',color_map(bbsIdx,:),'LineWidth',1);
-    text(box_position(1) + 1 , box_position(2), box_text, 'BackgroundColor', color_map( bbsIdx ,:),'EdgeColor',[0.5 0.5 0.5],'VerticalAlignment','bottom');
+    rectangle('position', box_position,'edgecolor',curr_color,'LineWidth',1);
+    text(box_position(1) + 1 , box_position(2), box_text, 'BackgroundColor', curr_color,'EdgeColor',[0.5 0.5 0.5],'VerticalAlignment','bottom');
   end
   axis equal;
   axis tight;

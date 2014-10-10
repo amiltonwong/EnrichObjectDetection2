@@ -33,7 +33,7 @@ HOGTemplatesz = size(HOGTemplate);
 wHeight = HOGTemplatesz(1);
 wWidth = HOGTemplatesz(2);
 HOGDim = HOGTemplatesz(3);
-nonEmptyCells = (sum(HOGTemplate,3) > hog_cell_threshold);
+nonEmptyCells = (sum(abs(HOGTemplate),3) > hog_cell_threshold);
 idxNonEmptyCells = find(nonEmptyCells);
 [nonEmptyRows,nonEmptyCols] = ind2sub([wHeight, wWidth], idxNonEmptyCells);
 

@@ -62,7 +62,7 @@ if wHeight > param.hog_gamma_cell_size(1) || wWidth > param.hog_gamma_cell_size(
 end
 
 HOGDim = HOGTemplateSz(3);
-nonEmptyCells = (sum(HOGTemplate,3) > hog_cell_threshold);
+nonEmptyCells = (sum(abs(HOGTemplate),3) > hog_cell_threshold);
 idxNonEmptyCells = find(nonEmptyCells);
 [nonEmptyRows,nonEmptyCols] = ind2sub([wHeight, wWidth], idxNonEmptyCells);
 nonEmptyRows = int32(nonEmptyRows);

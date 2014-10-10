@@ -110,10 +110,10 @@ detector_name = sprintf('%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d',...
     LOWER_CASE_CLASS,  detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
 
 detector_file_name = sprintf('%s.mat', detector_name);
-fprintf('\nThe result will be saved on %s\n',detector_file_name);
 
-detection_result_file = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_%0.2f_sbin_%d_level_%d_nms_%0.2f_skp_%s.txt',...
-      DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level, param.nms_threshold, skip_name);
+detection_result_file = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_%0.2f_sbin_%d_level_%d_nms_%0.2f_skp_%s_server_%s.txt',...
+      DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level, param.nms_threshold, skip_name, server_id.num);
+fprintf('\nThe result will be saved on %s\n',detection_result_file);
 
 %% Make Detectors
 if exist(detector_file_name,'file')
@@ -237,7 +237,7 @@ for imgIdx=1:N_IMAGE
     [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, detScore{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
     
     [~, img_file_name] = fileparts(recs(imgIdx).imgname);
-    dwot_save_detection(bbsNMS, 'Result', detection_result_file, img_file_name, false, 1); % save mode != 0 to save template index
+    dwot_save_detection(esvm_nms(bbsAllLevel, 0.7), 'Result', detection_result_file, img_file_name, false, 1); % save mode != 0 to save template index
     
     if visualize_detection && ~isempty(clsinds)
       % figure(2);
@@ -268,9 +268,9 @@ for imgIdx=1:N_IMAGE
       spaceplots();
       
       drawnow;
-      save_name = sprintf('%s_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_%0.2f_sbin_%d_level_%d_nms_%0.2f_imgIdx_%d.jpg',...
-        DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, param.b_calibrate,  n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level, param.nms_threshold, imgIdx);
-      print('-djpeg','-r150',['Result/' LOWER_CASE_CLASS '_' TEST_TYPE '/' save_name]);
+%       save_name = sprintf('%s_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_%0.2f_sbin_%d_level_%d_nms_%0.2f_imgIdx_%d.jpg',...
+%         DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, param.b_calibrate,  n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level, param.nms_threshold, imgIdx);
+%       print('-djpeg','-r150',['Result/' LOWER_CASE_CLASS '_' TEST_TYPE '/' save_name]);
       
       %  waitforbuttonpress;
     end
@@ -303,6 +303,12 @@ title(tit);
 axis([0 1 0 1]);
 set(gcf,'color','w');
 save_name = sprintf('AP_%s_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_%0.2f_sbin_%d_level_%d_nms_%0.2f_skp_%s_N_IM_%d_%s.png',...
-        DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, param.b_calibrate, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level, param.nms_threshold, skip_name, N_IMAGE, sys_host_name);
+        DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, param.b_calibrate, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level, param.nms_threshold, skip_name, N_IMAGE, server_id.num);
 
 print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TEST_TYPE '/' save_name])
+
+
+if ~isempty(server_id)
+  system(['scp ./Result/' LOWER_CASE_CLASS '_' TEST_TYPE '/' save_name ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/' LOWER_CASE_CLASS '_' TEST_TYPE]);
+  system(['scp ./Result/' detection_result_file ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/']);
+end
