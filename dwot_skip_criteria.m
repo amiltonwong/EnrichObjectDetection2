@@ -14,6 +14,8 @@ function b_skip = dwot_skip_criteria(object_annotations, criteria)
           b_skip  = b_skip || cur_object_annotation.truncated;
         case 'difficult'    
           b_skip  = b_skip || cur_object_annotation.difficult;
+        case 'occluded'
+          b_skip  = b_skip || cur_object_annotation.occluded;      
         otherwise
           continue;
       end

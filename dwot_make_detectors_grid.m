@@ -35,14 +35,15 @@ for model_index = model_indexes
           % param.detector_table( dwot_detector_key(azGT, elGT, yawGT, fovGT) ) = i;
 
           if visualize
-            figure(1); subplot(131);
+            subplot(121);
             imagesc(detector.rendering_image); axis equal; axis tight;
             % subplot(132);
             % imagesc(HOGpicture(HOGTemplate)); axis equal; axis tight;
-            subplot(133);
+            subplot(122);
             imagesc(HOGpicture(detector.whow)); axis equal; axis tight;
-            disp('press any button to continue');
-            waitforbuttonpress;
+            drawnow;
+%            disp('press any button to continue');
+%            waitforbuttonpress;
           end
           i = i + 1;    
         end

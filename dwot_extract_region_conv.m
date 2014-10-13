@@ -1,4 +1,6 @@
-function [hog_region_pyramid, im_region]= dwot_extract_region_conv(im, hog, scales, bbsNMS, param)
+% Deprecated
+% use dwot_extract_hog
+function [hog_region_pyramid, im_region]= dwot_extract_region_conv(im, hog, scales, bbsNMS, param, visualize)
 % Clip bounding box to fit image.
 
 % Create HOG pyramid for each of the proposal regions.
@@ -13,6 +15,9 @@ function [hog_region_pyramid, im_region]= dwot_extract_region_conv(im, hog, scal
 %  |  |
 % To prevent unnecessary 
 
+if nargin < 6
+    visualize = false;
+end
 
 padder = param.detect_pyramid_padding;
 sbin = param.sbin;
@@ -98,25 +103,28 @@ for boxIdx = 1:nBBox
     
     pyramidIdx = pyramidIdx + 1;
     % debug
-    if 1
-      figure(1);
+    if visualize
       subplot(221);
       imagesc(im);
       rectangle('position',[imgVIdx1, imgUIdx1, imgVIdx2-imgVIdx1, imgUIdx2-imgUIdx1]);
+      axis equal; axis tight;
       
       subplot(222);
       hogSize = 20;
       imagesc(HOGpicture(hog{level},hogSize));
       dwot_draw_hog_bounding_box(hogVIdx1, hogUIdx1, hogVIdx2, hogUIdx2, hogSize);
       title(['level : ' num2str(level) ' detlevel : ' num2str(detLevel)]);
+      axis equal; axis tight;
       
       subplot(223);
       detectorIdx = bbsNMS(boxIdx, 11);
       imagesc(HOGpicture(param.detectors{detectorIdx}.whow));
+      axis equal; axis tight;
       
       subplot(224);
-      extractedHOG = hog{level}(floor(hogUIdx1):ceil(hogUIdx2), floor(hogVIdx1):ceil(hogVIdx2),:);
+      extractedHOG = hog{level}(floor(clipU1):ceil(clipU2), floor(clipV1):ceil(clipV2),:);
       imagesc(HOGpicture(extractedHOG,hogSize));
+      axis equal; axis tight;
       
       if level == detLevel
         fprintf('detection score single precision %f\n', bbsNMS(boxIdx, 12));

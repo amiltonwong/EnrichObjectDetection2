@@ -3,7 +3,7 @@ if nargin < 9
   bool_get_image = true;
 end
 % model class and index are not supported yet
-renderer.setViewpoint(180 + azimuth,elevation,yaw,0,fov);
+renderer.setViewpoint(azimuth,elevation,yaw,0,fov);
 im = renderer.renderCrop();
 if isempty(im)
   error('Rendering error');

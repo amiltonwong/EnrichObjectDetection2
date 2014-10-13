@@ -3,6 +3,7 @@ function dwot_visualize_models(renderer, model_files, azimuth, elevation, yaw, f
 
 n_models = numel(model_files);
 
+
 % Render the images and find optimal template size
 im_model = cell(1,n_models);
 for model_index = 1:n_models
@@ -21,7 +22,12 @@ for model_index = 1:n_models
     waitforbuttonpress;
 end
 
-if nargin > 5
+if nargin > 6
+    if ~exist(save_path)
+        mkdir(save_path);
+        disp(['Made new path ' save_path]);
+    end
+    
     % Save images to the path
     for model_index = 1:n_models 
         imagesc(im_model{model_index}); 

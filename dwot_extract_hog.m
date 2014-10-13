@@ -1,4 +1,4 @@
-function [hog_region_pyramid, im_region] = dwot_extract_hog(hog, scales, templates, bbs_nms, param, im)
+function [hog_region_pyramid, im_region] = dwot_extract_hog(hog, scales, detectors, bbs_nms, param, im, visualize)
 
 % Clip bounding box to fit image.
 
@@ -13,6 +13,10 @@ function [hog_region_pyramid, im_region] = dwot_extract_hog(hog, scales, templat
 %  |  ----- Actual image and hog region start
 %  |  |
 % To prevent unnecessary 
+
+if nargin < 7
+    visualize = false;
+end
 
 padder = param.detect_pyramid_padding;
 sbin = param.sbin;
@@ -52,7 +56,7 @@ for region_idx = 1:n_regions
   detUIdx  = bbs_nms(region_idx, 7); % uus
   detVIdx  = bbs_nms(region_idx, 8); % uus
   detTemplateIdx = bbs_nms(region_idx, 11); % template Id
-  detTemplateSize = size(templates{detTemplateIdx});
+  detTemplateSize = detectors{detTemplateIdx}.sz;
   detScore = bbs_nms(region_idx, 12);
   
   startLevel = max(1, detLevel - region_extraction_levels);
@@ -64,7 +68,7 @@ for region_idx = 1:n_regions
   hog_region_pyramid{region_idx}.template_size = detTemplateSize;
   hog_region_pyramid{region_idx}.det_score = detScore;
   hog_region_pyramid{region_idx}.models_path = {};
-  hog_region_pyramid{region_idx}.models_idx = {};
+  hog_region_pyramid{region_idx}.models_idx = detectors{detTemplateIdx}.model_index;
 %   hog_region_pyramid{region_idx}.pyramid = struct('hog_bbox',repmat({zeros(1,4)},nLevel,1),...
 %                                                   'clip_hog_bbox',repmat({zeros(1,4)},nLevel,1),...
 %                                                   'padded_clip_hog_bbox',repmat({zeros(1,4)},nLevel,1),...
@@ -128,8 +132,7 @@ for region_idx = 1:n_regions
 
     
     % debug
-    if 0
-      figure(1);
+    if visualize
       subplot(221);
       % Confirmed correct
       if param.computing_mode == 0
@@ -144,6 +147,7 @@ for region_idx = 1:n_regions
     
       imagesc(im);
       rectangle('position',[img_x1_d, img_y1_d, img_x2_d-img_x1_d, img_y2_d-img_y1_d]);
+      axis equal; axis tight;
       
       subplot(222);
       hogSize = 20;
@@ -151,16 +155,19 @@ for region_idx = 1:n_regions
       dwot_draw_hog_bounding_box(hog_x1,        hog_y1,         hog_x2,       hog_y2,        hogSize);
       dwot_draw_hog_bounding_box(padded_hog_x1, padded_hog_y1, padded_hog_x2, padded_hog_y2, hogSize);
       title(['level : ' num2str(level) ' detlevel : ' num2str(detLevel)]);
+      axis equal; axis tight;
       
       subplot(223);
       detectorIdx = bbs_nms(region_idx, 11);
       imagesc(HOGpicture(param.detectors{detectorIdx}.whow));
+      axis equal; axis tight;
       
       subplot(224);
       % cla;
       % extractedHOG = hog{level}(floor(hogUIdx1):ceil(hogUIdx2), floor(hogVIdx1):ceil(hogVIdx2),:);
       % imagesc(HOGpicture(extractedHOG,hogSize));
       imagesc(HOGpicture(hog_region_pyramid{region_idx}.pyramid(pyramidIdx).padded_hog, hogSize));
+      axis equal; axis tight;
       
       if level == detLevel
         fprintf('detection score single precision %f\n', bbs_nms(region_idx, 12));

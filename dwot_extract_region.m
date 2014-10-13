@@ -1,3 +1,5 @@
+% Deprecated
+% use dwot_extract_hog
 function [hog_region_pyramid, im_region]= dwot_extract_region(im, hog, scales, bbs_nms, param)
 % Clip bounding box to fit image.
 

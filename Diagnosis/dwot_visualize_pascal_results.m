@@ -1,4 +1,4 @@
-function [ output_args ] = dwot_visualize_pascal_results( detection_result_txt, detectors, save_path, VOCopts, param, skip_criteria, color_range)
+function [ output_args ] = dwot_visualize_pascal_results( detection_result_txt, detectors, save_path, VOCopts, param, skip_criteria, color_range, nms_threshold)
 
 if ~isfield(param, 'nms_threshold')
   nms_threshold = 0.4;
@@ -63,6 +63,10 @@ fn_struct   = struct('BB',[],'diff',[],'truncated',[],'im',[]);
 
 detector_struct = {};
 
+npos = 0;
+tp = cell(1,N_IMAGE);
+fp = cell(1,N_IMAGE);
+detScore = cell(1,N_IMAGE);
 
 image_count = 1;
 
@@ -94,7 +98,7 @@ for imgIdx=1:n_unique_files
   bbsNMS = esvm_nms(bbs, nms_threshold);
   
   bbsNMS_clip = clip_to_image(bbsNMS, [1 1 imSz(2) imSz(1)]);
-  [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, ~, gt(imgIdx)] = ...
+  [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, detScore{imgIdx}, gt(imgIdx)] = ...
                     dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
   bbsNMS(:,9) = bbsNMS_clip(:,9);
   
@@ -144,8 +148,37 @@ for imgIdx=1:n_unique_files
   end
   
   image_count = image_count + 1;
+  
+  npos=npos+sum(~gt(imgIdx).diff);
+  
 end
 
+
+detScore = cell2mat(detScore);
+fp = cell2mat(fp);
+tp = cell2mat(tp);
+
+[~, si] =sort(detScore,'descend');
+fpSort = cumsum(fp(si));
+tpSort = cumsum(tp(si));
+
+recall = tpSort/npos;
+precision = tpSort./(fpSort + tpSort);
+
+ap = VOCap(recall', precision');
+fprintf('AP = %.4f\n', ap);
+
+close all;
+plot(recall, precision, 'r', 'LineWidth',3);
+xlabel('Recall');
+
+tit = sprintf('Average Precision = %.3f', 100*ap);
+title(tit);
+axis([0 1 0 1]);
+set(gcf,'color','w');
+    
+waitforbuttonpress;
+    
 % Sort the scores for each detectors and print  
 
 if ~exist(save_path)

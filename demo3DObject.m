@@ -3,10 +3,7 @@
 % 
 % see dwot_avg_model.m
 DATA_SET = '3DObject';
-DATA_PATH = '/home/chrischoy/Dataset/3DObject/';
-if ismac
-  DATA_PATH = '~/dataset/3DObject';
-end
+dwot_set_datapath;
 
 % VOC_PATH = '/home/chrischoy/Dataset/VOCdevkit/';
 % if ismac
@@ -18,8 +15,8 @@ addpath('HoG/features');
 addpath('Util');
 addpath('DecorrelateFeature/');
 addpath('../MatlabRenderer/');
+addpath('../MatlabRenderer/bin');
 addpath('../MatlabCUDAConv/');
-addpath(DATA_PATH);
 
 % Computing Mode  = 0, CPU
 %                 = 1, GPU

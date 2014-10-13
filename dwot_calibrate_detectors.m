@@ -1,6 +1,10 @@
-function detectors = dwot_calibrate_detectors(detectors, LOWER_CASE_CLASS, VOCopts, param)
+function detectors = dwot_calibrate_detectors(detectors, calibration_mode, LOWER_CASE_CLASS, VOCopts, param, visualize)
 % Calibrate the object detectors, from the negative images, we gather negative image patches
 % and make false positive rate to be 0.01 percent
+
+if nargin < 6 
+    visualize = false;
+end
 
 sbin = param.sbin;
 n_detectors = numel(detectors);
@@ -41,30 +45,58 @@ for imgIdx = 1:param.n_calibration_images
       hog_size = size(hog{level});
       for det_idx = 1:n_detectors
         hm = reshape(HM{det_idx}(4:hog_size(1)+floor(sz{det_idx}(1)/2), 4:hog_size(2)+floor(sz{det_idx}(2)/2)),1,[]);
-        detection_scores{det_idx}{numel(detection_scores{det_idx}) + 1} = randsample(hm, floor(numel(hm) * 0.1));    
+        % detection_scores{det_idx}{numel(detection_scores{det_idx}) + 1} = randsample(hm, floor(numel(hm) * 0.1));  
+        detection_scores{det_idx}{numel(detection_scores{det_idx}) + 1} = hm(:);  
       end
     end
     fprintf(' time to convolution: %0.4f\n', toc(calTic));
 end
 
+%%%%% Visualize %%%%
+if visualize
+    hist_range = -200:5:200;
+    detection_scores_temp = {};
+    for det_idx = 1:n_detectors
+        detection_scores_temp{det_idx} = cell2mat(detection_scores{det_idx}');
+        count_per_bin = histc(detection_scores_temp{det_idx}, hist_range);
+        plot(hist_range + 5, count_per_bin,'r-');
+
+        mean(detection_scores_temp{det_idx});
+        hold on;
+        drawnow;
+        % waitforbuttonpress;
+    end
+end
+%%%%%%%%%%%%%
+
 % Compute the convolution score with mean HOG feature
 for det_idx = 1:n_detectors
-    muSwapDim = permute(param.hog_mu, [2 3 1]);
-    muProdTemplate = bsxfun(@times, templates{det_idx} , muSwapDim);
-    muProdTemplate = sum(muProdTemplate(:));
-    detection_scores{det_idx} = cell2mat(detection_scores{det_idx});
-    n_sample = numel(detection_scores{det_idx});
-   
-    percent_calibration_fp = 0.01;
-    if isfield(param,'percent_calibration_fp')
-        percent_calibration_fp = param.percent_calibration_fp;
+    
+    switch calibration_mode
+        case 'gaussian'
+            detection_scores_temp = cell2mat(detection_scores{det_idx}');
+            detectors{det_idx}.mean = mean(detection_scores_temp);
+            detectors{det_idx}.var = var(detection_scores_temp);
+        case 'linear'
+            muSwapDim = permute(param.hog_mu, [2 3 1]);
+            muProdTemplate = bsxfun(@times, templates{det_idx} , muSwapDim);
+            muProdTemplate = sum(muProdTemplate(:));
+            detection_scores{det_idx} = cell2mat(detection_scores{det_idx});
+            n_sample = numel(detection_scores{det_idx});
+
+            percent_calibration_fp = 0.01;
+            if isfield(param,'percent_calibration_fp')
+                percent_calibration_fp = param.percent_calibration_fp;
+            end
+
+            % use min/max algorithm to find top k scores without sorting
+            top_scores = maxk(detection_scores{det_idx}, ceil(percent_calibration_fp / 100 * n_sample));
+            t = [muProdTemplate, 1; top_scores(end), 1]\[-1; 0];
+            detectors{det_idx}.a = t(1);
+            detectors{det_idx}.b = t(2);
+        otherwise
+            error(['Calibration mode undefined : ' calibration_mode]);
     end
-   
-    % use min/max algorithm to find top k scores without sorting
-    top_scores = maxk(detection_scores{det_idx}, ceil(percent_calibration_fp / 100 * n_sample));
-    t = [muProdTemplate, 1; top_scores(end), 1]\[-1; 0];
-    detectors{det_idx}.a = t(1);
-    detectors{det_idx}.b = t(2);
 end
 
 

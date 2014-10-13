@@ -1,4 +1,8 @@
-function [best_proposals]= dwot_mcmc_proposal_region(renderer, hog_region_pyramid, im_region, detectors, param, im)
+function [best_proposals]= dwot_mcmc_proposal_region(renderer, hog_region_pyramid, im_region, detectors, param, im, visualize)
+
+if nargin <7 
+    visualize = false;
+end
 
 n_proposal_region = numel(hog_region_pyramid);
 
@@ -7,19 +11,19 @@ org_cell_limit = param.n_cell_limit;
 % param.n_cell_limit = 200;
 
 best_proposals = cell(1, n_proposal_region);
-try
+% try
   for region_idx = 1:n_proposal_region
     % Initialize Chain
     template_idx = hog_region_pyramid{region_idx}.template_idx;
     best_state = struct('x', [detectors{template_idx}.az, detectors{template_idx}.el, detectors{template_idx}.yaw, detectors{template_idx}.fov],...
-                    'models_idx', cell(1, n_batch),... % there can be multiple models and renderings 
+                    'models_idx', detectors{template_idx}.model_index,... % there can be multiple models and renderings 
                     'template_size', cell(1, n_batch),...
                     'rendering_image', detectors{template_idx}.rendering_image,...
                     'image_bbox', hog_region_pyramid{region_idx}.image_bbox,...
                     'score', hog_region_pyramid{region_idx}.det_score);
 
     current_state = struct('x', [detectors{template_idx}.az, detectors{template_idx}.el, detectors{template_idx}.yaw, detectors{template_idx}.fov],...
-                    'models_idx', cell(1, n_batch),... % for multiple model
+                    'models_idx', detectors{template_idx}.model_index,... % for multiple model
                     'score', hog_region_pyramid{region_idx}.det_score);
 
     % Run Chain using Gibbs sampling
@@ -39,11 +43,13 @@ try
           best_state(chain_idx).rendering_image = rendering_image;
         end
         
-        if 0
-          figure(1);
+        if visualize
           subplot(121);
           image_bbox(:,12) = max_score;
-          dwot_draw_overlap_detection(im, image_bbox, rendering_image, 5, 50, true);
+          if ~isempty(rendering_image) && max_score > -inf
+            dwot_draw_overlap_detection(im, image_bbox, rendering_image, 5, 50, true);
+          end
+          
           subplot(122);
           bestBox = best_state(chain_idx).image_bbox;
           bestBox(:,12) = best_state(chain_idx).score;
@@ -62,11 +68,11 @@ try
     
     best_proposals{region_idx} = best_state;
   end
-catch e
-  disp(e.message);
-  param.n_cell_limit = org_cell_limit;
-  rethrow(e);
-end
+% catch e
+%   disp(e.message);
+%   param.n_cell_limit = org_cell_limit;
+%   rethrow(e);
+% end
 param.n_cell_limit = org_cell_limit;
 
 
@@ -75,7 +81,8 @@ param.n_cell_limit = org_cell_limit;
 %     instant detector
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [max_score, template, template_size, rendering_image, image_bbox] = dwot_detect_using_instant_detector(renderer, hog_pyramid, az, el, yaw, fov, models_idx, param, im_region)
-renderer.setViewpoint(90-az,el,yaw,0,fov);
+renderer.setViewpoint(az,el,yaw,0,fov);
+renderer.setModelIndex(models_idx);
 rendering_image = renderer.renderCrop();
 template = WHOTemplateCG_CUDA( rendering_image, param);
 template_size = size(template);

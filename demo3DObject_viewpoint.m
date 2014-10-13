@@ -3,18 +3,7 @@
 % 
 % see dwot_avg_model.m
 DATA_SET = '3DObject';
-
-[~, sys_result] = system('hostname');
-server_id = regexp(sys_result, '^napoli(?<num>\d+).*','names');
-if isempty(server_id)
-  DATA_PATH = '/home/chrischoy/Dataset/3DObject/';
-else
-  DATA_PATH = '/scratch/chrischoy/Dataset/3DObject/';
-end
-
-if ismac
-  DATA_PATH = '~/dataset/3DObject';
-end
+dwot_set_datapath;
 
 % VOC_PATH = '/home/chrischoy/Dataset/VOCdevkit/';
 % if ismac
@@ -26,8 +15,8 @@ addpath('HoG/features');
 addpath('Util');
 addpath('DecorrelateFeature/');
 addpath('../MatlabRenderer/');
+addpath('../MatlabRenderer/bin');
 addpath('../MatlabCUDAConv/');
-addpath(DATA_PATH);
 addpath('3rdParty/SpacePlot');
 
 % Computing Mode  = 0, CPU

@@ -1,4 +1,6 @@
-function [hog_region_pyramid, im_region] = dwot_extract_region_fft(im, hog, scales,  bbsNMS, param)
+% Deprecated
+% use dwot_extract_hog
+function [hog_region_pyramid, im_region] = dwot_extract_region_fft(im, hog, scales,  bbsNMS, param, visualize)
 % Clip bounding box to fit image.
 
 % Create HOG pyramid for each of the proposal regions.
@@ -13,11 +15,14 @@ function [hog_region_pyramid, im_region] = dwot_extract_region_fft(im, hog, scal
 %  |  |
 % To prevent unnecessary 
 
+if nargin < 6
+    visualize = false;
+end
 
 sbin = param.sbin;
 
 if isfield(param,'region_extraction_padding_ratio')
-  region_extraction_padding_ratio = param.extraction_padding_ratio;
+  region_extraction_padding_ratio = param.region_extraction_padding_ratio;
 else
   region_extraction_padding_ratio = 0.1; % 10 percent
 end
@@ -103,28 +108,32 @@ for boxIdx = 1:nBBox
 
     pyramidIdx = pyramidIdx + 1;
     % debug
-    if 1
-      figure(1);
+    if visualize
       subplot(221);
       imagesc(im);
       rectangle('position',[imgVIdx1, imgUIdx1, imgVIdx2-imgVIdx1, imgUIdx2-imgUIdx1]);
+      axis equal; axis tight;
       
       subplot(222);
       hogSize = 20;
       imagesc(HOGpicture(hog{level},hogSize));
       dwot_draw_hog_bounding_box(hogVIdx1, hogUIdx1, hogVIdx2, hogUIdx2, hogSize);
       title(['level : ' num2str(level) ' detlevel : ' num2str(detLevel)]);
+      axis equal; axis tight;
       
       subplot(223);
       detectorIdx = bbsNMS(boxIdx, 11);
       imagesc(HOGpicture(param.detectors{detectorIdx}.whow));
+      axis equal; axis tight;
       
       subplot(224);
-      extractedHOG = hog{level}(round(hogUIdx1):round(hogUIdx2),...
-                                round(hogVIdx1):round(hogVIdx2),:);
+      
+      extractedHOG = hog{level}(clipU1:clipU2,...
+                                clipV1:clipV2,:);
       imagesc(HOGpicture(extractedHOG,hogSize));
 %       imagesc(HOGpicture(hog{level}(floor(detUIdx):ceil(detUIdx + templateSize{detId}(1) - 1),...
 %                                     floor(detVIdx):ceil(detVIdx + templateSize{detId}(2) - 1),:), hogSize));
+      axis equal; axis tight;
       
       a = fconvblasfloat( single(extractedHOG),  { single( param.detectors{detectorIdx}.whow)} , 1 ,1);
       fprintf('\ndetection level %d, cur level %d, \ndetection score %f, cur score %f\n',detLevel, level,  detScore, max(a{1}(:)));

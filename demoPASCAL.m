@@ -1,36 +1,17 @@
-[~, sys_host_name] = system('hostname');
-server_id = regexp(sys_host_name, '^napoli(?<num>\d+).*','names');
-if isempty(server_id)
-  VOC_PATH = '/home/chrischoy/Dataset/VOCdevkit/';
-else
-  VOC_PATH = '/scratch/chrischoy/Dataset/VOCdevkit/';
-end
-
-if ismac
-  VOC_PATH = '~/dataset/VOCdevkit/';
-end
-
 addpath('HoG');
 addpath('HoG/features');
 addpath('Util');
 addpath('DecorrelateFeature/');
 addpath('../MatlabRenderer/');
+addpath('../MatlabRenderer/bin');
 addpath('../MatlabCUDAConv/');
-addpath(VOC_PATH);
-addpath([VOC_PATH, 'VOCcode']);
 addpath('3rdParty/SpacePlot');
 addpath('3rdParty/MinMaxSelection');
 addpath('Diagnosis');
 
-% Addpath doesn't work pwd in the code uses current directory so move to
-% the directory.
-curDir = pwd;
-eval(['cd ' VOC_PATH]);
-VOCinit;
-eval(['cd ' curDir]);
+DATA_SET = 'PASCAL12';
+dwot_set_datapath;
 
-
-DATA_SET = 'PASCAL';
 COMPUTING_MODE = 1;
 CLASS = 'Car';
 % CLASS = 'Bicycle';
@@ -74,19 +55,19 @@ n_proposals = 5;
 %               'glx_bike',...
 %               'road_bike'};
 
-models_to_use = {'2012-VW-beetle-turbo',...
-              'Kia_Spectra5_2006',...
-              '2008-Jeep-Cherokee',...
-              'Ford Ranger Updated',...
-              'BMW_X1_2013',...
-              'Honda_Accord_Coupe_2009',...
-              'Porsche_911',...
-              '2009 Toyota Cargo'};
-
-use_idx = ismember(model_names,models_to_use);
-
-model_names = model_names(use_idx);
-model_paths = model_paths(use_idx);
+% models_to_use = {'2012-VW-beetle-turbo',...
+%               'Kia_Spectra5_2006',...
+%               '2008-Jeep-Cherokee',...
+%               'Ford Ranger Updated',...
+%               'BMW_X1_2013',...
+%               'Honda_Accord_Coupe_2009',...
+%               'Porsche_911',...
+%               '2009 Toyota Cargo'};
+% 
+% use_idx = ismember(model_names,models_to_use);
+% 
+% model_names = model_names(use_idx);
+% model_paths = model_paths(use_idx);
 
 % skip_criteria = {'empty', 'truncated','difficult'};
 skip_criteria = {'empty'};
@@ -102,6 +83,7 @@ param.b_calibrate = 0;
 param.n_calibration_images = 100;
 param.detection_threshold = 100;
 param.image_scale_factor = 2;
+color_range = [-inf 100:20:300 inf];
 % param.gather_
 
 % detector name
@@ -174,12 +156,13 @@ elseif COMPUTING_MODE == 2
 else
   error('Computing mode undefined');
 end
+endskip_criteria = {'empty', 'truncated','difficult','occluded'};
 
 
 %% Set variables for detection
 [gtids,t] = textread(sprintf(VOCopts.imgsetpath,[LOWER_CASE_CLASS '_' TEST_TYPE]),'%s %d');
 
-N_IMAGE = length(gtids);
+N_IMAGE = length(gtids);skip_criteria = {'empty', 'truncated','difficult','occluded'};
 % N_IMAGE = 1500;
 % extract ground truth objects
 npos = 0;
@@ -255,14 +238,14 @@ for imgIdx=1:N_IMAGE
       
       % True positives
       subplot(222);
-      dwot_draw_overlap_detection(im, bbsNMS(tpIdx,:), renderings, 1, 50, visualize_detection, [0.3, 0.7, 0] );
+      dwot_draw_overlap_detection(im, bbsNMS(tpIdx,:), renderings, 1, 50, visualize_detection, [0.3, 0.7, 0], color_range );
 
       subplot(223);
-      dwot_draw_overlap_detection(im, bbsNMS(tpIdx,:), renderings, inf, 50, visualize_detection, [0.3, 0.5, 0.2] );
+      dwot_draw_overlap_detection(im, bbsNMS(tpIdx,:), renderings, inf, 50, visualize_detection, [0.3, 0.5, 0.2], color_range );
       
       % False positives
       subplot(224);
-      dwot_draw_overlap_detection(im, bbsNMS(~tpIdx,:), renderings, 5, 50, visualize_detection, [0.3, 0.7, 0]);
+      dwot_draw_overlap_detection(im, bbsNMS(~tpIdx,:), renderings, 5, 50, visualize_detection, [0.3, 0.7, 0], color_range );
       
       drawnow;
       spaceplots();
