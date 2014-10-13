@@ -32,7 +32,7 @@ for level = length(hog):-1:1
     
     % Use calibration
     if param.b_calibrate
-      HM{templateIdx} = param.detectors{templateIdx}.a * HM{templateIdx} + param.detectors{templateIdx}.b;
+        HM{templateIdx} = dwot_calibrate_score(HM{templateIdx}, templateIdx, param.detectors, param);
     end
     
     [idx] = find(HM{templateIdx}(:) > param.detection_threshold);
@@ -61,12 +61,7 @@ for level = length(hog):-1:1
     % dataset
 
     bbs(:,11) = templateIdx;
-    if param.b_calibrate
-        calibrated_score = dwot_calibrate_score(HM{templateIdx}(idx), templateIdx, param.detectors, param);
-        bbs(:,12) = calibrated_score;
-    else
-        bbs(:,12) = HM{templateIdx}(idx);
-    end
+    bbs(:,12) = HM{templateIdx}(idx);
     bbsTemplate{templateIdx} = bbs;
     
     % if visualize

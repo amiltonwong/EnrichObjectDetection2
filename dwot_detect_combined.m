@@ -36,7 +36,12 @@ for level = length(hog):-1:1
   bbsTemplate = cell(nTemplates,1);
   
   for templateIdx = 1:nTemplates
+    if param.b_calibrate
+        HM{templateIdx} = dwot_calibrate_score(HM{templateIdx}, templateIdx, param.detectors, param);
+    end
+    
     [idx] = find(HM{templateIdx}(:) > param.detection_threshold);
+    
     if isempty(idx)
       continue;
     end
@@ -66,12 +71,8 @@ for level = length(hog):-1:1
     % bbs(:,10) = abs(detectors{templateIdx}.az - azGT) < 30;
 
     bbs(:,11) = templateIdx;
-    if param.b_calibrate
-        calibrated_score = dwot_calibrate_score(HM{templateIdx}(idx), templateIdx, param.detectors, param);
-        bbs(:,12) = calibrated_score;
-    else
-        bbs(:,12) = HM{templateIdx}(idx);
-    end
+    bbs(:,12) = HM{templateIdx}(idx);
+
     bbsTemplate{templateIdx} = bbs;
     
     % if visualize

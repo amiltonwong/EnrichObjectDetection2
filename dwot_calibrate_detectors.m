@@ -55,7 +55,7 @@ for imgIdx = 1:numel(gtids)
     if n_processed >= param.n_calibration_images
         break;
     end
-    fprintf(' time to convolution: %0.4f\n', toc(calTic));
+    fprintf(' convolution time: %0.4f\n', toc(calTic));
 end
 
 if n_processed < param.n_calibration_images
