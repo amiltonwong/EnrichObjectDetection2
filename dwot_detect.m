@@ -60,7 +60,13 @@ for level = length(hog):-1:1
     % bbs(:,10) = abs(detectors{templateIdx}.az - azGT) < 30;
 
     bbs(:,11) = templateIdx;
-    bbs(:,12) = HM{templateIdx}(idx);
+    if param.b_calibrate
+        calibrated_score = dwot_calibrate_score(HM{templateIdx}(idx), templateIdx, param.detectors, param);
+        bbs(:,12) = calibrated_score;
+    else
+        bbs(:,12) = HM{templateIdx}(idx);
+    end
+
     bbsTemplate{templateIdx} = bbs;
     
     % if visualize

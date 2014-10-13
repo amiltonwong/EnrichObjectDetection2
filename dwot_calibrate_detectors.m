@@ -1,8 +1,8 @@
-function detectors = dwot_calibrate_detectors(detectors, calibration_mode, LOWER_CASE_CLASS, VOCopts, param, visualize)
+function detectors = dwot_calibrate_detectors(detectors, LOWER_CASE_CLASS, VOCopts, param, visualize)
 % Calibrate the object detectors, from the negative images, we gather negative image patches
 % and make false positive rate to be 0.01 percent
 
-if nargin < 6 
+if nargin < 6
     visualize = false;
 end
 
@@ -17,8 +17,9 @@ sz = cellfun(@(x) size(x), templates, 'UniformOutput',false);
 
 
 %% Collect statistics
-for imgIdx = 1:param.n_calibration_images
-    fprintf('%d/%d ',imgIdx,param.n_calibration_images);
+n_processed = 0;
+for imgIdx = 1:numel(gtids)
+    fprintf('. ');
     calTic = tic;
     recs(imgIdx)=PASreadrecord(sprintf(VOCopts.annopath,gtids{imgIdx}));
     clsinds = strmatch(LOWER_CASE_CLASS,{recs(imgIdx).objects(:).class},'exact');
@@ -49,9 +50,18 @@ for imgIdx = 1:param.n_calibration_images
         detection_scores{det_idx}{numel(detection_scores{det_idx}) + 1} = hm(:);  
       end
     end
+    n_processed = n_processed + 1;
+    
+    if n_processed >= param.n_calibration_images
+        break;
+    end
     fprintf(' time to convolution: %0.4f\n', toc(calTic));
 end
 
+if n_processed < param.n_calibration_images
+    warning('Number of requested calibration images was larger than the dataset size');
+end
+    
 %%%%% Visualize %%%%
 if visualize
     hist_range = -200:5:200;
@@ -72,21 +82,24 @@ end
 % Compute the convolution score with mean HOG feature
 for det_idx = 1:n_detectors
     
-    switch calibration_mode
+    switch param.calibration_mode
         case 'gaussian'
+            % normalize score by normalizing the negative instances score distribution
             detection_scores_temp = cell2mat(detection_scores{det_idx}');
             detectors{det_idx}.mean = mean(detection_scores_temp);
             detectors{det_idx}.var = var(detection_scores_temp);
         case 'linear'
+            % Seeing 3D Chair, CVPR 14 approach
             muSwapDim = permute(param.hog_mu, [2 3 1]);
             muProdTemplate = bsxfun(@times, templates{det_idx} , muSwapDim);
             muProdTemplate = sum(muProdTemplate(:));
             detection_scores{det_idx} = cell2mat(detection_scores{det_idx});
             n_sample = numel(detection_scores{det_idx});
 
-            percent_calibration_fp = 0.01;
             if isfield(param,'percent_calibration_fp')
                 percent_calibration_fp = param.percent_calibration_fp;
+            else
+                percent_calibration_fp = 0.01;
             end
 
             % use min/max algorithm to find top k scores without sorting

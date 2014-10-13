@@ -79,12 +79,15 @@ dwot_get_default_params;
 param.template_initialization_mode = 0; 
 param.nms_threshold = 0.4;
 param.model_paths = model_paths;
+
 param.b_calibrate = 0;
-param.n_calibration_images = 100;
-param.detection_threshold = 100;
+param.n_calibration_images = 50;
+param.calibration_mode = 'gaussian';
+
+param.detection_threshold = 80;
 param.image_scale_factor = 2;
 color_range = [-inf 100:20:300 inf];
-% param.gather_
+
 
 % detector name
 [ detector_model_name ] = dwot_get_detector_name(CLASS, SUB_CLASS, model_names, param);

@@ -82,8 +82,12 @@ dwot_get_default_params;
 param.template_initialization_mode = 0; 
 param.nms_threshold = 0.4;
 param.model_paths = model_paths;
+
+
 param.b_calibrate = 0;
-param.n_calibration_images = 100;
+param.n_calibration_images = 20;
+param.calibration_mode = 'gaussian';
+
 param.detection_threshold = 100;
 param.image_scale_factor = 2;
 
@@ -151,6 +155,7 @@ param.detect_pyramid_padding = 10;
 %%%%%%%%%%%%
 renderings = cellfun(@(x) x.rendering_image, detectors, 'UniformOutput', false);
 
+
 %% Make templates, these are just pointers to the templates in the detectors,
 % The following code copies variables to GPU or make pointers to memory
 % according to the computing mode.
@@ -188,7 +193,7 @@ detIdx = 0;
 
 clear gt;
 gt(length(gtids))=struct('BB',[],'diff',[],'det',[]);
-for imgIdx=5:N_IMAGE
+for imgIdx=1:N_IMAGE
     fprintf('%d/%d ', imgIdx, N_IMAGE);
     imgTic = tic;
     % read annotation
