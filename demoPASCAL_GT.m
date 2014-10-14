@@ -218,8 +218,8 @@ for imgIdx=1:N_IMAGE
       clip_padded_bbox = dwot_clip_pad_bbox(BB, param.extraction_padding_ratio, imSz);
       width = BB(3)-BB(1);
       height = BB(4)-BB(2);
-      gt_region              = im(clip_padded_bbox(2):clip_padded_bbox(4), clip_padded_bbox(1):clip_padded_bbox(3),:);
-      gt_size                  = size(gt_region);
+      gt_pad_im              = im(clip_padded_bbox(2):clip_padded_bbox(4), clip_padded_bbox(1):clip_padded_bbox(3),:);
+      gt_size                  = size(gt_pad_im);
       gt_start                 = [BB(1)-clip_padded_bbox(1)+1, BB(2)-clip_padded_bbox(2)+1];
       crop_BB                = [ gt_start(1), gt_start(2), gt_start(1)+width, gt_start(2)+height ];
       
@@ -238,11 +238,11 @@ for imgIdx=1:N_IMAGE
       param.detect_levels_per_octave = 50;
       
         if COMPUTING_MODE == 0
-            [bbsAllLevel, hog, scales] = dwot_detect( gt_region, templates_cpu, param);
+            [bbsAllLevel, hog, scales] = dwot_detect( gt_pad_im, templates_cpu, param);
         elseif COMPUTING_MODE == 1
-            [bbsAllLevel, hog, scales] = dwot_detect_gpu( gt_region, templates_gpu, param);
+            [bbsAllLevel, hog, scales] = dwot_detect_gpu( gt_pad_im, templates_gpu, param);
         elseif COMPUTING_MODE == 2
-            [bbsAllLevel, hog, scales] = dwot_detect_combined( gt_region, templates_gpu, templates_cpu, param);
+            [bbsAllLevel, hog, scales] = dwot_detect_combined( gt_pad_im, templates_gpu, templates_cpu, param);
         else
             error('Computing Mode Undefined');
         end
@@ -251,12 +251,16 @@ for imgIdx=1:N_IMAGE
         n_mcmc = min(n_proposals, size(bbsNMS,1));
 
         % dwot_draw_overlap_detection(gt_region, bbsNMS, renderings, 3, 50, visualize_detection, [0.3, 0.7, 0] , color_range );
-        [hog_region_pyramid, im_region] = dwot_extract_hog(hog, scales, detectors, bbsNMS(1:n_mcmc,:), param, gt_region);
+        [hog_region_pyramid, im_region] = dwot_extract_hog(hog, scales, detectors, bbsNMS(1:n_mcmc,:), param, gt_pad_im);
 
 
         figure(2);  
-        [best_proposals] = dwot_mcmc_proposal_region(renderer, hog_region_pyramid, im_region, detectors, param, gt_region, true);
-    
+        % [best_proposals] = dwot_mcmc_proposal_region(renderer, hog_region_pyramid, im_region, detectors, param, gt_pad_im, true);
+        % [best_proposals] = dwot_breadth_first_search_proposal_region(hog_region_pyramid, im_region, detectors, detector_table, param, im);
+        [best_proposals, detectors, detector_table] = dwot_binary_search_proposal_region(hog_region_pyramid, im_region, detectors, detector_table, renderer, param, gt_pad_im);
+        
+        
+        
         figure(1);
         for proposal_idx = 1:n_mcmc
               bbsNMS_clip = clip_to_image(bbsNMS, [1 1 gt_size(2) gt_size(1)]);
@@ -267,24 +271,23 @@ for imgIdx=1:N_IMAGE
               end
               
               subplot(131);
-            imagesc(gt_region);
+            imagesc(gt_pad_im);
             rectangle('position',crop_BB - [0 0 crop_BB(1:2)],'edgecolor',[0.5 0.5 0.5],'LineWidth',3);
             axis equal; axis tight;
             
             subplot(132);
-            dwot_draw_overlap_detection(gt_region, bbsNMS, renderings, n_proposals, 50, visualize_detection, [0.3, 0.7, 0] , color_range );
+            dwot_draw_overlap_detection(gt_pad_im, bbsNMS, renderings, n_proposals, 50, visualize_detection, [0.3, 0.7, 0] , color_range );
             axis equal; axis tight;
-            
-          
-              
+                        
             subplot(133);
             bbox = best_proposals{proposal_idx}.image_bbox;
                         
             bbox(12) = best_proposals{proposal_idx}.score;
             bbsNMS_clip = clip_to_image(bbox, [1 1 gt_size(2) gt_size(1)]);
-              [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, ~, ~] = dwot_compute_positives(bbox, temp_gt, param);
-              bbox(:,9) = bbsNMS_clip(:,9);
-            dwot_draw_overlap_detection(gt_region, bbox, best_proposals{proposal_idx}.rendering_image, n_mcmc, 50, true,  [0.3, 0.7, 0] , color_range);
+            [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, ~, ~] = dwot_compute_positives(bbsNMS_clip, temp_gt, param);
+            bbox(:,9) = bbsNMS_clip(:,9);
+            
+            dwot_draw_overlap_detection(gt_pad_im, bbox, best_proposals{proposal_idx}.rendering_image, n_mcmc, 50, true,  [0.3, 0.7, 0] , color_range);
             axis equal; axis tight;
 
             spaceplots();

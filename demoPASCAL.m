@@ -159,13 +159,11 @@ elseif COMPUTING_MODE == 2
 else
   error('Computing mode undefined');
 end
-endskip_criteria = {'empty', 'truncated','difficult','occluded'};
-
 
 %% Set variables for detection
 [gtids,t] = textread(sprintf(VOCopts.imgsetpath,[LOWER_CASE_CLASS '_' TEST_TYPE]),'%s %d');
 
-N_IMAGE = length(gtids);skip_criteria = {'empty', 'truncated','difficult','occluded'};
+N_IMAGE = length(gtids);
 % N_IMAGE = 1500;
 % extract ground truth objects
 npos = 0;

@@ -88,6 +88,7 @@ for det_idx = 1:n_detectors
             detection_scores_temp = cell2mat(detection_scores{det_idx}');
             detectors{det_idx}.mean = mean(detection_scores_temp);
             detectors{det_idx}.var = var(detection_scores_temp);
+            detectors{det_idx}.sigma = sqrt(detectors{det_idx}.var);
         case 'linear'
             % Seeing 3D Chair, CVPR 14 approach
             muSwapDim = permute(param.hog_mu, [2 3 1]);

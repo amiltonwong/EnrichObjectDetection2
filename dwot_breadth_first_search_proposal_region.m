@@ -1,6 +1,11 @@
-function [best_proposals]= dwot_breadth_first_search_proposal_region(hog_region_pyramid, im_region, detectors, detectors_kdtree, renderer, param, im)
+function [best_proposals]= dwot_breadth_first_search_proposal_region(hog_region_pyramid, im_region, detectors, detectors_kdtree, renderer, param, im, visualize)
 % Search proposal regions with bread-first-search. Each proposal region will
 % be examined using a collection of detectors and we track down the peak
+
+if nargin <8 
+    visualize = false;
+end
+
 n_proposal_region = numel(hog_region_pyramid);
 
 n_batch = 1;
@@ -59,7 +64,7 @@ try
           best_state(chain_idx).rendering_image = rendering_image;
         end
 
-        if 1
+        if visualize
           figure(1);
           subplot(121);
           dwot_draw_overlap_detection(im, image_bbox, rendering_image, 5, 50, true);
