@@ -20,8 +20,10 @@ LOWER_CASE_CLASS = lower(CLASS);
 TEST_TYPE = 'val';
 mkdir('Result',[LOWER_CASE_CLASS '_' TEST_TYPE]);
 
+DEVICE_ID = 1;
+
 if COMPUTING_MODE > 0
-  gdevice = gpuDevice(1);
+  gdevice = gpuDevice(DEVICE_ID + 1); % Matlab use 1 base indexing
   reset(gdevice);
   cos(gpuArray(1));
 end
@@ -55,19 +57,19 @@ n_proposals = 5;
 %               'glx_bike',...
 %               'road_bike'};
 
-% models_to_use = {'2012-VW-beetle-turbo',...
-%               'Kia_Spectra5_2006',...
-%               '2008-Jeep-Cherokee',...
-%               'Ford Ranger Updated',...
-%               'BMW_X1_2013',...
-%               'Honda_Accord_Coupe_2009',...
-%               'Porsche_911',...
-%               '2009 Toyota Cargo'};
-% 
-% use_idx = ismember(model_names,models_to_use);
-% 
-% model_names = model_names(use_idx);
-% model_paths = model_paths(use_idx);
+models_to_use = {'2012-VW-beetle-turbo',...
+              'Kia_Spectra5_2006',...
+              '2008-Jeep-Cherokee',...
+              'Ford Ranger Updated',...
+              'BMW_X1_2013',...
+              'Honda_Accord_Coupe_2009',...
+              'Porsche_911',...
+              '2009 Toyota Cargo'};
+
+use_idx = ismember(model_names,models_to_use);
+
+model_names = model_names(use_idx);
+model_paths = model_paths(use_idx);
 
 % skip_criteria = {'empty', 'truncated','difficult'};
 skip_criteria = {'empty'};
@@ -86,6 +88,7 @@ param.calibration_mode = 'gaussian';
 
 param.detection_threshold = 80;
 param.image_scale_factor = 2;
+
 color_range = [-inf 100:20:300 inf];
 
 

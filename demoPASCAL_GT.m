@@ -32,8 +32,8 @@ del = 20;
 dfov = 10;
 dyaw = 10;
 
-azs = 0:7.5:352.5; % azs = [azs , azs - 10, azs + 10];
-els = 0:10:20;
+azs = 0:15:345; % azs = [azs , azs - 10, azs + 10];
+els = 0:20:20;
 fovs = [25 50];
 yaws = 0;
 n_cell_limit = [300];
@@ -110,22 +110,22 @@ detector_name = sprintf('%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d',...
 detector_file_name = sprintf('%s.mat', detector_name);
 
 if exist('renderer','var')
-renderer.delete();
-clear renderer;
+    renderer.delete();
+    clear renderer;
 end
 
 % Initialize renderer
 if ~isfield(param,'renderer')
-renderer = Renderer();
-if ~renderer.initialize(model_paths, 700, 700, 0, 0, 0, 0, 25)
-  error('fail to load model');
-end
+    renderer = Renderer();
+    if ~renderer.initialize(model_paths, 700, 700, 0, 0, 0, 0, 25)
+      error('fail to load model');
+    end
 end
 
 
 %% Make Detectors
 if exist(detector_file_name,'file')
-  load(detector_file_name);
+	load(detector_file_name);
 else
 
   [detectors] = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_names), LOWER_CASE_CLASS, param, visualize_detector);
@@ -154,7 +154,7 @@ param.detectors              = detectors;
 param.detect_pyramid_padding = 10;
 %%%%%%%%%%%%
 renderings = cellfun(@(x) x.rendering_image, detectors, 'UniformOutput', false);
-
+depth_masks = cellfun(@(x) x.rendering_depth, detectors, 'UniformOutput', false);
 
 %% Make templates, these are just pointers to the templates in the detectors,
 % The following code copies variables to GPU or make pointers to memory
@@ -276,7 +276,7 @@ for imgIdx=1:N_IMAGE
             axis equal; axis tight;
             
             subplot(132);
-            dwot_draw_overlap_detection(gt_pad_im, bbsNMS, renderings, n_proposals, 50, visualize_detection, [0.3, 0.7, 0] , color_range );
+            dwot_draw_overlap_rendering(gt_pad_im, bbsNMS, renderings, depth_masks, n_proposals, 50, visualize_detection, [0.1, 0.9, 0] , color_range );
             axis equal; axis tight;
                         
             subplot(133);

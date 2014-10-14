@@ -1,4 +1,8 @@
-function [best_proposals, detectors, detector_table]= dwot_binary_search_proposal_region(hog_region_pyramid, im_region, detectors, detector_table, renderer, param, im)
+function [best_proposals, detectors, detector_table]= dwot_binary_search_proposal_region(hog_region_pyramid, im_region, detectors, detector_table, renderer, param, im, visualize)
+
+if nargin < 8
+    visualize = false;
+end
 
 n_proposal_region = numel(hog_region_pyramid);
 
@@ -55,7 +59,7 @@ for region_idx = 1:n_proposal_region
       best_state.rendering_image = detectors{max_detector_index}.rendering_image;
     end
 
-    if 1
+    if visualize
       figure(1);
       subplot(121);
       image_bbox_orig = hog_region_pyramid{region_idx}.image_bbox;

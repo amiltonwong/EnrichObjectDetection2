@@ -114,6 +114,10 @@ param.hog_gamma_gpu   = gpuArray(single(stats.Gamma));
 param.hog_gamma_dim   = size(stats.Gamma);
 param.hog_gamma_cell_size = size(stats.Gamma)/31;
 
+%% GPU Setting
+param.device_id = DEVICE_ID;
+
+
 %% CG setting
 param.N_THREAD_H = 32;
 param.N_THREAD_W = 32;

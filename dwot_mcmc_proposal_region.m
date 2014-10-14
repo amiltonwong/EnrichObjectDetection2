@@ -33,7 +33,14 @@ best_proposals = cell(1, n_proposal_region);
         proposal_x = current_state(chain_idx).x;
         proposal_x(update_idx) = proposal_x(update_idx) + 5 * randn(1);
         models_idx = current_state(chain_idx).models_idx;
-        [max_score, template, template_size, rendering_image, image_bbox] = dwot_detect_using_instant_detector(renderer, hog_region_pyramid{region_idx}, proposal_x(1), proposal_x(2), proposal_x(3), proposal_x(4), models_idx, param, im_region{region_idx});
+        % For some cases, the sigma matrix inversion would fail due to the large template 
+        try
+            [max_score, template, template_size, rendering_image, image_bbox] = dwot_detect_using_instant_detector(renderer, hog_region_pyramid{region_idx}, proposal_x(1), proposal_x(2), proposal_x(3), proposal_x(4), models_idx, param, im_region{region_idx});
+        catch e
+            disp(e.message);
+            max_score = -inf;
+        end
+
         if max_score > best_state(chain_idx).score
           fprintf(sprintf('region %d iter %d : %f\n',region_idx, mcmc_iter, max_score));
           best_state(chain_idx).score = max_score;
@@ -56,6 +63,8 @@ best_proposals = cell(1, n_proposal_region);
           dwot_draw_overlap_detection(im, bestBox, best_state(chain_idx).rendering_image, 5, 50, true);
           drawnow;
         end
+
+      
         % Metropolis Hastings
         acc = min(1, probability_from_score((max_score - current_state(chain_idx).score)/param.n_cell_limit * 100));
         if rand(1) < acc

@@ -4,7 +4,7 @@ if nargin < 9
 end
 % model class and index are not supported yet
 renderer.setViewpoint(azimuth,elevation,yaw,0,fov);
-im = renderer.renderCrop();
+[im, depth] = renderer.renderCrop();
 if isempty(im)
   error('Rendering error');
 end
@@ -27,4 +27,8 @@ if bool_get_image
   paddedIm = 255 * ones(size_im + [2 * padding, 2 * padding, 0],'uint8');
   paddedIm(padding+1:padding+size_im(1), padding+1:padding+size_im(2),:) = im;
   detector.rendering_image = paddedIm;
+  
+  paddedDepth = zeros(size_im(1:2) + [2 * padding, 2 * padding],'double');
+  paddedDepth(padding+1:padding+size_im(1), padding+1:padding+size_im(2)) = depth;
+  detector.rendering_depth = paddedDepth;
 end
