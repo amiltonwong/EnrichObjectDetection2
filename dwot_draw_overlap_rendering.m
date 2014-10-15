@@ -1,4 +1,4 @@
-function resultIm = dwot_draw_overlap_rendering(im, bbsNMS, renderings, depth_masks, max_n_draw_box, draw_padding, box_text, drawing_weights, color_range)
+function resultIm = dwot_draw_overlap_rendering(im, bbsNMS, detectors, max_n_draw_box, draw_padding, box_text, drawing_weights, color_range)
 
 if nargin < 5
   max_n_draw_box = 5;
@@ -13,7 +13,7 @@ if nargin < 7
 end
 
 if nargin < 8
-  drawing_weights = ones(1,3)/3;
+  drawing_weights = ones(1,2)/2;
 end
 
 if nargin < 9
@@ -29,13 +29,10 @@ NDrawBox = min(size(bbsNMS, 1),max_n_draw_box);
 clipBBox = zeros(NDrawBox,4);
 for bbsIdx = NDrawBox:-1:1
     template_idx = bbsNMS(bbsIdx,11);
-    if iscell(renderings)
-    rendering = im2double(renderings{template_idx});
-    depth_mask = depth_masks{template_idx};
-    else
-    rendering = im2double(renderings);
-    depth_mask = depth_masks;
-    end
+    
+    rendering  = im2double(detectors{template_idx}.rendering_image);
+    depth_mask =           detectors{template_idx}.rendering_depth;
+
     box_position = round(bbsNMS(bbsIdx, 1:4)) + draw_padding;
     bboxWidth  = box_position(3) - box_position(1);
     bboxHeight = box_position(4) - box_position(2);

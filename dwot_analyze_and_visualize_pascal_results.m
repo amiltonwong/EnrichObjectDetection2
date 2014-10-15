@@ -1,9 +1,12 @@
-function [ output_args ] = dwot_visualize_pascal_results( detection_result_txt, detectors, save_path, VOCopts, param, skip_criteria, color_range, nms_threshold)
+function [ ap ] = dwot_analyze_and_visualize_pascal_results( detection_result_txt, ...
+    detectors, save_path, VOCopts, param, skip_criteria, color_range, nms_threshold, visualize)
 
-if ~isfield(param, 'nms_threshold')
-  nms_threshold = 0.4;
-else
-  nms_threshold = param.nms_threshold;
+if ~exist('nms_threshold','var') || isempty(nms_threshold)
+    if ~isfield(param, 'nms_threshold')
+      nms_threshold = 0.4;
+    else
+      nms_threshold = param.nms_threshold;
+    end
 end
 
 if ~exist('skip_criteria','var') || isempty(skip_criteria)
@@ -25,6 +28,12 @@ detection_params = regexp(detection_result_txt,...
   'f_(?<n_fov>\d+)_scale_(?<scale>[\d.]+)_sbin_(?<sbin>\d+)_level_(?<n_level>\d+)_',...
   'nms_(?<nms_threshold>[\d.]+)_skp_(?<skip_criterion>\w)'],...
   'names');
+
+% SNames = fieldnames(temp); 
+% for loopIndex = 1:numel(SNames) 
+%     stuff = S.(SNames{loopIndex})
+% end
+
 detection_param_name = regexp(detection_result_txt,'\/?([\w\.]+)\.txt','tokens');
 detection_name = detection_param_name{1}{1};
 
@@ -110,7 +119,6 @@ for imgIdx=1:n_unique_files
     if numel(detector_struct) < detector_idx || isempty(detector_struct{detector_idx})
       detector_struct{detector_idx} = {};
     end
-    detection_score = bbsNMS(bbs_idx, end);
     detector_struct{detector_idx}{numel(detector_struct{detector_idx}) + 1} = struct('BB',bbsNMS(bbs_idx,:),'im',recs.imgname);
   end
   
@@ -176,206 +184,206 @@ tit = sprintf('Average Precision = %.3f', 100*ap);
 title(tit);
 axis([0 1 0 1]);
 set(gcf,'color','w');
+drawnow;
     
-waitforbuttonpress;
     
 % Sort the scores for each detectors and print  
+if visualize
+    if ~exist(save_path)
+      mkdir(save_path);
+    end
 
-if ~exist(save_path)
-  mkdir(save_path);
+    for detector_idx = 1:numel(detector_struct)
+      if isempty(detector_struct{detector_idx})
+        continue;
+      end
+
+      score = cellfun(@(x) x.BB(end), detector_struct{detector_idx});
+      [~, sorted_idx] = sort(score,'descend');
+
+      count = 1;
+      for idx = sorted_idx(1:min(7,numel(sorted_idx)))
+        curr_detection = detector_struct{detector_idx}{idx};
+
+        im_name = curr_detection.im;
+        im = imread([VOCopts.datadir,im_name]);
+        im = imresize(im, image_scale_factor);
+
+        BB = curr_detection.BB(1:4);
+
+        subplot(221);
+        imagesc(im);
+        rectangle('position', BB - [0 0 BB(1:2)],'edgecolor','b','linewidth',2);
+        axis equal; axis tight;
+
+        % Rendering
+        subplot(223);
+        imagesc(renderings{detector_idx});
+        axis equal; axis tight;
+
+        % Overlay
+        subplot(224);
+        dwot_draw_overlap_detection(im,  curr_detection.BB, renderings, 1, 50, true, [0.5, 0.5, 0], color_range);
+        axis equal; axis tight;
+
+        drawnow;
+        spaceplots();
+
+        save_name = sprintf('%s_detector_%d_sort_%04d.jpg', detection_name, detector_idx, count);
+        count = count + 1;
+        print('-djpeg','-r150',fullfile(save_path, save_name));
+      end
+    end
+
+    % sort the TP and FP according to the score and and print them
+    % Concatenate all arrays, we used structure to speed up memory allocation
+
+    non_empty_idx = cellfun(@(x) ~isempty(x), {tp_struct.diff});
+
+    tp.gtBB       = cell2mat({tp_struct.gtBB});
+    tp.predBB     = cell2mat({tp_struct.predBB});
+    tp.diff       = cell2mat({tp_struct(non_empty_idx).diff});
+    tp.truncated  = cell2mat({tp_struct(non_empty_idx).truncated});
+    tp.score      = cell2mat({tp_struct(non_empty_idx).score}');
+    tp.im         = convert_doubly_deep_cell({tp_struct(non_empty_idx).im});
+    tp.detector_id = cell2mat({tp_struct.detector_id}');
+
+    [~, sorted_idx] = sort(tp.score,'descend');
+
+    count = 1;
+    for idx = sorted_idx'
+      im_cell = tp.im(idx);
+      im = imread([VOCopts.datadir,im_cell{1}]);
+      im = imresize(im, image_scale_factor);
+
+      gtBB = tp.gtBB(:,idx);
+      predBB = tp.predBB(:,idx);
+
+      subplot(221);
+      imagesc(im);
+      rectangle('position', gtBB' - [0 0 gtBB(1:2)'],'edgecolor','b','linewidth',2);
+      rectangle('position', predBB' - [0 0 predBB(1:2)'],'edgecolor','r','linewidth',2);
+      axis equal; axis tight;
+
+      % Crop
+
+      subplot(222);
+      imagesc(im(gtBB(2):gtBB(4), gtBB(1):gtBB(3), :));
+      axis equal; axis tight;
+
+      % Rendering
+      subplot(223);
+      imagesc(renderings{tp.detector_id(idx)});
+      axis equal; axis tight;
+
+      % Overlay
+      subplot(224);
+      dwot_draw_overlap_detection(im, [predBB' zeros(1,6) tp.detector_id(idx) tp.score(idx)], renderings, 1, 50, true, [0.5, 0.5, 0] );
+      axis equal; axis tight;
+
+      drawnow;
+      spaceplots();
+
+      save_name = sprintf('%s_tp_sort_%04d.jpg', detection_name, count);
+      count = count + 1;
+      print('-djpeg','-r150',fullfile(save_path, save_name));
+      % waitforbuttonpress;
+    end
+
+
+    % False Positive
+    non_empty_idx = cellfun(@(x) ~isempty(x), {fp_struct.score});
+
+    fp.BB       = cell2mat({fp_struct.BB});
+    fp.score      = cell2mat({fp_struct(non_empty_idx).score}');
+    fp.im         = convert_doubly_deep_cell({fp_struct(non_empty_idx).im});
+    fp.detector_id = cell2mat({fp_struct.detector_id}');
+
+    [~, sorted_idx] = sort(fp.score,'descend');
+    count = 1;
+
+    for idx = sorted_idx(1:600)'
+      im_cell = fp.im(idx);
+      im = imread([VOCopts.datadir,im_cell{1}]);
+      im = imresize(im, image_scale_factor);
+      imSz = size(im);
+
+      BB = clip_to_image( round(fp.BB(:,idx))', [1 1 imSz(2) imSz(1)]) ;
+
+      subplot(221);
+      imagesc(im);
+      rectangle('position', BB - [0 0 BB(1:2)],'edgecolor','r','linewidth',2);
+      axis equal; axis tight;
+
+      % Crop
+      subplot(222);
+      imagesc(im(BB(2):BB(4), BB(1):BB(3), :));
+      axis equal; axis tight;
+
+      % Rendering
+      subplot(223);
+      imagesc(renderings{fp.detector_id(idx)});
+      axis equal; axis tight;
+
+      % Overlay
+      subplot(224);
+      dwot_draw_overlap_detection(im, [BB zeros(1,6) fp.detector_id(idx) fp.score(idx)], renderings, 1, 50, true, [0.5, 0.5, 0] );
+      axis equal; axis tight;
+
+      drawnow;
+      spaceplots();
+
+      save_name = sprintf('%s_fp_sort_%04d.jpg', detection_name, count);
+      count = count + 1;
+      print('-djpeg','-r150',fullfile(save_path, save_name));
+    end
+
+
+    % False Negative
+    non_empty_idx = cellfun(@(x) ~isempty(x), {fn_struct.diff});
+
+    fn.BB       = cell2mat({fn_struct.BB});
+    fn.diff       = cell2mat({fn_struct(non_empty_idx).diff});
+    fn.truncated  = cell2mat({fn_struct(non_empty_idx).truncated});
+    fn.im         = convert_doubly_deep_cell({fn_struct(non_empty_idx).im});
+    count = 1;
+
+    close all;
+    for idx = 1:numel(fn.diff)
+      im_cell = fn.im(idx);
+      im = imread([VOCopts.datadir,im_cell{1}]);
+      im = imresize(im, image_scale_factor);
+
+      BB = fn.BB(:,idx) ;
+      plot_title = '';
+      if fn.diff(idx)
+        continue;
+        plot_title = [plot_title ' difficult'];
+      end
+
+      if fn.truncated(idx)
+        plot_title = [plot_title ' truncated'];
+      end
+      subplot(121);
+      imagesc(im);
+      rectangle('position', BB' - [0 0 BB(1:2)'],'edgecolor','b','linewidth',2);
+      axis equal; axis tight;
+
+      title(plot_title);
+
+      % Crop
+      subplot(122);
+      imagesc(im(BB(2):BB(4), BB(1):BB(3), :));
+      axis equal; axis tight;
+
+      drawnow;
+      spaceplots();
+
+      save_name = sprintf('%s_fn_sort_%04d.jpg', detection_name, count);
+      count = count + 1;
+      print('-djpeg','-r150',fullfile(save_path, save_name));
+    end
 end
-
-for detector_idx = 1:numel(detector_struct)
-  if isempty(detector_struct{detector_idx})
-    continue;
-  end
-  
-  score = cellfun(@(x) x.BB(end), detector_struct{detector_idx});
-  [~, sorted_idx] = sort(score,'descend');
-  
-  count = 1;
-  for idx = sorted_idx(1:min(7,numel(sorted_idx)))
-    curr_detection = detector_struct{detector_idx}{idx};
-    
-    im_name = curr_detection.im;
-    im = imread([VOCopts.datadir,im_name]);
-    im = imresize(im, image_scale_factor);
-
-    BB = curr_detection.BB(1:4);
-
-    subplot(221);
-    imagesc(im);
-    rectangle('position', BB - [0 0 BB(1:2)],'edgecolor','b','linewidth',2);
-    axis equal; axis tight;
-
-    % Rendering
-    subplot(223);
-    imagesc(renderings{detector_idx});
-    axis equal; axis tight;
-
-    % Overlay
-    subplot(224);
-    dwot_draw_overlap_detection(im,  curr_detection.BB, renderings, 1, 50, true, [0.5, 0.5, 0], color_range);
-    axis equal; axis tight;
-
-    drawnow;
-    spaceplots();
-
-    save_name = sprintf('%s_detector_%d_sort_%04d.jpg', detection_name, detector_idx, count);
-    count = count + 1;
-    print('-djpeg','-r150',fullfile(save_path, save_name));
-  end
-end
-
-% sort the TP and FP according to the score and and print them
-% Concatenate all arrays, we used structure to speed up memory allocation
-
-non_empty_idx = cellfun(@(x) ~isempty(x), {tp_struct.diff});
-
-tp.gtBB       = cell2mat({tp_struct.gtBB});
-tp.predBB     = cell2mat({tp_struct.predBB});
-tp.diff       = cell2mat({tp_struct(non_empty_idx).diff});
-tp.truncated  = cell2mat({tp_struct(non_empty_idx).truncated});
-tp.score      = cell2mat({tp_struct(non_empty_idx).score}');
-tp.im         = convert_doubly_deep_cell({tp_struct(non_empty_idx).im});
-tp.detector_id = cell2mat({tp_struct.detector_id}');
-
-[~, sorted_idx] = sort(tp.score,'descend');
-
-count = 1;
-for idx = sorted_idx'
-  im_cell = tp.im(idx);
-  im = imread([VOCopts.datadir,im_cell{1}]);
-  im = imresize(im, image_scale_factor);
-  
-  gtBB = tp.gtBB(:,idx);
-  predBB = tp.predBB(:,idx);
-  
-  subplot(221);
-  imagesc(im);
-  rectangle('position', gtBB' - [0 0 gtBB(1:2)'],'edgecolor','b','linewidth',2);
-  rectangle('position', predBB' - [0 0 predBB(1:2)'],'edgecolor','r','linewidth',2);
-  axis equal; axis tight;
-  
-  % Crop
-
-  subplot(222);
-  imagesc(im(gtBB(2):gtBB(4), gtBB(1):gtBB(3), :));
-  axis equal; axis tight;
-  
-  % Rendering
-  subplot(223);
-  imagesc(renderings{tp.detector_id(idx)});
-  axis equal; axis tight;
-  
-  % Overlay
-  subplot(224);
-  dwot_draw_overlap_detection(im, [predBB' zeros(1,6) tp.detector_id(idx) tp.score(idx)], renderings, 1, 50, true, [0.5, 0.5, 0] );
-  axis equal; axis tight;
-  
-  drawnow;
-  spaceplots();
-
-  save_name = sprintf('%s_tp_sort_%04d.jpg', detection_name, count);
-  count = count + 1;
-  print('-djpeg','-r150',fullfile(save_path, save_name));
-  % waitforbuttonpress;
-end
-
-
-% False Positive
-non_empty_idx = cellfun(@(x) ~isempty(x), {fp_struct.score});
-
-fp.BB       = cell2mat({fp_struct.BB});
-fp.score      = cell2mat({fp_struct(non_empty_idx).score}');
-fp.im         = convert_doubly_deep_cell({fp_struct(non_empty_idx).im});
-fp.detector_id = cell2mat({fp_struct.detector_id}');
-
-[~, sorted_idx] = sort(fp.score,'descend');
-count = 1;
-
-for idx = sorted_idx(1:600)'
-  im_cell = fp.im(idx);
-  im = imread([VOCopts.datadir,im_cell{1}]);
-  im = imresize(im, image_scale_factor);
-  imSz = size(im);
-  
-  BB = clip_to_image( round(fp.BB(:,idx))', [1 1 imSz(2) imSz(1)]) ;
-  
-  subplot(221);
-  imagesc(im);
-  rectangle('position', BB - [0 0 BB(1:2)],'edgecolor','r','linewidth',2);
-  axis equal; axis tight;
-  
-  % Crop
-  subplot(222);
-  imagesc(im(BB(2):BB(4), BB(1):BB(3), :));
-  axis equal; axis tight;
-  
-  % Rendering
-  subplot(223);
-  imagesc(renderings{fp.detector_id(idx)});
-  axis equal; axis tight;
-  
-  % Overlay
-  subplot(224);
-  dwot_draw_overlap_detection(im, [BB zeros(1,6) fp.detector_id(idx) fp.score(idx)], renderings, 1, 50, true, [0.5, 0.5, 0] );
-  axis equal; axis tight;
-  
-  drawnow;
-  spaceplots();
-
-  save_name = sprintf('%s_fp_sort_%04d.jpg', detection_name, count);
-  count = count + 1;
-  print('-djpeg','-r150',fullfile(save_path, save_name));
-end
-
-
-% False Negative
-non_empty_idx = cellfun(@(x) ~isempty(x), {fn_struct.diff});
-
-fn.BB       = cell2mat({fn_struct.BB});
-fn.diff       = cell2mat({fn_struct(non_empty_idx).diff});
-fn.truncated  = cell2mat({fn_struct(non_empty_idx).truncated});
-fn.im         = convert_doubly_deep_cell({fn_struct(non_empty_idx).im});
-count = 1;
-
-close all;
-for idx = 1:numel(fn.diff)
-  im_cell = fn.im(idx);
-  im = imread([VOCopts.datadir,im_cell{1}]);
-  im = imresize(im, image_scale_factor);
-  
-  BB = fn.BB(:,idx) ;
-  plot_title = '';
-  if fn.diff(idx)
-    continue;
-    plot_title = [plot_title ' difficult'];
-  end
-  
-  if fn.truncated(idx)
-    plot_title = [plot_title ' truncated'];
-  end
-  subplot(121);
-  imagesc(im);
-  rectangle('position', BB' - [0 0 BB(1:2)'],'edgecolor','b','linewidth',2);
-  axis equal; axis tight;
-  
-  title(plot_title);
-  
-  % Crop
-  subplot(122);
-  imagesc(im(BB(2):BB(4), BB(1):BB(3), :));
-  axis equal; axis tight;
-  
-  drawnow;
-  spaceplots();
-
-  save_name = sprintf('%s_fn_sort_%04d.jpg', detection_name, count);
-  count = count + 1;
-  print('-djpeg','-r150',fullfile(save_path, save_name));
-end
-
 
 
 

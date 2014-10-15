@@ -95,12 +95,16 @@ color_range = [-inf 100:20:300 inf];
 % detector name
 [ detector_model_name ] = dwot_get_detector_name(CLASS, SUB_CLASS, model_names, param);
 detector_name = sprintf('%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d',...
-    LOWER_CASE_CLASS,  detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs));
+    LOWER_CASE_CLASS,  detector_model_name, n_cell_limit, lambda,...
+    numel(azs), numel(els), numel(yaws), numel(fovs));
 
 detector_file_name = sprintf('%s.mat', detector_name);
 
-detection_result_file = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_%0.2f_sbin_%d_level_%d_nms_%0.2f_skp_%s_server_%s.txt',...
-      DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level, param.nms_threshold, skip_name, server_id.num);
+detection_result_file = sprintf(['%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_',...
+    '%0.2f_sbin_%d_level_%d_nms_%0.2f_skp_%s_server_%s.txt'],...
+    DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda,...
+    numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin,...
+    n_level, param.nms_threshold, skip_name, server_id.num);
 fprintf('\nThe result will be saved on %s\n',detection_result_file);
 
 %% Make Detectors
@@ -120,7 +124,8 @@ else
     end
   end
 
-  [detectors] = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_names), LOWER_CASE_CLASS, param, visualize_detector);
+  [detectors] = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_names),...
+      LOWER_CASE_CLASS, param, visualize_detector);
   [detectors, detector_table]= dwot_make_table_from_detectors(detectors);
   if sum(cellfun(@(x) isempty(x), detectors))
     error('Detector Not Completed');
@@ -155,7 +160,7 @@ if COMPUTING_MODE == 0
   % for CPU convolution, use fconvblas which handles template inversion
   templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
 elseif COMPUTING_MODE == 1
-  % for GPU convolution, invert template
+  % for GPU convolution, we use FFT based convolution. invert template
   templates_gpu = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
 elseif COMPUTING_MODE == 2
   templates_gpu = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
@@ -222,85 +227,49 @@ for imgIdx=1:N_IMAGE
     bbsNMS = esvm_nms(bbsAllLevel, param.nms_threshold);
     
     bbsNMS_clip = clip_to_image(bbsNMS, [1 1 imSz(2) imSz(1)]);
-    [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, detScore{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
+    [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, detScore{imgIdx}, ~] = ...
+                                    dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
     
     [~, img_file_name] = fileparts(recs(imgIdx).imgname);
-    % dwot_save_detection(esvm_nms(bbsAllLevel, 0.7), 'Result', detection_result_file, img_file_name, false, 1); % save mode != 0 to save template index
+    % dwot_save_detection(esvm_nms(bbsAllLevel, 0.7), 'Result', detection_result_file, ...
+    % img_file_name, false, 1); % save mode != 0 to save template index
     
     if visualize_detection && ~isempty(clsinds)
-      % figure(2);
-      nDet = size(bbsNMS,1);
-      if nDet > 0
-        bbsNMS(:,9) = bbsNMS_clip(:,9);
-      end
-      
-      tpIdx = logical(tp{imgIdx});
-      % tpIdx = bbsNMS(:, 9) > param.min_overlap;
-      
-      % Original images
-      subplot(221);
-      imagesc(im); axis off; axis equal;
-      
-      % True positives
-      subplot(222);
-      result_im = dwot_draw_overlap_rendering(im, bbsNMS(tpIdx,:), renderings, depth_masks, 1, 50, false, [0.15, 0.85, 0], color_range );
-      imagesc(result_im); axis off; axis equal;
-      % dwot_draw_overlap_detection(im, bbsNMS(tpIdx,:), renderings, depth_mask, 1, 50, visualize_detection, [0.3, 0.7, 0], color_range );
-
-      subplot(223);
-      dwot_draw_overlap_rendering(im, bbsNMS(tpIdx,:), renderings, depth_masks, inf, 50, visualize_detection, [0.1, 0.9, 0], color_range );
-      % dwot_draw_overlap_detection(im, bbsNMS(tpIdx,:), renderings, inf, 50, visualize_detection, [0.3, 0.5, 0.2], color_range );
-      
-      % False positives
-      subplot(224);
-      dwot_draw_overlap_rendering(im, bbsNMS(~tpIdx,:), renderings, depth_masks, 5, 50, visualize_detection, [0.1, 0.9, 0], color_range );
-      % dwot_draw_overlap_detection(im, bbsNMS(~tpIdx,:), renderings, 5, 50, visualize_detection, [0.3, 0.7, 0], color_range );
-      
-      drawnow;
-      spaceplots();
-      
-      drawnow;
-%       save_name = sprintf('%s_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_%0.2f_sbin_%d_level_%d_nms_%0.2f_imgIdx_%d.jpg',...
-%         DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, param.b_calibrate,  n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level, param.nms_threshold, imgIdx);
-%       print('-djpeg','-r150',['Result/' LOWER_CASE_CLASS '_' TEST_TYPE '/' save_name]);
-      
-      %  waitforbuttonpress;
-    end
-      
+        dwot_visualize_result;
+        save_name = sprintf(['%s_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_',...
+                            'scale_%0.2f_sbin_%d_level_%d_nms_%0.2f_imgIdx_%d.jpg'],...
+                            DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name,...
+                            param.b_calibrate,  n_cell_limit, lambda, numel(azs), numel(els),...
+                            numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level,...
+                            param.nms_threshold, imgIdx);
+        print('-djpeg','-r150',['Result/' LOWER_CASE_CLASS '_' TEST_TYPE '/' save_name]);
+    end  
     npos=npos+sum(~gt(imgIdx).diff);
 end
 
-detScore = cell2mat(detScore);
-fp = cell2mat(fp);
-tp = cell2mat(tp);
+%% Vary NMS threshold
+nms_thresholds = 0.3 : 0.05 : 0.7;
+ap = zeros(numel(nms_thresholds),1);
+ap_save_names = cell(numel(nms_thresholds),1);
+for i = 1:numel(nms_thresholds)
+    nms_threshold = nms_thresholds(i);
+    ap(i) = dwot_analyze_and_visualize_pascal_results(detection_result_file, detectors, [], ...
+                            VOCopts, param, skip_criteria, color_range, nms_threshold, false);
+                        
 
-[sc, si] =sort(detScore,'descend');
-fpSort = cumsum(fp(si));
-tpSort = cumsum(tp(si));
+    ap_save_names{i} = sprintf(['AP_%s_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_',...
+                        '%d_scale_%0.2f_sbin_%d_level_%d_nms_%0.2f_skp_%s_N_IM_%d_%s.png'],...
+                        DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name,...
+                        param.b_calibrate, n_cell_limit, lambda, numel(azs), numel(els),...
+                        numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level,...
+                        nms_threshold, skip_name, N_IMAGE, server_id.num);
 
-
-
-recall = tpSort/npos;
-precision = tpSort./(fpSort + tpSort);
-
-ap = VOCap(recall', precision');
-fprintf('AP = %.4f\n', ap);
-
-close all;
-plot(recall, precision, 'r', 'LineWidth',3);
-xlabel('Recall');
-
-tit = sprintf('Average Precision = %.3f', 100*ap);
-title(tit);
-axis([0 1 0 1]);
-set(gcf,'color','w');
-save_name = sprintf('AP_%s_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_%0.2f_sbin_%d_level_%d_nms_%0.2f_skp_%s_N_IM_%d_%s.png',...
-        DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, param.b_calibrate, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level, param.nms_threshold, skip_name, N_IMAGE, server_id.num);
-
-print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TEST_TYPE '/' save_name])
-
+     print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TEST_TYPE '/' save_name])
+end
 
 if ~isempty(server_id)
-  system(['scp ./Result/' LOWER_CASE_CLASS '_' TEST_TYPE '/' save_name ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/' LOWER_CASE_CLASS '_' TEST_TYPE]);
-  system(['scp ./Result/' detection_result_file ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/']);
+    for i = 1:numel(nms_thresholds)
+        system(['scp ./Result/' LOWER_CASE_CLASS '_' TEST_TYPE '/' ap_save_names{i} ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/' LOWER_CASE_CLASS '_' TEST_TYPE]);
+    end
+    system(['scp ./Result/' detection_result_file ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/']);
 end

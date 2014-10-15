@@ -155,7 +155,7 @@ for region_idx = 1:n_regions
       dwot_draw_hog_bounding_box(hog_x1,        hog_y1,         hog_x2,       hog_y2,        hogSize);
       dwot_draw_hog_bounding_box(padded_hog_x1, padded_hog_y1, padded_hog_x2, padded_hog_y2, hogSize);
       title(['level : ' num2str(level) ' detlevel : ' num2str(detLevel)]);
-      axis equal; axis tight;
+      axis equal; axis tight; axis off;
       
       subplot(223);
       detectorIdx = bbs_nms(region_idx, 11);
