@@ -12,7 +12,7 @@ addpath('Diagnosis');
 DATA_SET = 'PASCAL';
 dwot_set_datapath;
 
-COMPUTING_MODE = 0;
+COMPUTING_MODE = 1;
 CLASS = 'Car';
 % CLASS = 'Bicycle';
 SUB_CLASS = [];
@@ -146,6 +146,7 @@ param.detectors              = detectors;
 param.detect_pyramid_padding = 10;
 %%%%%%%%%%%%
 renderings = cellfun(@(x) x.rendering_image, detectors, 'UniformOutput', false);
+depth_masks = cellfun(@(x) x.rendering_depth, detectors, 'UniformOutput', false);
 
 %% Make templates, these are just pointers to the templates in the detectors,
 % The following code copies variables to GPU or make pointers to memory
@@ -182,7 +183,7 @@ clear gt;
 gt(length(gtids))=struct('BB',[],'diff',[],'det',[]);
 
 % Make empty detection save file
-detection_result_file = dwot_save_detection([], 'Result', detection_result_file, [], true);
+% detection_result_file = dwot_save_detection([], 'Result', detection_result_file, [], true);
 
 for imgIdx=1:N_IMAGE
     fprintf('%d/%d ',imgIdx,N_IMAGE);
@@ -224,7 +225,7 @@ for imgIdx=1:N_IMAGE
     [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, detScore{imgIdx}, ~] = dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
     
     [~, img_file_name] = fileparts(recs(imgIdx).imgname);
-    dwot_save_detection(esvm_nms(bbsAllLevel, 0.7), 'Result', detection_result_file, img_file_name, false, 1); % save mode != 0 to save template index
+    % dwot_save_detection(esvm_nms(bbsAllLevel, 0.7), 'Result', detection_result_file, img_file_name, false, 1); % save mode != 0 to save template index
     
     if visualize_detection && ~isempty(clsinds)
       % figure(2);
@@ -242,14 +243,18 @@ for imgIdx=1:N_IMAGE
       
       % True positives
       subplot(222);
-      dwot_draw_overlap_detection(im, bbsNMS(tpIdx,:), renderings, 1, 50, visualize_detection, [0.3, 0.7, 0], color_range );
+      result_im = dwot_draw_overlap_rendering(im, bbsNMS(tpIdx,:), renderings, depth_masks, 1, 50, false, [0.15, 0.85, 0], color_range );
+      imagesc(result_im); axis off; axis equal;
+      % dwot_draw_overlap_detection(im, bbsNMS(tpIdx,:), renderings, depth_mask, 1, 50, visualize_detection, [0.3, 0.7, 0], color_range );
 
       subplot(223);
-      dwot_draw_overlap_detection(im, bbsNMS(tpIdx,:), renderings, inf, 50, visualize_detection, [0.3, 0.5, 0.2], color_range );
+      dwot_draw_overlap_rendering(im, bbsNMS(tpIdx,:), renderings, depth_masks, inf, 50, visualize_detection, [0.1, 0.9, 0], color_range );
+      % dwot_draw_overlap_detection(im, bbsNMS(tpIdx,:), renderings, inf, 50, visualize_detection, [0.3, 0.5, 0.2], color_range );
       
       % False positives
       subplot(224);
-      dwot_draw_overlap_detection(im, bbsNMS(~tpIdx,:), renderings, 5, 50, visualize_detection, [0.3, 0.7, 0], color_range );
+      dwot_draw_overlap_rendering(im, bbsNMS(~tpIdx,:), renderings, depth_masks, 5, 50, visualize_detection, [0.1, 0.9, 0], color_range );
+      % dwot_draw_overlap_detection(im, bbsNMS(~tpIdx,:), renderings, 5, 50, visualize_detection, [0.3, 0.7, 0], color_range );
       
       drawnow;
       spaceplots();
