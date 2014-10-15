@@ -9,10 +9,10 @@ addpath('3rdParty/SpacePlot');
 addpath('3rdParty/MinMaxSelection');
 addpath('Diagnosis');
 
-DATA_SET = 'PASCAL12';
+DATA_SET = 'PASCAL';
 dwot_set_datapath;
 
-COMPUTING_MODE = 1;
+COMPUTING_MODE = 0;
 CLASS = 'Car';
 % CLASS = 'Bicycle';
 SUB_CLASS = [];

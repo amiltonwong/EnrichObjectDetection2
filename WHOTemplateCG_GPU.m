@@ -114,6 +114,7 @@ while i < CG_MAX_ITER
   end
   
   if r_min > r_hist(i)
+    r_min = r_hist(i);
     x_min = x;
   end
   

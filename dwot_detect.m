@@ -39,8 +39,10 @@ for level = length(hog):-1:1
 
     [y_coord,x_coord] = ind2sub(rmsizes{templateIdx}(1:2), idx);
 
-    [y1, x1] = dwot_hog_to_img_conv(y_coord, x_coord, sbin, scale, hogPadder);
-    [y2, x2] = dwot_hog_to_img_conv(y_coord + sz{templateIdx}(1), x_coord + sz{templateIdx}(2), sbin, scale, hogPadder);
+    % HOG templates are consistently smaller. Add extra padding after
+    % detection
+    [y1, x1] = dwot_hog_to_img_conv(y_coord - 1, x_coord -1, sbin, scale, hogPadder);
+    [y2, x2] = dwot_hog_to_img_conv(y_coord + sz{templateIdx}(1) + 1, x_coord + sz{templateIdx}(2) + 1, sbin, scale, hogPadder);
     
     bbs = zeros(numel(y_coord), 12);
     bbs(:,1:4) = [x1 y1, x2, y2];

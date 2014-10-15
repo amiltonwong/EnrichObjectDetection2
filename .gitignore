@@ -1,6 +1,7 @@
 *.m~
 *.mat
 Result/*
+Mesh/*
 *.jpg
 *.png
 *.swp
