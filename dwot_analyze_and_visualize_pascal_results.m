@@ -86,7 +86,7 @@ for imgIdx=1:n_unique_files
   if nnz(curr_file_idx) == 0 
     continue;
   end
-  fprintf('%d/%d\n',imgIdx,n_unique_files);
+  if mod(imgIdx,10) == 0; fprintf('.'); end;
 
   % read annotation
   clsinds = strmatch(detection_params.LOWER_CASE_CLASS,{recs.objects(:).class},'exact');
@@ -174,7 +174,7 @@ recall = tpSort/npos;
 precision = tpSort./(fpSort + tpSort);
 
 ap = VOCap(recall', precision');
-fprintf('AP = %.4f\n', ap);
+fprintf('\nAP = %.4f\n', ap);
 
 close all;
 plot(recall, precision, 'r', 'LineWidth',3);

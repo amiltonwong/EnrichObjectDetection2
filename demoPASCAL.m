@@ -7,20 +7,20 @@ addpath('../MatlabRenderer/bin');
 addpath('../MatlabCUDAConv/');
 addpath('3rdParty/SpacePlot');
 addpath('3rdParty/MinMaxSelection');
-addpath('Diagnosis');
+% addpath('Diagnosis');
 
 DATA_SET = 'PASCAL';
 dwot_set_datapath;
 
 COMPUTING_MODE = 1;
 CLASS = 'Car';
-% CLASS = 'Bicycle';
-SUB_CLASS = [];
+SUB_CLASS = [];     % Sub folders
 LOWER_CASE_CLASS = lower(CLASS);
 TEST_TYPE = 'val';
-mkdir('Result',[LOWER_CASE_CLASS '_' TEST_TYPE]);
+SAVE_PATH = fullfile('Result',[LOWER_CASE_CLASS '_' TEST_TYPE]);
+if ~exist(SAVE_PATH,'dir'); mkdir(SAVE_PATH); end
 
-DEVICE_ID = 1; % 0-base indexing
+DEVICE_ID = 0; % 0-base indexing
 
 if COMPUTING_MODE > 0
   gdevice = gpuDevice(DEVICE_ID + 1); % Matlab use 1 base indexing
@@ -96,25 +96,26 @@ param.image_scale_factor = 2; % scale image accordingly and detect on the scaled
 param.proposal_tuning_mode = 1;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-param.color_range = [-inf 100:20:300 inf];
+param.color_range = [-inf 120:10:300 inf];
 
 
 % detector name
 [ detector_model_name ] = dwot_get_detector_name(CLASS, SUB_CLASS, model_names, param);
 detector_name = sprintf('%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d',...
-    LOWER_CASE_CLASS,  detector_model_name, n_cell_limit, lambda,...
-    numel(azs), numel(els), numel(yaws), numel(fovs));
+        LOWER_CASE_CLASS,  detector_model_name, n_cell_limit, lambda,...
+        numel(azs), numel(els), numel(yaws), numel(fovs));
 
 detector_file_name = sprintf('%s.mat', detector_name);
 
 %% Make empty detection save file
 detection_result_file = sprintf(['%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_',...
-    '%0.2f_sbin_%d_level_%d_nms_%0.2f_skp_%s_server_%s.txt'],...
-    DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda,...
-    numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin,...
-    n_level, param.nms_threshold, skip_name, server_id.num);
+        '%0.2f_sbin_%d_level_%d_nms_%0.2f_skp_%s_server_%s.txt'],...
+        DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda,...
+        numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin,...
+        n_level, param.nms_threshold, skip_name, server_id.num);
+
 % Check duplicate file name and return different name
-detection_result_file = dwot_save_detection([], 'Result', detection_result_file, [], true);
+detection_result_file = dwot_save_detection([], SAVE_PATH, detection_result_file, [], true);
 
 if param.proposal_tuning_mode > 0
     detection_tuning_result_file = sprintf(['%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_',...
@@ -123,7 +124,7 @@ if param.proposal_tuning_mode > 0
         numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin,...
         n_level, param.nms_threshold, skip_name, server_id.num);
     % Check duplicate file name and return different name
-    detection_tuning_result_file = dwot_save_detection([], 'Result', detection_tuning_result_file, [], true);
+    detection_tuning_result_file = dwot_save_detection([], SAVE_PATH, detection_tuning_result_file, [], true);
 end
 
 fprintf('\nThe result will be saved on %s\n',detection_result_file);
@@ -136,11 +137,9 @@ if ~exist(detector_file_name,'file')  || param.proposal_tuning_mode > 0
     end
 
     % Initialize renderer
-    if ~isfield(param,'renderer')
-        renderer = Renderer();
-        if ~renderer.initialize(model_paths, 700, 700, 0, 0, 0, 0, 25)
-          error('fail to load model');
-        end
+    renderer = Renderer();
+    if ~renderer.initialize(model_paths, 700, 700, 0, 0, 0, 0, 25)
+      error('fail to load model');
     end
 end
 
@@ -240,7 +239,7 @@ for imgIdx=1:N_IMAGE
     else
       error('Computing Mode Undefined');
     end
-    fprintf(' convolution time: %0.4f\n', toc(imgTic));
+    fprintf('convolution time: %0.4f\n', toc(imgTic));
     
     % Automatically sort them according to the score and apply NMS
     bbsNMS = esvm_nms(bbsAllLevel, param.nms_threshold);
@@ -251,7 +250,7 @@ for imgIdx=1:N_IMAGE
         bbsNMS(:,9) = bbsNMS_clip(:,9);
     end
     [~, img_file_name] = fileparts(recs.imgname);
-    dwot_save_detection(esvm_nms(bbsAllLevel, 0.7), 'Result', detection_result_file, ...
+    dwot_save_detection(esvm_nms(bbsAllLevel, 0.7), SAVE_PATH, detection_result_file, ...
                                  img_file_name, false, 1); % save mode != 0 to save template index
     
     if visualize_detection && ~isempty(clsinds)
@@ -263,7 +262,7 @@ for imgIdx=1:N_IMAGE
                             param.b_calibrate,  n_cell_limit, lambda, numel(azs), numel(els),...
                             numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level,...
                             param.nms_threshold, imgIdx);
-        print('-djpeg','-r150',['Result/' LOWER_CASE_CLASS '_' TEST_TYPE '/' save_name]);
+        print('-djpeg','-r150',fullfile(SAVE_PATH, save_name));
     end
     
     
@@ -278,13 +277,16 @@ for imgIdx=1:N_IMAGE
         
         switch param.proposal_tuning_mode
             case 1
-                [best_proposals] = dwot_mcmc_proposal_region(renderer, hog_region_pyramid, im_region, detectors, param, im, false);
+                [best_proposals] = dwot_mcmc_proposal_region(renderer, hog_region_pyramid, im_region,...
+                                                detectors, param, im, false);
             case 2
-                [best_proposals] = dwot_breadth_first_search_proposal_region(hog_region_pyramid, im_region, detectors, detector_table, param, im);
+                [best_proposals] = dwot_breadth_first_search_proposal_region(hog_region_pyramid, ...
+                                                im_region, detectors, detector_table, param, im);
                 % [best_proposals, detectors, detector_table] = dwot_binary_search_proposal_region(...
                 %               hog_region_pyramid, im_region, detectors, detector_table, renderer, param, im);
             case 3
-                [best_proposals] = dwot_bfgs_proposal_region(renderer, hog_region_pyramid, im_region, detectors, detector_table, param, im);
+                [best_proposals] = dwot_bfgs_proposal_region(renderer, hog_region_pyramid, im_region,...
+                                                detectors, detector_table, param, im);
             otherwise
                 error('Undefined tuning mode');
         end
@@ -296,20 +298,22 @@ for imgIdx=1:N_IMAGE
             % fill out the box proposal infomation
             bbsProposal(proposal_idx, 1:4) = best_proposals{proposal_idx}.image_bbox;
             bb_clip = clip_to_image(bbsProposal(proposal_idx, :), [1 1 imSz(2) imSz(1)]);
-            [bb_clip] = dwot_compute_positives(bb_clip, gt, param);
+            bb_clip = dwot_compute_positives(bb_clip, gt, param);
             bbsProposal(proposal_idx, 9) = bb_clip(9);
             bbsProposal(proposal_idx, 12) = best_proposals{proposal_idx}.score;
             bbsProposal(proposal_idx, 11) = 1;
-            dwot_visualize_proposal_tuning(bbsNMS(proposal_idx,:), bbsProposal(proposal_idx,:), best_proposals{proposal_idx}, im, detectors, param);
+            dwot_visualize_proposal_tuning(bbsNMS(proposal_idx,:), bbsProposal(proposal_idx,:), ...
+                                            best_proposals{proposal_idx}, im, detectors, param);
             save_name = sprintf(['%s_%s_%s_tuning_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d',...
                       '_mcmc_%d_imgIdx_%d_obj_%d.jpg'],...
-                      DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, param.b_calibrate,  n_cell_limit, lambda, ...
-                      numel(azs), numel(els), numel(yaws), numel(fovs), param.mcmc_max_iter ,imgIdx, proposal_idx);
-%             print('-djpeg','-r150',['Result/' LOWER_CASE_CLASS '_GT_' TEST_TYPE '/' save_name]);
+                      DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, param.b_calibrate,...
+                      n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs), ...
+                      param.mcmc_max_iter ,imgIdx, proposal_idx);
+            print('-djpeg','-r150',fullfile(SAVE_PATH, save_name));
         end
     end
     bbsNMS(1:n_proposals,:) = bbsProposal;
-    dwot_save_detection(bbsNMS, 'Result', detection_tuning_result_file, ...
+    dwot_save_detection(bbsNMS, SAVE_PATH, detection_tuning_result_file, ...
                                  img_file_name, false, 1); % save mode != 0 to save template index
 end
 
@@ -319,8 +323,9 @@ ap = zeros(numel(nms_thresholds),1);
 ap_save_names = cell(numel(nms_thresholds),1);
 for i = 1:numel(nms_thresholds)
     nms_threshold = nms_thresholds(i);
-    ap(i) = dwot_analyze_and_visualize_pascal_results(fullfile('Result',detection_result_file), detectors, [], ...
-                            VOCopts, param, skip_criteria, param.color_range, nms_threshold, false);
+    ap(i) = dwot_analyze_and_visualize_pascal_results(fullfile('Result',detection_result_file), ...
+                        detectors, [], VOCopts, param, skip_criteria, param.color_range, ...
+                        nms_threshold, false);
                         
 
     ap_save_names{i} = sprintf(['AP_%s_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_',...
@@ -330,12 +335,13 @@ for i = 1:numel(nms_thresholds)
                         numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level,...
                         nms_threshold, skip_name, N_IMAGE, server_id.num);
 
-     print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TEST_TYPE '/' save_name])
+     print('-dpng','-r150',fullfile(SAVE_PATH, ap_save_names{i}));
 end
 
 if param.proposal_tuning_mode > 0
-    ap_tuning = dwot_analyze_and_visualize_pascal_results(fullfile('Result',detection_tuning_result_file), detectors, [], ...
-                            VOCopts, param, skip_criteria, param.color_range, param.nms_threshold, false);
+    ap_tuning = dwot_analyze_and_visualize_pascal_results(fullfile(SAVE_PATH,...
+                        detection_tuning_result_file), detectors, [], VOCopts, param,...
+                        skip_criteria, param.color_range, param.nms_threshold, false);
                         
     ap_tuning_save_name = sprintf(['AP_%s_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_',...
                         '%d_scale_%0.2f_sbin_%d_level_%d_nms_%0.2f_skp_%s_N_IM_%d_%s_tuning.png'],...
@@ -344,21 +350,23 @@ if param.proposal_tuning_mode > 0
                         numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level,...
                         nms_threshold, skip_name, N_IMAGE, server_id.num);
 
-     print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TEST_TYPE '/' ap_tuning_save_name])
+     print('-dpng','-r150',fullfile(SAVE_PATH, ap_tuning_save_name));
 end
 
 if ~isempty(server_id)
     for i = 1:numel(nms_thresholds)
-        system(['scp ./Result/', LOWER_CASE_CLASS, '_', TEST_TYPE, '/', ap_save_names{i},...
+        system(['scp ', fullfile(SAVE_PATH, ap_save_names{i}),...
             ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/',...
             LOWER_CASE_CLASS '_' TEST_TYPE]);
     end
     
     if param.proposal_tuning_mode > 1
-        system(['scp ./Result/', LOWER_CASE_CLASS, '_', TEST_TYPE, '/', ap_tuning_save_name,...
+        system(['scp ', fullfile(SAVE_PATH, ap_tuning_save_name),...
             ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/',...
             LOWER_CASE_CLASS '_' TEST_TYPE]);
+        system(['scp ' fullfile(SAVE_PATH, detection_tuning_result_file),...
+            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/']);
     end
-    system(['scp ./Result/', detection_result_file,...
+    system(['scp ' fullfile(SAVE_PATH, detection_result_file),...
         ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/']);
 end
