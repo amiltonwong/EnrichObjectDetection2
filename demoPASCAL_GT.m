@@ -212,30 +212,30 @@ for imgIdx=1:N_IMAGE
     imSz = size(im);
 
     for i_object = 1 : numel(clsinds)
-      BB = gt(imgIdx).BB(:,i_object)';
-      sbin = param.sbin;
-      
-      clip_padded_bbox = dwot_clip_pad_bbox(BB, param.extraction_padding_ratio, imSz);
-      width = BB(3)-BB(1);
-      height = BB(4)-BB(2);
-      gt_pad_im              = im(clip_padded_bbox(2):clip_padded_bbox(4), clip_padded_bbox(1):clip_padded_bbox(3),:);
-      gt_size                  = size(gt_pad_im);
-      gt_start                 = [BB(1)-clip_padded_bbox(1)+1, BB(2)-clip_padded_bbox(2)+1];
-      crop_BB                = [ gt_start(1), gt_start(2), gt_start(1)+width, gt_start(2)+height ];
-      
-      temp_gt.BB = crop_BB';
-      temp_gt.diff = gt(imgIdx).diff(i_object);
-      temp_gt.det = 0;
-      
-      search_scale = max_template_size(1:2)' * sbin ./ [height width];
-      if max(search_scale) >= 1
-          sbin = 4;
-          search_scale = max_template_size(1:2)' * sbin ./ [height width];
-      end
-      
-      param.detect_min_scale             = min(1, min(search_scale) / 1.4);
-      param.detect_max_scale            = min(1, min(search_scale) *1.2);
-      param.detect_levels_per_octave = 50;
+        BB = gt(imgIdx).BB(:,i_object)';
+        sbin = param.sbin;
+        
+        clip_padded_bbox = dwot_clip_pad_bbox(BB, param.extraction_padding_ratio, imSz);
+        width = BB(3)-BB(1);
+        height = BB(4)-BB(2);
+        gt_pad_im              = im(clip_padded_bbox(2):clip_padded_bbox(4), clip_padded_bbox(1):clip_padded_bbox(3),:);
+        gt_size                  = size(gt_pad_im);
+        gt_start                 = [BB(1)-clip_padded_bbox(1)+1, BB(2)-clip_padded_bbox(2)+1];
+        crop_BB                = [ gt_start(1), gt_start(2), gt_start(1)+width, gt_start(2)+height ];
+        
+        temp_gt.BB = crop_BB';
+        temp_gt.diff = gt(imgIdx).diff(i_object);
+        temp_gt.det = 0;
+        
+        search_scale = max_template_size(1:2)' * sbin ./ [height width];
+        if max(search_scale) >= 1
+            sbin = 4;
+            search_scale = max_template_size(1:2)' * sbin ./ [height width];
+        end
+        
+        param.detect_min_scale             = min(1, min(search_scale) / 1.4);
+        param.detect_max_scale            = min(1, min(search_scale) *1.2);
+        param.detect_levels_per_octave = 50;
       
         if COMPUTING_MODE == 0
             [bbsAllLevel, hog, scales] = dwot_detect( gt_pad_im, templates_cpu, param);

@@ -1,22 +1,22 @@
 function resultIm = dwot_draw_overlap_rendering(im, bbsNMS, detectors, max_n_draw_box, draw_padding, box_text, drawing_weights, color_range)
 
-if nargin < 5
+if nargin < 4
   max_n_draw_box = 5;
 end
 
-if nargin  < 6
+if nargin  < 5
   draw_padding = 25;
 end
 
-if nargin < 7
+if nargin < 6
   box_text = false;
 end
 
-if nargin < 8
+if nargin < 7
   drawing_weights = ones(1,2)/2;
 end
 
-if nargin < 9
+if nargin < 8
   color_range = false;
 end
 

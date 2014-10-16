@@ -50,12 +50,12 @@ for level = length(hog):-1:1
 
     % GPU
     if level > param.use_cpu_threshold
-      [y1, x1] = dwot_hog_to_img_fft(uus, vvs, sz{templateIdx}, sbin, scale);
-      [y2, x2] = dwot_hog_to_img_fft(uus + sz{templateIdx}(1), vvs + sz{templateIdx}(2), sz{templateIdx}, sbin, scale);
+      [y1, x1] = dwot_hog_to_img_fft(uus - 1, vvs - 1, sz{templateIdx}, sbin, scale);
+      [y2, x2] = dwot_hog_to_img_fft(uus + sz{templateIdx}(1) + 1, vvs + sz{templateIdx}(2) + 1, sz{templateIdx}, sbin, scale);
     % CPU
     else
-      [y1, x1] = dwot_hog_to_img_conv(uus, vvs, sbin, scale, padder);
-      [y2, x2] = dwot_hog_to_img_conv(uus + sz{templateIdx}(1), vvs + sz{templateIdx}(2), sbin, scale, padder);
+      [y1, x1] = dwot_hog_to_img_conv(uus - 1, vvs - 1, sbin, scale, padder);
+      [y2, x2] = dwot_hog_to_img_conv(uus + sz{templateIdx}(1) + 1, vvs + sz{templateIdx}(2) + 1, sbin, scale, padder);
     end
 
     bbs = zeros(numel(uus), 12);

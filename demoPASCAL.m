@@ -20,7 +20,7 @@ LOWER_CASE_CLASS = lower(CLASS);
 TEST_TYPE = 'val';
 mkdir('Result',[LOWER_CASE_CLASS '_' TEST_TYPE]);
 
-DEVICE_ID = 1;
+DEVICE_ID = 1; % 0-base indexing
 
 if COMPUTING_MODE > 0
   gdevice = gpuDevice(DEVICE_ID + 1); % Matlab use 1 base indexing
@@ -44,8 +44,8 @@ visualize_detection = true;
 visualize_detector = false;
 
 sbin = 6;
-n_level = 10;
-n_proposals = 5;
+n_level = 15;
+n_max_proposals = 10;
 
 % Load models
 % models_path = {'Mesh/Bicycle/road_bike'};
@@ -77,19 +77,26 @@ skip_name = cellfun(@(x) x(1), skip_criteria);
 
 %%%%%%%%%%%%%%% Set Parameters %%%%%%%%%%%%
 dwot_get_default_params;
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 param.template_initialization_mode = 0; 
 param.nms_threshold = 0.4;
 param.model_paths = model_paths;
 
-param.b_calibrate = 0;
-param.n_calibration_images = 50;
+param.b_calibrate = 0;      % apply callibration if > 0
+param.n_calibration_images = 100; 
 param.calibration_mode = 'gaussian';
 
 param.detection_threshold = 80;
-param.image_scale_factor = 2;
+param.image_scale_factor = 2; % scale image accordingly and detect on the scaled image
 
-color_range = [-inf 100:20:300 inf];
+% Tuning mode == 0, no tuning
+%             == 1, MCMC
+%             == 2, Breadth first search
+%             == 3, Quasi-Newton method (BFGS)
+param.proposal_tuning_mode = 1;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+param.color_range = [-inf 100:20:300 inf];
 
 
 % detector name
@@ -100,41 +107,64 @@ detector_name = sprintf('%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d',...
 
 detector_file_name = sprintf('%s.mat', detector_name);
 
+%% Make empty detection save file
 detection_result_file = sprintf(['%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_',...
     '%0.2f_sbin_%d_level_%d_nms_%0.2f_skp_%s_server_%s.txt'],...
     DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda,...
     numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin,...
     n_level, param.nms_threshold, skip_name, server_id.num);
+% Check duplicate file name and return different name
+detection_result_file = dwot_save_detection([], 'Result', detection_result_file, [], true);
+
+if param.proposal_tuning_mode > 0
+    detection_tuning_result_file = sprintf(['%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_',...
+        '%0.2f_sbin_%d_level_%d_nms_%0.2f_skp_%s_server_%s_tuning.txt'],...
+        DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda,...
+        numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin,...
+        n_level, param.nms_threshold, skip_name, server_id.num);
+    % Check duplicate file name and return different name
+    detection_tuning_result_file = dwot_save_detection([], 'Result', detection_tuning_result_file, [], true);
+end
+
 fprintf('\nThe result will be saved on %s\n',detection_result_file);
+
+%% Make Renderer
+if ~exist(detector_file_name,'file')  || param.proposal_tuning_mode > 0
+    if exist('renderer','var')
+        renderer.delete();
+        clear renderer;
+    end
+
+    % Initialize renderer
+    if ~isfield(param,'renderer')
+        renderer = Renderer();
+        if ~renderer.initialize(model_paths, 700, 700, 0, 0, 0, 0, 25)
+          error('fail to load model');
+        end
+    end
+end
 
 %% Make Detectors
 if exist(detector_file_name,'file')
-  load(detector_file_name);
+    load(detector_file_name);
 else
-  if exist('renderer','var')
-    renderer.delete();
-    clear renderer;
-  end
-
-  % Initialize renderer
-  if ~isfield(param,'renderer')
-    renderer = Renderer();
-    if ~renderer.initialize(model_paths, 700, 700, 0, 0, 0, 0, 25)
-      error('fail to load model');
+    [detectors] = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_names),...
+        LOWER_CASE_CLASS, param, visualize_detector);
+    [detectors, detector_table]= dwot_make_table_from_detectors(detectors);
+    if sum(cellfun(@(x) isempty(x), detectors))
+      error('Detector Not Completed');
     end
-  end
-
-  [detectors] = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_names),...
-      LOWER_CASE_CLASS, param, visualize_detector);
-  [detectors, detector_table]= dwot_make_table_from_detectors(detectors);
-  if sum(cellfun(@(x) isempty(x), detectors))
-    error('Detector Not Completed');
-  end
-  eval(sprintf(['save -v7.3 ' detector_file_name ' detectors detector_table']));
-  % detectors = dwot_make_detectors(renderer, azs, els, yaws, fovs, param, visualize_detector);
-  % eval(sprintf(['save ' detector_name ' detectors']));
+    eval(sprintf(['save -v7.3 ' detector_file_name ' detectors detector_table']));
+    % detectors = dwot_make_detectors(renderer, azs, els, yaws, fovs, param, visualize_detector);
+    % eval(sprintf(['save ' detector_name ' detectors']));
 end
 
+%% Calibrate detector. see param.b_calibrate
+% calibration mode == 'gaussian'
+%     tries to normalize the negative detection by normalizing it to follow standard distribution.
+%     performs worse than without calibration
+% calibration_mode == 'linear'
+%     follow 'Seeing 3D chair' CVPR 14, calibration stage. Performs worse
 if param.b_calibrate
   calibrated_detector_file_name = sprintf('%s_cal.mat', detector_name);
   if exist(calibrated_detector_file_name,'file')
@@ -150,12 +180,13 @@ end
 param.detectors              = detectors;
 param.detect_pyramid_padding = 10;
 %%%%%%%%%%%%
-renderings = cellfun(@(x) x.rendering_image, detectors, 'UniformOutput', false);
-depth_masks = cellfun(@(x) x.rendering_depth, detectors, 'UniformOutput', false);
 
 %% Make templates, these are just pointers to the templates in the detectors,
 % The following code copies variables to GPU or make pointers to memory
 % according to the computing mode.
+%
+% The GPU templates accelerates the computation time since it is already loaded
+% on GPU.
 if COMPUTING_MODE == 0
   % for CPU convolution, use fconvblas which handles template inversion
   templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
@@ -170,44 +201,32 @@ else
 end
 
 %% Set variables for detection
+% ground truth is required to plot figure.
 [gtids,t] = textread(sprintf(VOCopts.imgsetpath,[LOWER_CASE_CLASS '_' TEST_TYPE]),'%s %d');
 
 N_IMAGE = length(gtids);
-% N_IMAGE = 1500;
-% extract ground truth objects
-npos = 0;
-tp = cell(1,N_IMAGE);
-fp = cell(1,N_IMAGE);
-% atp = cell(1,N_IMAGE);
-% afp = cell(1,N_IMAGE);
-detScore = cell(1,N_IMAGE);
-detectorId = cell(1,N_IMAGE);
-detIdx = 0;
 
 clear gt;
-gt(length(gtids))=struct('BB',[],'diff',[],'det',[]);
-
-% Make empty detection save file
-% detection_result_file = dwot_save_detection([], 'Result', detection_result_file, [], true);
+gt = struct('BB',[],'diff',[],'det',[]);
 
 for imgIdx=1:N_IMAGE
     fprintf('%d/%d ',imgIdx,N_IMAGE);
     imgTic = tic;
     % read annotation
-    recs(imgIdx)=PASreadrecord(sprintf(VOCopts.annopath,gtids{imgIdx}));
+    recs=PASreadrecord(sprintf(VOCopts.annopath,gtids{imgIdx}));
     
-    clsinds = strmatch(LOWER_CASE_CLASS,{recs(imgIdx).objects(:).class},'exact');
+    clsinds = strmatch(LOWER_CASE_CLASS,{recs.objects(:).class},'exact');
 
-    if dwot_skip_criteria(recs(imgIdx).objects(clsinds), skip_criteria); continue; end
+    if dwot_skip_criteria(recs.objects(clsinds), skip_criteria); continue; end
 
-    gt(imgIdx).BB = param.image_scale_factor * cat(1, recs(imgIdx).objects(clsinds).bbox)';
-    gt(imgIdx).diff = [recs(imgIdx).objects(clsinds).difficult];
-    gt(imgIdx).det = zeros(length(clsinds),1);
+    gt.BB = param.image_scale_factor * cat(1, recs.objects(clsinds).bbox)';
+    gt.diff = [recs.objects(clsinds).difficult];
+    gt.det = zeros(length(clsinds),1);
     
-    
-    im = imread([VOCopts.datadir, recs(imgIdx).imgname]);
-    im = imresize(im,param.image_scale_factor);
+    im = imread([VOCopts.datadir, recs.imgname]);
+    im = imresize(im, param.image_scale_factor);
     imSz = size(im);
+
     if COMPUTING_MODE == 0
       [bbsAllLevel, hog, scales] = dwot_detect( im, templates_cpu, param);
 %       [hog_region_pyramid, im_region] = dwot_extract_region_conv(im, hog, scales, bbsNMS, param);
@@ -221,20 +240,22 @@ for imgIdx=1:N_IMAGE
     else
       error('Computing Mode Undefined');
     end
-    fprintf(' time to convolution: %0.4f\n', toc(imgTic));
+    fprintf(' convolution time: %0.4f\n', toc(imgTic));
     
     % Automatically sort them according to the score and apply NMS
     bbsNMS = esvm_nms(bbsAllLevel, param.nms_threshold);
     
     bbsNMS_clip = clip_to_image(bbsNMS, [1 1 imSz(2) imSz(1)]);
-    [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, detScore{imgIdx}, ~] = ...
-                                    dwot_compute_positives(bbsNMS_clip, gt(imgIdx), param);
-    
-    [~, img_file_name] = fileparts(recs(imgIdx).imgname);
-    % dwot_save_detection(esvm_nms(bbsAllLevel, 0.7), 'Result', detection_result_file, ...
-    % img_file_name, false, 1); % save mode != 0 to save template index
+    [bbsNMS_clip, tp ] = dwot_compute_positives(bbsNMS_clip, gt, param);
+    if size(bbsNMS,1) > 0
+        bbsNMS(:,9) = bbsNMS_clip(:,9);
+    end
+    [~, img_file_name] = fileparts(recs.imgname);
+    dwot_save_detection(esvm_nms(bbsAllLevel, 0.7), 'Result', detection_result_file, ...
+                                 img_file_name, false, 1); % save mode != 0 to save template index
     
     if visualize_detection && ~isempty(clsinds)
+        tpIdx = logical(tp); % Index of bounding boxes that will be printed as ground truth
         dwot_visualize_result;
         save_name = sprintf(['%s_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_',...
                             'scale_%0.2f_sbin_%d_level_%d_nms_%0.2f_imgIdx_%d.jpg'],...
@@ -243,18 +264,63 @@ for imgIdx=1:N_IMAGE
                             numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level,...
                             param.nms_threshold, imgIdx);
         print('-djpeg','-r150',['Result/' LOWER_CASE_CLASS '_' TEST_TYPE '/' save_name]);
-    end  
-    npos=npos+sum(~gt(imgIdx).diff);
+    end
+    
+    
+    %% Proposal Tuning
+    if param.proposal_tuning_mode > 0
+        tuningTic = tic;
+
+        n_proposals = min(n_max_proposals, size(bbsNMS,1));
+
+        [hog_region_pyramid, im_region] = dwot_extract_hog(hog, scales, detectors, ...
+                              bbsNMS(1:n_proposals,:), param, im);
+        
+        switch param.proposal_tuning_mode
+            case 1
+                [best_proposals] = dwot_mcmc_proposal_region(renderer, hog_region_pyramid, im_region, detectors, param, im, false);
+            case 2
+                [best_proposals] = dwot_breadth_first_search_proposal_region(hog_region_pyramid, im_region, detectors, detector_table, param, im);
+                % [best_proposals, detectors, detector_table] = dwot_binary_search_proposal_region(...
+                %               hog_region_pyramid, im_region, detectors, detector_table, renderer, param, im);
+            case 3
+                [best_proposals] = dwot_bfgs_proposal_region(renderer, hog_region_pyramid, im_region, detectors, detector_table, param, im);
+            otherwise
+                error('Undefined tuning mode');
+        end
+        fprintf(' tuning time : %0.4f\n', toc(tuningTic));
+        
+        bbsProposal = zeros(n_proposals,12);
+        % For each proposals draw original, before and after
+        for proposal_idx = 1:n_proposals
+            % fill out the box proposal infomation
+            bbsProposal(proposal_idx, 1:4) = best_proposals{proposal_idx}.image_bbox;
+            bb_clip = clip_to_image(bbsProposal(proposal_idx, :), [1 1 imSz(2) imSz(1)]);
+            [bb_clip] = dwot_compute_positives(bb_clip, gt, param);
+            bbsProposal(proposal_idx, 9) = bb_clip(9);
+            bbsProposal(proposal_idx, 12) = best_proposals{proposal_idx}.score;
+            bbsProposal(proposal_idx, 11) = 1;
+            dwot_visualize_proposal_tuning(bbsNMS(proposal_idx,:), bbsProposal(proposal_idx,:), best_proposals{proposal_idx}, im, detectors, param);
+            save_name = sprintf(['%s_%s_%s_tuning_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d',...
+                      '_mcmc_%d_imgIdx_%d_obj_%d.jpg'],...
+                      DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, param.b_calibrate,  n_cell_limit, lambda, ...
+                      numel(azs), numel(els), numel(yaws), numel(fovs), param.mcmc_max_iter ,imgIdx, proposal_idx);
+%             print('-djpeg','-r150',['Result/' LOWER_CASE_CLASS '_GT_' TEST_TYPE '/' save_name]);
+        end
+    end
+    bbsNMS(1:n_proposals,:) = bbsProposal;
+    dwot_save_detection(bbsNMS, 'Result', detection_tuning_result_file, ...
+                                 img_file_name, false, 1); % save mode != 0 to save template index
 end
 
 %% Vary NMS threshold
-nms_thresholds = 0.3 : 0.05 : 0.7;
+nms_thresholds = 0.2 : 0.05 : 0.7;
 ap = zeros(numel(nms_thresholds),1);
 ap_save_names = cell(numel(nms_thresholds),1);
 for i = 1:numel(nms_thresholds)
     nms_threshold = nms_thresholds(i);
-    ap(i) = dwot_analyze_and_visualize_pascal_results(detection_result_file, detectors, [], ...
-                            VOCopts, param, skip_criteria, color_range, nms_threshold, false);
+    ap(i) = dwot_analyze_and_visualize_pascal_results(fullfile('Result',detection_result_file), detectors, [], ...
+                            VOCopts, param, skip_criteria, param.color_range, nms_threshold, false);
                         
 
     ap_save_names{i} = sprintf(['AP_%s_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_',...
@@ -267,9 +333,32 @@ for i = 1:numel(nms_thresholds)
      print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TEST_TYPE '/' save_name])
 end
 
+if param.proposal_tuning_mode > 0
+    ap_tuning = dwot_analyze_and_visualize_pascal_results(fullfile('Result',detection_tuning_result_file), detectors, [], ...
+                            VOCopts, param, skip_criteria, param.color_range, param.nms_threshold, false);
+                        
+    ap_tuning_save_name = sprintf(['AP_%s_%s_%s_%s_cal_%d_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_',...
+                        '%d_scale_%0.2f_sbin_%d_level_%d_nms_%0.2f_skp_%s_N_IM_%d_%s_tuning.png'],...
+                        DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name,...
+                        param.b_calibrate, n_cell_limit, lambda, numel(azs), numel(els),...
+                        numel(yaws), numel(fovs), param.image_scale_factor, sbin, n_level,...
+                        nms_threshold, skip_name, N_IMAGE, server_id.num);
+
+     print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TEST_TYPE '/' ap_tuning_save_name])
+end
+
 if ~isempty(server_id)
     for i = 1:numel(nms_thresholds)
-        system(['scp ./Result/' LOWER_CASE_CLASS '_' TEST_TYPE '/' ap_save_names{i} ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/' LOWER_CASE_CLASS '_' TEST_TYPE]);
+        system(['scp ./Result/', LOWER_CASE_CLASS, '_', TEST_TYPE, '/', ap_save_names{i},...
+            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/',...
+            LOWER_CASE_CLASS '_' TEST_TYPE]);
     end
-    system(['scp ./Result/' detection_result_file ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/']);
+    
+    if param.proposal_tuning_mode > 1
+        system(['scp ./Result/', LOWER_CASE_CLASS, '_', TEST_TYPE, '/', ap_tuning_save_name,...
+            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/',...
+            LOWER_CASE_CLASS '_' TEST_TYPE]);
+    end
+    system(['scp ./Result/', detection_result_file,...
+        ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/']);
 end

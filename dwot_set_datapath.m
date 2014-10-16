@@ -47,3 +47,6 @@ elseif strcmp(DATA_SET,'3DObject')
     addpath(DATA_PATH);
 end
 
+if isempty(server_id)
+    server_id(1).num = 'capri7';
+end
