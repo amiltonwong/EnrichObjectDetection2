@@ -1,4 +1,4 @@
-function resultIm = dwot_draw_overlap_rendering(im, bbsNMS, detectors, max_n_draw_box, draw_padding, box_text, drawing_weights, color_range)
+function resultIm = dwot_draw_overlap_rendering(im, bbsNMS, detectors, max_n_draw_box, draw_padding, box_text, drawing_weights, color_range, text_mode)
 
 if nargin < 4
   max_n_draw_box = 5;
@@ -18,6 +18,10 @@ end
 
 if nargin < 8
   color_range = false;
+end
+
+if nargin < 9
+    text_mode = 0;
 end
 
 paddedIm = pad_image(im2double(im), draw_padding, 1);
@@ -129,10 +133,12 @@ if box_text
     box_position = clipBBox(bbsIdx, 1:4) + [0 0 -clipBBox(bbsIdx, 1:2)];
     
     % if detector id available (positive number), print it
-    if bbsNMS(bbsIdx,11) > 0 
+    if bbsNMS(bbsIdx,11) > 0 && (text_mode == 0)
       box_text = sprintf(' s:%0.2f o:%0.2f t:%d',bbsNMS(bbsIdx,12),bbsNMS(bbsIdx,9),bbsNMS(bbsIdx,11));
-    else
+    elseif (text_mode == 0)
       box_text = sprintf(' s:%0.2f o:%0.2f ',bbsNMS(bbsIdx,12),bbsNMS(bbsIdx,9));
+    elseif (text_mode == 1)
+      box_text = sprintf(' s:%0.2f ',bbsNMS(bbsIdx,12));
     end
     
     rectangle('position', box_position,'edgecolor',[0.5 0.5 0.5],'LineWidth',3);

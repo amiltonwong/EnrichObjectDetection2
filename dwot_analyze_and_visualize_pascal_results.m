@@ -22,12 +22,7 @@ renderings = cellfun(@(x) x.rendering_image, detectors, 'UniformOutput', false);
 
 % PASCAL_car_val_init_0_Car_each_7_lim_300_lam_0.0150_a_24_e_2_y_1_f_2_scale_2.00_sbin_6_level_10_nms_0.40_skp_e
 % Group inside group not supported in matlab
-detection_params = regexp(detection_result_txt,...
-  ['(?<DATA_SET>[a-zA-Z0-9]+)_(?<pad_detection>pad_detection)?_(?<LOWER_CASE_CLASS>[a-zA-Z]+)_(?<TYPE>[a-zA-Z]+)_(?<detector_model_name>[\w_]+)_',...
-  'lim_(?<n_cell_limit>\d+)_lam_(?<lambda>[\d.]+)_a_(?<n_az>\d+)_e_(?<n_el>\d)_y_(?<n_yaw>\d+)_',...
-  'f_(?<n_fov>\d+)_scale_(?<scale>[\d.]+)_sbin_(?<sbin>\d+)_level_(?<n_level>\d+)_',...
-  'nms_(?<nms_threshold>[\d.]+)_skp_(?<skip_criterion>\w)'],...
-  'names');
+detection_params = dwot_detection_params_from_name(detection_result_txt);
 
 % SNames = fieldnames(temp); 
 % for loopIndex = 1:numel(SNames) 
@@ -114,13 +109,13 @@ for imgIdx=1:n_unique_files
   %% Collect statistics
   % Per Detector Statistics
   
-  for bbs_idx = 1:size(bbsNMS,1)
-    detector_idx = bbsNMS(bbs_idx, 11);
-    if numel(detector_struct) < detector_idx || isempty(detector_struct{detector_idx})
-      detector_struct{detector_idx} = {};
-    end
-    detector_struct{detector_idx}{numel(detector_struct{detector_idx}) + 1} = struct('BB',bbsNMS(bbs_idx,:),'im',recs.imgname);
-  end
+%   for bbs_idx = 1:size(bbsNMS,1)
+%     detector_idx = bbsNMS(bbs_idx, 11);
+%     if numel(detector_struct) < detector_idx || isempty(detector_struct{detector_idx})
+%       detector_struct{detector_idx} = {};
+%     end
+%     detector_struct{detector_idx}{numel(detector_struct{detector_idx}) + 1} = struct('BB',bbsNMS(bbs_idx,:),'im',recs.imgname);
+%   end
   
   % TP collection
   gtIdx = find(gt(imgIdx).det > 0);
@@ -176,7 +171,6 @@ precision = tpSort./(fpSort + tpSort);
 ap = VOCap(recall', precision');
 fprintf('\nAP = %.4f\n', ap);
 
-close all;
 plot(recall, precision, 'r', 'LineWidth',3);
 xlabel('Recall');
 
@@ -189,7 +183,7 @@ drawnow;
     
 % Sort the scores for each detectors and print  
 if visualize
-    if ~exist(save_path)
+    if ~exist(save_path,'dir')
       mkdir(save_path);
     end
 

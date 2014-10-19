@@ -1,27 +1,36 @@
-function b_skip = dwot_skip_criteria(object_annotations, criteria)
-  if nargin < 2
+function [b_skip_im, object_idx] = dwot_skip_criteria(object_annotations, criteria)
+if nargin < 2
     error('Wrong number of inputs');
-  end
-  
-  b_skip = false;
-  n_annotations = numel(object_annotations);
-  for i = 1:n_annotations
+end
+
+n_object  = numel(object_annotations);
+b_skip    = false(1, n_object);
+
+for i = 1:n_object
     cur_object_annotation = object_annotations(i);
-    
+    b_curr = false;
     for criterion = criteria
       switch criterion{1}
         case 'truncated'
-          b_skip  = b_skip || cur_object_annotation.truncated;
+          b_curr  = b_curr || cur_object_annotation.truncated;
         case 'difficult'    
-          b_skip  = b_skip || cur_object_annotation.difficult;
+          b_curr  = b_curr || cur_object_annotation.difficult;
         case 'occluded'
-          b_skip  = b_skip || cur_object_annotation.occluded;      
+          b_curr  = b_curr || cur_object_annotation.occluded;      
         otherwise
           continue;
       end
     end
-  end
-  
-  if n_annotations == 0 && ismember('empty', criteria)
-    b_skip = true;
-  end
+    b_skip(i) = b_curr;
+end
+
+object_idx = find(~b_skip);
+if ~ismember('none', criteria)
+    b_skip_im = isempty(object_idx);
+else
+    b_skip_im = false;
+end
+
+if n_object == 0 && ismember('empty', criteria)
+    b_skip_im = true;
+end

@@ -41,8 +41,8 @@ for level = length(hog):-1:1
 
     % HOG templates are consistently smaller. Add extra padding after
     % detection
-    [y1, x1] = dwot_hog_to_img_conv(y_coord - 1, x_coord -1, sbin, scale, hogPadder);
-    [y2, x2] = dwot_hog_to_img_conv(y_coord + sz{templateIdx}(1) + 1, x_coord + sz{templateIdx}(2) + 1, sbin, scale, hogPadder);
+    [y1, x1] = dwot_hog_to_img_conv(y_coord - 0.5, x_coord - 0.5, sbin, scale, hogPadder);
+    [y2, x2] = dwot_hog_to_img_conv(y_coord + sz{templateIdx}(1) + 0.5, x_coord + sz{templateIdx}(2) + 0.5, sbin, scale, hogPadder);
     
     bbs = zeros(numel(y_coord), 12);
     bbs(:,1:4) = [x1 y1, x2, y2];

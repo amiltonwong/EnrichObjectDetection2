@@ -27,8 +27,8 @@ for detector_idx = 1:50:780
     subplot(224);
     imagesc(detectors{bbsNMS(1,11)}.rendering_image);
     axis equal; axis tight;
-  
-    dwot_draw_overlap_detection(im, bbsNMS(1,:), renderings, inf, 50, visualize_detection, [0.2, 0.8, 0.0], color_range );
+    dwot_draw_overlap_rendering(im, bbsNMS(1,:), detectors, inf, 10, visualize_detection, [0.7, 0.3, 0.0], param.color_range );
+%    dwot_draw_overlap_detection(im, bbsNMS(1,:), renderings, inf, 50, visualize_detection, [0.2, 0.8, 0.0], color_range );
 
     waitforbuttonpress;
 end

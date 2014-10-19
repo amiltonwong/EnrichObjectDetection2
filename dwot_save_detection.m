@@ -17,7 +17,9 @@ if b_new_file
   
   if exist(fullfile(save_path,file_name),'file')
     warning('file name exists, appending temporary number');
-    temp_numbers = cellfun(@(x) regexp(x, [file_name 'tmp_(?<num>\d+)(.txt)?'],'names'),{file_list.name},'UniformOutput',false);
+    [~,file_name_wo_ext] = fileparts(file_name);
+    
+    temp_numbers = cellfun(@(x) regexp(x, [file_name_wo_ext '_tmp_(?<num>\d+)\.txt'],'names'),{file_list.name},'UniformOutput',false);
     temp_numbers = temp_numbers(cellfun(@(x) ~isempty(x), temp_numbers));
     temp_numbers = cellfun(@(x) str2double(x.num), temp_numbers);
     if isempty(temp_numbers)
