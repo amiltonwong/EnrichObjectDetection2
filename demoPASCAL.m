@@ -12,6 +12,9 @@ addpath('3rdParty/MinMaxSelection');
 DATA_SET = 'PASCAL';
 dwot_set_datapath;
 
+% Computing Mode  = 0, CPU
+%                 = 1, GPU
+%                 = 2, Combined
 COMPUTING_MODE = 1;
 CLASS = 'Car';
 SUB_CLASS = [];     % Sub folders
@@ -27,6 +30,7 @@ if COMPUTING_MODE > 0
   reset(gdevice);
   cos(gpuArray(1));
 end
+
 daz = 45;
 del = 20;
 dfov = 10;
@@ -316,10 +320,11 @@ for imgIdx=1:N_IMAGE
                       imgIdx, proposal_idx);
             print('-djpeg','-r150',fullfile(SAVE_PATH, save_name));
         end
-    end
-    bbsNMS(1:n_proposals,:) = bbsProposal;
-    dwot_save_detection(bbsNMS, SAVE_PATH, detection_tuning_result_file, ...
+        
+        bbsNMS(1:n_proposals,:) = bbsProposal;
+        dwot_save_detection(bbsNMS, SAVE_PATH, detection_tuning_result_file, ...
                                  img_file_name, false, 1); % save mode != 0 to save template index
+    end
 end
 
 close all;  % space plot casues problem when using different subplot grid

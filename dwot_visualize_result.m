@@ -5,6 +5,8 @@ switch param.detection_mode
     bbsNMSDraw = bbsNMS;
     if nDet > 0
         bbsNMSDraw(:,9) = bbsNMS_clip(:,9);
+        bbsNMS_ov = bbsNMS;
+        bbsNMS_ov(:,9) = bbsNMS_clip(:,9);
     end
 
     % Sort the image according to it width
@@ -32,7 +34,7 @@ switch param.detection_mode
 
     % False positives
     subplot(224);
-    dwot_draw_overlap_rendering(im, bbsNMSDraw(~tpIdxSort,:), detectors, 5, 50,...
+    dwot_draw_overlap_rendering(im, bbsNMS_ov(~tpIdx,:), detectors, 5, 50,...
                                 visualize_detection, [0.2, 0.8, 0], param.color_range  );
 
     drawnow;
