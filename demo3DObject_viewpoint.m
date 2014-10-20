@@ -6,6 +6,7 @@ addpath('../MatlabRenderer/');
 addpath('../MatlabRenderer/bin');
 addpath('../MatlabCUDAConv/');
 addpath('3rdParty/SpacePlot');
+addpath('3rdParty/MinMaxSelection/');
 
 % Tests average model
 % The average template is generated using multiple renderings
@@ -38,8 +39,8 @@ del = 15;
 dyaw = 15;
 dfov = 20;
 
-azs = 0:15:315; 
-els = 0:10:30;
+azs = 0:45:315; 
+els = 0:20:20;
 fovs = [25 50];
 yaws = 0;
 n_cell_limit = [250];
@@ -67,11 +68,25 @@ param.template_initialization_mode = 0;
 param.nms_threshold = 0.4;
 param.model_paths = model_paths;
 
-param.b_calibrate = 0;      % apply callibration if > 0
+param.b_calibrate = 1;      % apply callibration if > 0
 param.n_calibration_images = 100; 
-param.calibration_mode = 'gaussian';
+% Calibration mode == 'gaussian', fit gaussian
+%                  == 'linear' , put 0.01% of data to be above 1.
+param.calibration_mode = 'linear';
+if param.b_calibrate
+    switch param.calibration_mode
+      case 'gaussian'
+        param.color_range = [-inf 4:0.5:10 inf];
+        param.detection_threshold = 4;
+      case 'linear'
+        param.color_range = [-inf -0.2:0.1:3 inf];
+        param.detection_threshold = -0.2;
+    end
+else
+    param.color_range = [-inf 120:10:300 inf];
+    param.detection_threshold = 80;
+end
 
-param.detection_threshold = 80;
 param.image_scale_factor = 1; % scale image accordingly and detect on the scaled image
 
 % Tuning mode == 0, no tuning
@@ -87,7 +102,6 @@ param.proposal_tuning_mode = 1;
 param.detection_mode = 'dwot';
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-param.color_range = [-inf 120:10:300 inf];
 
 % For Debuggin purpose only
 % param.detectors              = detectors;
@@ -129,7 +143,7 @@ if param.proposal_tuning_mode > 0
     detection_tuning_result_common_name = detection_tuning_result_common_name.name;
 end
 
-fprintf('\nThe result will be saved on %s\n',detection_result_file);
+fprintf('\nThe result will be saved on %s\n', detection_result_file);
 
 
 %% Make Renderer
@@ -169,14 +183,34 @@ end
 % calibration_mode == 'linear'
 %     follow 'Seeing 3D chair' CVPR 14, calibration stage. Performs worse
 if param.b_calibrate
-  calibrated_detector_file_name = sprintf('%s_cal.mat', detector_name);
-  if exist(calibrated_detector_file_name,'file')
-    load(calibrated_detector_file_name);
-  else
-    detectors = dwot_calibrate_detectors(detectors, LOWER_CASE_CLASS, VOCopts, param);
-    eval(sprintf(['save -v7.3 ' calibrated_detector_file_name ' detectors']));
-  end
-  param.detectors = detectors;
+    
+    %%%%%%%%%% Since we do not have VOCopt for 3DObject, embed the ugly
+    % loading part
+    if isempty(server_id) || strmatch(server_id.num,'capri7')
+        VOC_PATH = '/home/chrischoy/Dataset/VOCdevkit/';
+    else
+        VOC_PATH = '/scratch/chrischoy/Dataset/VOCdevkit/';
+    end
+    if ismac
+        VOC_PATH = '~/dataset/VOCdevkit/';
+    end
+    addpath(VOC_PATH);
+    addpath([VOC_PATH, 'VOCcode']);
+
+    curDir = pwd;
+    eval(['cd ' VOC_PATH]);
+    VOCinit;
+    eval(['cd ' curDir]);
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    detector_name = sprintf('%s_cal_%s',detector_name, param.calibration_mode);
+    if exist(detector_name,'file')
+        load(detector_name);
+    else
+        detectors = dwot_calibrate_detectors(detectors, LOWER_CASE_CLASS, VOCopts, param);
+        eval(sprintf(['save -v7.3 ' detector_name ' detectors']));
+    end
+    param.detectors = detectors;
 end
 
 %%%%% For Debuggin purpose only
@@ -277,8 +311,9 @@ for imgIdx = 1:N_IMAGE
                        
     % Compute overlap of per view nms detections
     [bbsNMS_clip_per_template_mat, ~, ~, ~] = dwot_compute_positives_view(bbsNMS_clip_per_template_mat, gt{imgIdx}, detectors, param);
-    bbsNMS_per_template_nms_mat(:,9) = bbsNMS_clip_per_template_mat(:,9); % copy overlap to original non-clipped detection
-    
+    if numel(bbsNMS_clip_per_template_mat) > 0
+        bbsNMS_per_template_nms_mat(:,9) = bbsNMS_clip_per_template_mat(:,9); % copy overlap to original non-clipped detection
+    end
     % Gather statistics
     % [tp_per_template, fp_per_template] = dwot_gather_viewpoint_statistics(tp_per_template, fp_per_template, bbsNMS_clip_per_template_mat, 0.75);
     

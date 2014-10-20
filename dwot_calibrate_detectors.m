@@ -19,7 +19,6 @@ sz = cellfun(@(x) size(x), templates, 'UniformOutput',false);
 %% Collect statistics
 n_processed = 0;
 for imgIdx = 1:numel(gtids)
-    fprintf('. ');
     calTic = tic;
     recs(imgIdx)=PASreadrecord(sprintf(VOCopts.annopath,gtids{imgIdx}));
     clsinds = strmatch(LOWER_CASE_CLASS,{recs(imgIdx).objects(:).class},'exact');
@@ -55,7 +54,13 @@ for imgIdx = 1:numel(gtids)
     if n_processed >= param.n_calibration_images
         break;
     end
-    fprintf(' convolution time: %0.4f\n', toc(calTic));
+    
+    if mod(n_processed,10) == 0
+        fprintf(' avg time: %0.3f\n', toc(calTic)/10);
+        calTic = tic;
+    else
+        fprintf('.');
+    end
 end
 
 if n_processed < param.n_calibration_images
@@ -94,7 +99,7 @@ for det_idx = 1:n_detectors
             muSwapDim = permute(param.hog_mu, [2 3 1]);
             muProdTemplate = bsxfun(@times, templates{det_idx} , muSwapDim);
             muProdTemplate = sum(muProdTemplate(:));
-            detection_scores{det_idx} = cell2mat(detection_scores{det_idx});
+            detection_scores{det_idx} = cell2mat(detection_scores{det_idx}');
             n_sample = numel(detection_scores{det_idx});
 
             if isfield(param,'percent_calibration_fp')

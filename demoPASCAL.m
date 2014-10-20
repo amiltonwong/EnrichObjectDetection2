@@ -180,7 +180,7 @@ end
 % calibration_mode == 'linear'
 %     follow 'Seeing 3D chair' CVPR 14, calibration stage. Performs worse
 if param.b_calibrate
-  calibrated_detector_file_name = sprintf('%s_cal.mat', detector_name);
+  calibrated_detector_file_name = sprintf('%s_cal_%s.mat', detector_name, param.calibration_mode);
   if exist(calibrated_detector_file_name,'file')
     load(calibrated_detector_file_name);
   else
