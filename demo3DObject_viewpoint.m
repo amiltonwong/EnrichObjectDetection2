@@ -26,7 +26,7 @@ TEST_TYPE = 'val';
 SAVE_PATH = fullfile('Result',[LOWER_CASE_CLASS '_' TEST_TYPE]);
 if ~exist(SAVE_PATH,'dir'); mkdir(SAVE_PATH); end
 
-DEVICE_ID = 0; % 0-base indexing
+DEVICE_ID = 1; % 0-base indexing
 
 if COMPUTING_MODE > 0
   gdevice = gpuDevice(DEVICE_ID + 1); % Matlab use 1 base indexing
@@ -40,7 +40,7 @@ dyaw = 15;
 dfov = 20;
 
 azs = 0:7.5:352.5; 
-els = 0:10:30;
+els = 0:7.5;22.5;
 fovs = [25 50];
 yaws = 0;
 n_cell_limit = [250];
@@ -90,6 +90,10 @@ param.detection_mode = 'dwot';
 
 param.color_range = [-inf 120:10:300 inf];
 
+%% Deconvolve all
+% DATA_SET = [DATA_SET '_deconvolve_all'];
+param.whow_deconvolve_all = false;
+
 
 % For Debuggin purpose only
 % param.detectors              = detectors;
@@ -99,8 +103,8 @@ param.color_range = [-inf 120:10:300 inf];
 
 % detector name
 [ detector_model_name ] = dwot_get_detector_name(CLASS, SUB_CLASS, model_names, param);
-detector_name = sprintf('%s_%s_lim_%d_lam_%0.3f_a_%d_e_%d_y_%d_f_%d',...
-        LOWER_CASE_CLASS,  detector_model_name, n_cell_limit, lambda,...
+detector_name = sprintf('%s_%s_deconvall_%d_lim_%d_lam_%0.3f_a_%d_e_%d_y_%d_f_%d',...
+        LOWER_CASE_CLASS,  detector_model_name, param.whow_deconvolve_all, n_cell_limit, lambda,...
         numel(azs), numel(els), numel(yaws), numel(fovs));
 
 detector_file_name = sprintf('%s.mat', detector_name);

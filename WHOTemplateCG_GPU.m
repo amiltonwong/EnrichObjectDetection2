@@ -67,7 +67,13 @@ HOGTemplateSz = size(HOGTemplate);
 wHeight = HOGTemplateSz(1);
 wWidth = HOGTemplateSz(2);
 HOGDim = HOGTemplateSz(3);
-nonEmptyCells = (sum(abs(HOGTemplate),3) > hog_cell_threshold);
+
+if param.whow_deconvolve_all
+    nonEmptyCells = true(HOGTemplateSz(1), HOGTemplateSz(2));
+else
+    nonEmptyCells = (sum(abs(HOGTemplate),3) > hog_cell_threshold);
+end
+
 idxNonEmptyCells = find(nonEmptyCells);
 [nonEmptyRows,nonEmptyCols] = ind2sub([wHeight, wWidth], idxNonEmptyCells);
 nonEmptyRows = int32(nonEmptyRows);
@@ -86,6 +92,11 @@ AGPU = feval(param.scramble_kernel, SigmaGPU, param.hog_gamma_gpu, single(lambda
   
 muSwapDim = permute(Mu,[2 3 1]);
 centeredHOG = bsxfun(@minus, HOGTemplate, muSwapDim);
+
+if param.whow_deconvolve_all
+    centeredHOG = centeredHOG .* repmat(double(nonEmptyCells),[1 1 HOGDim]);
+end
+
 permHOG = permute(centeredHOG,[3 1 2]); % [HOGDim, Nrow, Ncol] = HOGDim, N1, N2
 onlyNonEmptyIdx = cell2mat(arrayfun(@(x) x + (1:HOGDim)', HOGDim * (idxNonEmptyCells - 1),'UniformOutput',false));
 nonEmptyHOG = permHOG(onlyNonEmptyIdx);

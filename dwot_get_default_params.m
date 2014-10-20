@@ -106,7 +106,7 @@ param.hog_cell_threshold  = 1.0;
 param.feature_dim         = 31;
 
 % Statistics
-stats = load('Statistics/sumGamma_N1_40_N2_40_sbin_4_nLevel_10_nImg_1601_napoli1_gamma.mat');
+stats = load('Statistics/sumGamma_N1_40_N2_40_sbin_4_nLevel_10_nImg_3601_napoli1_gamma.mat');
 
 param.hog_mu          = stats.mu;
 param.hog_gamma       = stats.Gamma;
