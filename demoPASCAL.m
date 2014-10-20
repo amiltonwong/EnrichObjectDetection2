@@ -359,7 +359,7 @@ if param.proposal_tuning_mode > 0
 end
 
 % If it runs on server copy to host
-if ~isempty(server_id)
+if ~isempty(server_id) && isempty(strmatch(server_id.num,'capri7'))
     for i = 1:numel(nms_thresholds)
         system(['scp ', fullfile(SAVE_PATH, ap_save_names{i}),...
             ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/',...

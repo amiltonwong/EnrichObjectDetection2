@@ -1,5 +1,6 @@
 [~, sys_host_name] = system('hostname');
 server_id = regexp(sys_host_name, '^napoli(?<num>\d+).*','names');
+fprintf('Using server %s\n', server_id.num);
 if strcmp(DATA_SET,'PASCAL')
     if isempty(server_id)
         VOC_PATH = '/home/chrischoy/Dataset/VOCdevkit/';

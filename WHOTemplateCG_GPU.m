@@ -55,7 +55,7 @@ paddedIm = padarray(im2double(im), [padding, padding, 0], 1);
 bbox = [1 1 size(im,2) size(im,1)] + padding;
 
 % TODO replace it
-if (param.template_initialization_mode == 0)
+if (param.template_initialization_mode == 0 || param.template_initialization_mode == 2)
   [HOGTemplate, scale] = dwot_initialize_template(paddedIm, bbox, param);
 else
   [HOGTemplate, scale] = dwot_initialize_template_const_active_cell(paddedIm, bbox, param);
@@ -68,9 +68,14 @@ wHeight = HOGTemplateSz(1);
 wWidth = HOGTemplateSz(2);
 HOGDim = HOGTemplateSz(3);
 
-if param.whow_deconvolve_all
+if wHeight > param.hog_gamma_cell_size(1) || wWidth > param.hog_gamma_cell_size(2)
+  error('Template dimension too large, create large Gamma matrix or decrese the number of cells per template');
+end
+
+% Decorrelate all HOG  cells
+if (param.template_initialization_mode == 2)
     nonEmptyCells = true(HOGTemplateSz(1), HOGTemplateSz(2));
-else
+else % Decorrelate only non-zero HOG cells
     nonEmptyCells = (sum(abs(HOGTemplate),3) > hog_cell_threshold);
 end
 
@@ -93,7 +98,7 @@ AGPU = feval(param.scramble_kernel, SigmaGPU, param.hog_gamma_gpu, single(lambda
 muSwapDim = permute(Mu,[2 3 1]);
 centeredHOG = bsxfun(@minus, HOGTemplate, muSwapDim);
 
-if param.whow_deconvolve_all
+if  (param.template_initialization_mode == 2)
     centeredHOG = centeredHOG .* repmat(double(nonEmptyCells),[1 1 HOGDim]);
 end
 

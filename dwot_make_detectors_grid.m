@@ -15,6 +15,7 @@ end
 % end
 
 i = 1;
+start_time = tic;
 detectors = cell(1,numel(azs) * numel(els) * numel(fovs));
 for model_index = model_indexes
   renderer.setModelIndex(model_index);
@@ -27,10 +28,8 @@ for model_index = model_indexes
           yawGT = yaws(yawIdx);
           fovGT = fovs(fovIdx);
 
-          tic
           detector = dwot_get_detector(renderer, azGT, elGT, yawGT, fovGT, model_index, 'not_supported_model_class', param);
-          toc;
-
+          
           detectors{i} = detector;
           % param.detector_table( dwot_detector_key(azGT, elGT, yawGT, fovGT) ) = i;
 
@@ -45,7 +44,13 @@ for model_index = model_indexes
 %            disp('press any button to continue');
 %            waitforbuttonpress;
           end
-          i = i + 1;    
+          i = i + 1;
+                    
+          if mod(i,20)==1
+              fprintf('average time : %0.2f sec\n', toc(start_time)/i);
+          else
+              fprintf('.');
+          end
         end
       end
     end

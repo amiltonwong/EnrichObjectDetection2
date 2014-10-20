@@ -14,7 +14,6 @@ addpath('3rdParty/SpacePlot');
 rng('default');
 DATA_SET = '3DObject';
 dwot_set_datapath;
-
 % Computing Mode  = 0, CPU
 %                 = 1, GPU
 %                 = 2, Combined
@@ -39,12 +38,12 @@ del = 15;
 dyaw = 15;
 dfov = 20;
 
-azs = 0:7.5:352.5; 
-els = 0:7.5;22.5;
+azs = 0:15:315; 
+els = 0:10:30;
 fovs = [25 50];
 yaws = 0;
 n_cell_limit = [250];
-lambda = [0.015];
+lambda = [0.02];
 detection_threshold = 80;
 
 visualize_detection = true;
@@ -57,11 +56,11 @@ n_proposals = 5;
 % Get all possible sub-classes
 [ model_names, model_paths ] = dwot_get_cad_models('Mesh', CLASS, SUB_CLASS, {'3ds'});
 
-% AccordIdx = ismember(model_names,'Honda-Accord-3');
-% model_names = model_names(AccordIdx);
-% file_paths = file_paths(AccordIdx);
-
+honda_idx = ismember(model_names,'Honda-Accord-3');
+model_names = model_names(honda_idx);
+model_paths = model_paths(honda_idx);
 %%%%%%%%%%%%%%% Set Parameters %%%%%%%%%%%%
+
 dwot_get_default_params;
 
 param.template_initialization_mode = 0; 
@@ -90,11 +89,6 @@ param.detection_mode = 'dwot';
 
 param.color_range = [-inf 120:10:300 inf];
 
-%% Deconvolve all
-% DATA_SET = [DATA_SET '_deconvolve_all'];
-param.whow_deconvolve_all = false;
-
-
 % For Debuggin purpose only
 % param.detectors              = detectors;
 % param.detect_pyramid_padding = 10;
@@ -103,8 +97,9 @@ param.whow_deconvolve_all = false;
 
 % detector name
 [ detector_model_name ] = dwot_get_detector_name(CLASS, SUB_CLASS, model_names, param);
-detector_name = sprintf('%s_%s_deconvall_%d_lim_%d_lam_%0.3f_a_%d_e_%d_y_%d_f_%d',...
-        LOWER_CASE_CLASS,  detector_model_name, param.whow_deconvolve_all, n_cell_limit, lambda,...
+
+detector_name = sprintf('%s_%s_lim_%d_lam_%0.3f_a_%d_e_%d_y_%d_f_%d',...
+        LOWER_CASE_CLASS, detector_model_name, n_cell_limit, lambda,...
         numel(azs), numel(els), numel(yaws), numel(fovs));
 
 detector_file_name = sprintf('%s.mat', detector_name);
@@ -152,21 +147,20 @@ if ~exist('renderer','var') || (~exist(detector_file_name,'file')  && param.prop
 end
 
 %% Make Detectors
-if ~exist('detectors','var')
-    if exist(detector_file_name,'file')
-        load(detector_file_name);
-    else
-        [detectors] = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_names),...
-            LOWER_CASE_CLASS, param, visualize_detector);
-        [detectors, detector_table]= dwot_make_table_from_detectors(detectors);
-        if sum(cellfun(@(x) isempty(x), detectors))
-          error('Detector Not Completed');
-        end
-        eval(sprintf(['save -v7.3 ' detector_file_name ' detectors detector_table']));
-        % detectors = dwot_make_detectors(renderer, azs, els, yaws, fovs, param, visualize_detector);
-        % eval(sprintf(['save ' detector_name ' detectors']));
+if exist(detector_file_name,'file')
+    load(detector_file_name);
+else
+    [detectors] = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_names),...
+        LOWER_CASE_CLASS, param, visualize_detector);
+    [detectors, detector_table]= dwot_make_table_from_detectors(detectors);
+    if sum(cellfun(@(x) isempty(x), detectors))
+      error('Detector Not Completed');
     end
+    eval(sprintf(['save -v7.3 ' detector_file_name ' detectors detector_table']));
+    % detectors = dwot_make_detectors(renderer, azs, els, yaws, fovs, param, visualize_detector);
+    % eval(sprintf(['save ' detector_name ' detectors']));
 end
+
 
 %% Calibrate detector. see param.b_calibrate
 % calibration mode == 'gaussian'
@@ -330,14 +324,14 @@ for imgIdx = 1:N_IMAGE
         drawnow;
         spaceplots();
         save_name = sprintf(['%s_img_%d.jpg'],...
-                      detection_tuning_result_common_name,...
+                      detection_result_common_name,...
                       imgIdx);
-        print('-djpeg','-r150',fullfile(SAVE_PATH, save_name));
+%         print('-djpeg','-r150',fullfile(SAVE_PATH, save_name));
         % save_name = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.png',...
         % DATA_SET, CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);
         % print('-dpng','-r150',['Result/' LOWER_CASE_CLASS '_' TYPE '/' save_name])
         
-        dwot_save_detection(bbsNMS_clip_per_template_nms_mat_nms, SAVE_PATH, detection_tuning_result_file, ...
+        dwot_save_detection(bbsNMS_clip_per_template_nms_mat_nms, SAVE_PATH, detection_result_file, ...
                            img_file_name, false, 1); % save mode != 0 to save template index
     end
     
@@ -348,7 +342,7 @@ end
 close all;  % space plot casues problem when using different subplot grid
 
 %% Vary NMS threshold
-nms_thresholds = 0.2 : 0.05 : 0.7;
+nms_thresholds = 0.2 : 0.05 : 0.6;
 ap = zeros(numel(nms_thresholds),1);
 ap_save_names = cell(numel(nms_thresholds),1);
 for i = 1:numel(nms_thresholds)
@@ -361,6 +355,25 @@ for i = 1:numel(nms_thresholds)
                         detection_result_common_name, nms_threshold);
 
      print('-dpng','-r150',fullfile(SAVE_PATH, ap_save_names{i}));
+end
+
+% If it runs on server copy to host
+if ~isempty(server_id) && isempty(strmatch(server_id.num,'capri7'))
+    for i = 1:numel(nms_thresholds)
+        system(['scp ', fullfile(SAVE_PATH, ap_save_names{i}),...
+            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/',...
+            LOWER_CASE_CLASS '_' TEST_TYPE]);
+    end
+    system(['scp ' fullfile(SAVE_PATH, detection_result_file),...
+        ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/']);
+    
+    if param.proposal_tuning_mode > 1
+        system(['scp ', fullfile(SAVE_PATH, ap_tuning_save_name),...
+            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/',...
+            LOWER_CASE_CLASS '_' TEST_TYPE]);
+        system(['scp ' fullfile(SAVE_PATH, detection_tuning_result_file),...
+            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/']);
+    end
 end
 
 

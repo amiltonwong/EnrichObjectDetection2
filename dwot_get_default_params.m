@@ -90,11 +90,15 @@ param.init_params = init_params;
 %% WHO setting
 % TEMPLATE_INITIALIZATION_MODE == 0
 %     Creates templates that have approximately same number of cells
+% and decorrelate cells with non zero HOG values
 % TEMPLATE_INITIALIZATION_MODE == 1
 %     Creates templates that have approxmiately same number of active cells
 % Active cells are the HOG cells whose absolute values is above the
 % HOG_CELL_THRESHOLD
-param.template_initialization_mode = 1; 
+% TEMPLATE_INITIALIZATION_MODE == 2
+%     Create templates that have approximately same number of cells but
+% decorrelate all cells even including zero HOG cells
+param.template_initialization_mode = 0; 
 param.image_padding       = 50;
 param.lambda              = lambda;
 param.n_level_per_octave  = n_level;
@@ -106,13 +110,13 @@ param.hog_cell_threshold  = 1.0;
 param.feature_dim         = 31;
 
 % Statistics
-stats = load('Statistics/sumGamma_N1_40_N2_40_sbin_4_nLevel_10_nImg_3601_napoli1_gamma.mat');
+stats = load('Statistics/sumGamma_N1_40_N2_40_sbin_4_nLevel_10_nImg_3601_napoli3_gamma.mat');
 
 param.hog_mu          = stats.mu;
 param.hog_gamma       = stats.Gamma;
-param.hog_gamma_gpu   = gpuArray(single(stats.Gamma));
-param.hog_gamma_dim   = size(stats.Gamma);
-param.hog_gamma_cell_size = size(stats.Gamma)/31;
+param.hog_gamma_gpu   = gpuArray(single(param.hog_gamma));
+param.hog_gamma_dim   = size(param.hog_gamma);
+param.hog_gamma_cell_size = size(param.hog_gamma)/31;
 
 %% GPU Setting
 param.device_id = DEVICE_ID;
