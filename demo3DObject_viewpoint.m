@@ -118,33 +118,6 @@ detector_name = sprintf('%s_%s_lim_%d_lam_%0.3f_a_%d_e_%d_y_%d_f_%d',...
 
 detector_file_name = sprintf('%s.mat', detector_name);
 
-%% Make empty detection save file
-detection_result_file = sprintf(['%s_%s_%s_%s_lim_%d_lam_%0.3f_a_%d_e_%d_y_%d_f_%d_scale_',...
-        '%0.2f_sbin_%d_level_%d_server_%s.txt'],...
-        DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda,...
-        numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin,...
-        n_level, server_id.num);
-
-% Check duplicate file name and return different name
-detection_result_file = dwot_save_detection([], SAVE_PATH, detection_result_file, [], true);
-detection_result_common_name = regexp(detection_result_file, '\/?(?<name>.+)\.txt','names');
-detection_result_common_name = detection_result_common_name.name;
-
-if param.proposal_tuning_mode > 0
-    detection_tuning_result_file = sprintf(['%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_',...
-        '%0.2f_sbin_%d_level_%d_nms_%0.2f_server_%s_tuning.txt'],...
-        DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda,...
-        numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin,...
-        n_level, param.nms_threshold, server_id.num);
-    
-    % Check duplicate file name and return different name
-    detection_tuning_result_file = dwot_save_detection([], SAVE_PATH, detection_tuning_result_file, [], true);
-    detection_tuning_result_common_name = regexp(detection_tuning_result_file, '\/?(?<name>.+)\.txt','names');
-    detection_tuning_result_common_name = detection_tuning_result_common_name.name;
-end
-
-fprintf('\nThe result will be saved on %s\n', detection_result_file);
-
 
 %% Make Renderer
 if ~exist('renderer','var') || (~exist(detector_file_name,'file')  && param.proposal_tuning_mode > 0)
@@ -183,10 +156,10 @@ end
 % calibration_mode == 'linear'
 %     follow 'Seeing 3D chair' CVPR 14, calibration stage. Performs worse
 if param.b_calibrate
-    
+
     %%%%%%%%%% Since we do not have VOCopt for 3DObject, embed the ugly
     % loading part
-    if isempty(server_id) || strmatch(server_id.num,'capri7')
+    if isempty(server_id) || ~isempty(strmatch(server_id.num,'capri7'))
         VOC_PATH = '/home/chrischoy/Dataset/VOCdevkit/';
     else
         VOC_PATH = '/scratch/chrischoy/Dataset/VOCdevkit/';
@@ -202,16 +175,44 @@ if param.b_calibrate
     VOCinit;
     eval(['cd ' curDir]);
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    
+
     detector_name = sprintf('%s_cal_%s',detector_name, param.calibration_mode);
-    if exist(detector_name,'file')
-        load(detector_name);
+    detector_file_name = sprintf('%s.mat', detector_name);
+    if exist(detector_file_name,'file')
+        load(detector_file_name);
     else
         detectors = dwot_calibrate_detectors(detectors, LOWER_CASE_CLASS, VOCopts, param);
-        eval(sprintf(['save -v7.3 ' detector_name ' detectors']));
+        eval(sprintf(['save -v7.3 ' detector_file_name ' detectors']));
     end
     param.detectors = detectors;
 end
+
+
+%% Make empty detection save file
+detection_result_file = sprintf(['%s_%s_scale_',...
+        '%0.2f_sbin_%d_level_%d_server_%s.txt'],...
+        DATA_SET, detector_name, param.image_scale_factor, sbin,...
+        n_level, server_id.num);
+
+% Check duplicate file name and return different name
+detection_result_file = dwot_save_detection([], SAVE_PATH, detection_result_file, [], true);
+detection_result_common_name = regexp(detection_result_file, '\/?(?<name>.+)\.txt','names');
+detection_result_common_name = detection_result_common_name.name;
+
+if param.proposal_tuning_mode > 0
+    detection_tuning_result_file = sprintf(['%s_%s_scale_',...
+        '%0.2f_sbin_%d_level_%d_server_%s_tuning.txt'],...
+        DATA_SET, detector_name, param.image_scale_factor, sbin,...
+        n_level, param.nms_threshold, server_id.num);
+
+    % Check duplicate file name and return different name
+    detection_tuning_result_file = dwot_save_detection([], SAVE_PATH, detection_tuning_result_file, [], true);
+    detection_tuning_result_common_name = regexp(detection_tuning_result_file, '\/?(?<name>.+)\.txt','names');
+    detection_tuning_result_common_name = detection_tuning_result_common_name.name;
+end
+
+fprintf('\nThe result will be saved on %s\n', detection_result_file);
+
 
 %%%%% For Debuggin purpose only
 param.detectors              = detectors;

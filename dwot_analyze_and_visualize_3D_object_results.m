@@ -29,7 +29,7 @@ detection_name = detection_param_name{1}{1};
 [gt, image_path] = dwot_3d_object_dataset(DATA_PATH, CLASS);
 
 % Find image scaling factor
-temp = regexp(detection_result_txt,'\d_scale_([\d+.]+)','tokens');
+temp = regexp(detection_result_txt,'_scale_([\d+.]+)','tokens');
 image_scale_factor = str2double(temp{1});
 
 

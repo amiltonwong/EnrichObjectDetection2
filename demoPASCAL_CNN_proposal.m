@@ -34,10 +34,10 @@ dyaw = 10;
 
 azs = 0:15:345; % azs = [azs , azs - 10, azs + 10];
 els = 0:20:20;
-fovs = [25 50];
+fovs = [25];
 yaws = 0;
-n_cell_limit = [300];
-lambda = [0.015];
+n_cell_limit = [250];
+lambda = [0.15];
 detection_threshold = 80;
 
 visualize_detection = true;
@@ -86,14 +86,14 @@ param.b_calibrate = 0;      % apply callibration if > 0
 param.n_calibration_images = 100; 
 param.calibration_mode = 'gaussian';
 
-param.detection_threshold = 80;
+param.detection_threshold = 30;
 param.image_scale_factor = 2; % scale image accordingly and detect on the scaled image
 
 % Tuning mode == 'none', no tuning
 %             == 'mcm', MCMC
 %             == 'not supported yet', Breadth first search
 %             == 'bfgs', Quasi-Newton method (BFGS)
-param.proposal_tuning_mode = 'mcmc';
+param.proposal_tuning_mode = 'none';
 
 % Detection mode == 'dwot' ours
 %                == 'cnn'
@@ -103,8 +103,8 @@ param.detection_mode = 'cnn';
 % image_region_extraction.padding_ratio = 0.2;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-param.color_range = [-inf 120:10:300 inf];
-cnn_color_range = [ -inf -4:0.1:3 inf];
+param.color_range = [-inf 20:5:100 inf];
+param.cnn_color_range = [ -inf -4:0.1:3 inf];
 
 % detector name
 [ detector_model_name ] = dwot_get_detector_name(CLASS, SUB_CLASS, model_names, param);
@@ -116,11 +116,9 @@ detector_file_name = sprintf('%s.mat', detector_name);
 
 %% Make empty detection save file
 % if ~isempty(strmatch(param.detection_mode,'dwot'))
-detection_result_file = sprintf(['%s_%s_%s_%s_%s_lim_%d_lam_%0.3f_a_%d_e_%d_y_%d_f_%d_scale_',...
+detection_result_file = sprintf(['%s_%s_scale_',...
         '%0.2f_sbin_%d_level_%d_skp_%s_server_%s.txt'],...
-        DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, param.detection_mode,...
-        n_cell_limit, lambda,...
-        numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin,...
+        DATA_SET, detector_name, param.image_scale_factor, sbin,...
         n_level, skip_name, server_id.num);
 
 % Check duplicate file name and return different name
@@ -129,13 +127,22 @@ detection_result_common_name = regexp(detection_result_file, '\/?(?<name>.+)\.tx
 detection_result_common_name = detection_result_common_name.name;
 fprintf('\nThe result will be saved on %s\n',detection_result_file);
 
+% For detection right after the 
+detection_dwot_proposal_result_file = sprintf(['%s_%s_scale_',...
+        '%0.2f_sbin_%d_level_%d_skp_%s_server_%s_cnn_proposal_dwot.txt'],...
+        DATA_SET, detector_name, param.image_scale_factor, sbin,...
+        n_level, skip_name, server_id.num);
+
+% Check duplicate file name and return different name
+detection_dwot_proposal_result_file = dwot_save_detection([], SAVE_PATH, detection_dwot_proposal_result_file, [], true);
+fprintf('\nThe result will be saved on %s\n',detection_dwot_proposal_result_file);
+
+
 % If tuning mode is defined and not none.
-if isfield(param,'proposal_tuning_mode') && isempty(strmatch(param.proposal_tuning_mode,'none'))
-    detection_tuning_result_file = sprintf(['%s_%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_',...
+if isfield(param,'proposal_tuning_mode') && ~strcmp(param.proposal_tuning_mode,'none')
+    detection_tuning_result_file = sprintf(['%s_%s_scale_',...
         '%0.2f_sbin_%d_level_%d_skp_%s_server_%s_tuning_%s.txt'],...
-        DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, param.detection_mode,...
-        n_cell_limit, lambda,...
-        numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin,...
+        DATA_SET, detector_name, param.image_scale_factor, sbin,...
         n_level, skip_name, server_id.num, param.proposal_tuning_mode);
     
     % Check duplicate file name and return different name
@@ -148,7 +155,7 @@ end
 
 
 %% Make Renderer
-if ~exist('renderer','var') || (~exist(detector_file_name,'file')  && param.proposal_tuning_mode > 0)
+if ~strcmp(param.proposal_tuning_mode, 'none') && (~exist('renderer','var') || ~exist(detector_file_name,'file') )
     % Initialize renderer
     renderer = Renderer();
     if ~renderer.initialize(model_paths, 700, 700, 0, 0, 0, 0, 25)
@@ -157,20 +164,19 @@ if ~exist('renderer','var') || (~exist(detector_file_name,'file')  && param.prop
 end
 
 %% Make Detectors
-if ~exist('detectors','var')
-    if exist(detector_file_name,'file')
-        load(detector_file_name);
-    else
-        [detectors] = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_names),...
-            LOWER_CASE_CLASS, param, visualize_detector);
-        [detectors, detector_table]= dwot_make_table_from_detectors(detectors);
-        if sum(cellfun(@(x) isempty(x), detectors))
-          error('Detector Not Completed');
-        end
-        eval(sprintf(['save -v7.3 ' detector_file_name ' detectors detector_table']));
-        % detectors = dwot_make_detectors(renderer, azs, els, yaws, fovs, param, visualize_detector);
-        % eval(sprintf(['save ' detector_name ' detectors']));
+
+if exist(detector_file_name,'file')
+    load(detector_file_name);
+else
+    [detectors] = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_names),...
+        LOWER_CASE_CLASS, param, visualize_detector);
+    [detectors, detector_table]= dwot_make_table_from_detectors(detectors);
+    if sum(cellfun(@(x) isempty(x), detectors))
+      error('Detector Not Completed');
     end
+    eval(sprintf(['save -v7.3 ' detector_file_name ' detectors detector_table']));
+    % detectors = dwot_make_detectors(renderer, azs, els, yaws, fovs, param, visualize_detector);
+    % eval(sprintf(['save ' detector_name ' detectors']));
 end
 
 %%%%% For Debugging
@@ -185,16 +191,16 @@ param.detect_pyramid_padding = 10;
 % The GPU templates accelerates the computation time since it is already loaded
 % on GPU.
 if COMPUTING_MODE == 0
-  % for CPU convolution, use fconvblas which handles template inversion
-  templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
+    % for CPU convolution, use fconvblas which handles template inversion
+    templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
 elseif COMPUTING_MODE == 1
-  % for GPU convolution, we use FFT based convolution. invert template
-  templates_gpu = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
+    % for GPU convolution, we use FFT based convolution. invert template
+    templates_gpu = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
 elseif COMPUTING_MODE == 2
-  templates_gpu = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
-  templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
+    templates_gpu = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
+    templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
 else
-  error('Computing mode undefined');
+    error('Computing mode undefined');
 end
 
 template_size = cell2mat(cellfun(@(x) (x.sz)', detectors,'uniformoutput',false));
@@ -211,7 +217,7 @@ end
 [gtids,t] = textread(sprintf(VOCopts.imgsetpath,[LOWER_CASE_CLASS '_' TEST_TYPE]),'%s %d');
 
 N_IMAGE = length(gtids);
-N_IMAGE = 1000;
+% N_IMAGE = 1000;
 
 clear gt;
 gt = struct('BB',[],'diff',[],'det',[]);
@@ -226,7 +232,7 @@ for img_idx=1:N_IMAGE
     % read annotation
     recs = PASreadrecord(sprintf(VOCopts.annopath, img_file_name));
     
-    clsinds = strmatch(LOWER_CASE_CLASS,{recs.objects(:).class},'exact');
+    clsinds = strmatch(LOWER_CASE_CLASS, {recs.objects(:).class},'exact');
 
     [skip_img, object_idx] = dwot_skip_criteria(recs.objects(clsinds), skip_criteria);
     
@@ -252,7 +258,7 @@ for img_idx=1:N_IMAGE
         fprintf('convolution time: %0.4f\n', toc(imgTic));
       case 'cnn'
         bounding_box_proposals = cnn_detection.detBoxes{cnn_class_idx}{img_idx};
-        bounding_box_proposals = bounding_box_proposals(find(bounding_box_proposals(:,end) > -0.2 ),:);
+        bounding_box_proposals = bounding_box_proposals(find(bounding_box_proposals(:,end) > -inf ),:);
         bbsAllLevel = double(bounding_box_proposals);
         bbsAllLevel(:,1:4) = param.image_scale_factor * bbsAllLevel(:,1:4);
       case 'dpm'
@@ -280,6 +286,7 @@ for img_idx=1:N_IMAGE
     end
     dwot_save_detection(temp, SAVE_PATH, detection_result_file, ...
                                  img_file_name, false, 0); 
+    
     [~, img_file_name] = fileparts(recs.imgname);
     % save mode != 0 to save template index
     
@@ -294,9 +301,9 @@ for img_idx=1:N_IMAGE
 %         print('-djpeg','-r150',fullfile(SAVE_PATH, save_name));
 %     end
     
-    %% Proposal Tuning
+    %% Proposal Detection
     n_proposals = min([n_max_proposals, size(bbsNMS,1) ]);
-    if  strmatch(param.proposal_tuning_mode,'mcmc') && n_proposals > 0
+    if  n_proposals > 0
         tuningTic = tic;
 
         bbs_tuning = cell(n_proposals , 1);
@@ -305,17 +312,12 @@ for img_idx=1:N_IMAGE
         for proposal_idx = 1:n_proposals
             bbox = bbsNMS(proposal_idx, :);
             
-            extraction_padding_ratio = 0.4;
+            extraction_padding_ratio = 0.3;
+            
+            [proposal_im, clip_padded_bbox, clip_padded_bbox_offset, width, height] =...
+                    dwot_extract_image_with_padding(im, bbox, extraction_padding_ratio, im_size);
 
-            clip_padded_bbox = dwot_clip_pad_bbox(bbox, extraction_padding_ratio, im_size);
-            clip_padded_bbox_offset = [clip_padded_bbox(1:2) clip_padded_bbox(1:2)]; % x and y coordinate
-            
-            width  = clip_padded_bbox(3)-clip_padded_bbox(1);
-            height = clip_padded_bbox(4)-clip_padded_bbox(2);
-            
-            % bbox_clip = clip_to_image(round(bbox), [1 1 im_size(2) im_size(1)]);
-            proposal_im = im(clip_padded_bbox(2):clip_padded_bbox(4), clip_padded_bbox(1):clip_padded_bbox(3), :);
-            
+            % Find right scale to search. Resize image if it's too small
             search_scale = max_template_size(1:2)' * sbin ./ [height width];
             proposal_resize_scale = 1;
             if max(search_scale) >= 0.7
@@ -323,111 +325,140 @@ for img_idx=1:N_IMAGE
                 proposal_im = imresize(proposal_im, proposal_resize_scale);
                 search_scale = search_scale ./ proposal_resize_scale;
             end
-
             param.detect_min_scale = min(1, min(search_scale) / 1.6);
             param.detect_max_scale = min(1, min(search_scale) * 1.6);
 
+            
+            % Detect object and get initial proposal regions
             [bbsAllLevel, hog, scales] = dwot_detect_gpu( proposal_im, templates_gpu, param);
+            
+            if numel(bbsAllLevel) == 0; continue; end;
+            
             bbsNMS_dwot_proposal = esvm_nms(bbsAllLevel,param.nms_threshold);
+            
+            % Save detection result
+            save_bbs_nms = esvm_nms(bbsAllLevel,0.7);
+            save_bbs_nms(:,1:4) = bsxfun(@plus, save_bbs_nms(:,1:4)/proposal_resize_scale, clip_padded_bbox_offset);
+            dwot_save_detection(save_bbs_nms, SAVE_PATH, detection_dwot_proposal_result_file, ...
+                                  img_file_name, false, 1); % save mode != 0 to save template index
+                              
             n_detection_per_proposal = size( bbsNMS_dwot_proposal, 1);
             n_tuning_per_proposal = min(n_max_tuning, n_detection_per_proposal);
 
-            if n_tuning_per_proposal == 0; fprintf('no detection'); continue; end;
-            
-%             if visualize_detection
-%                 dwot_draw_overlap_rendering(proposal_im, bbsNMS_dwot_proposal, detectors, n_tuning_per_proposal, 10,...
-%                                     visualize_detection, [0.5, 0.5, 0], param.color_range  );
-%             end
+            % Fine tuning
+            if strcmp(param.proposal_tuning_mode,'mcmc') 
+                if n_tuning_per_proposal == 0; fprintf('no detection'); continue; end;
 
-            [hog_region_pyramids, im_regions] = dwot_extract_hog(hog, scales, detectors, ...
-                                                 bbsNMS_dwot_proposal(1:n_tuning_per_proposal ,:), param, proposal_im);
-            [best_proposal_tunings] = dwot_mcmc_proposal_region(renderer, hog_region_pyramids, im_regions,...
-                                             detectors, param, im, false);
-            
-            fprintf(' tuning time : %0.4f\n', toc(tuningTic));
-            
-            % Sort the scores 
-            [~, tuning_sorting_idx] = sort(cellfun(@(x) x.score, best_proposal_tunings),'descend');         
-            best_proposal_tunings = best_proposal_tunings(tuning_sorting_idx);
-            bbsNMS_dwot_proposal = bbsNMS_dwot_proposal(tuning_sorting_idx,:);
-            bbs_tuning_per_proposal = zeros(n_tuning_per_proposal,12);
-            
-            % For each of the proposal 
-            for detection_per_proposal_idx = n_tuning_per_proposal:-1:1
-                
-                % fill out the box proposal infomation
-                bbs_tuning_per_proposal(detection_per_proposal_idx, 1:4) = best_proposal_tunings{detection_per_proposal_idx}.image_bbox;
-                bb_clip = clip_to_image(bbs_tuning_per_proposal(detection_per_proposal_idx, :), [1 1 im_size(2) im_size(1)]);
-                bb_clip = dwot_compute_positives(bb_clip, gt, param);
-                bbs_tuning_per_proposal(detection_per_proposal_idx, 9) = bb_clip(9);
-                bbs_tuning_per_proposal(detection_per_proposal_idx, 12) = best_proposal_tunings{detection_per_proposal_idx}.score;
-                bbs_tuning_per_proposal(detection_per_proposal_idx, 11) = 1;
+                [hog_region_pyramids, im_regions] = dwot_extract_hog(hog, scales, detectors, ...
+                                                     bbsNMS_dwot_proposal(1:n_tuning_per_proposal ,:), param, proposal_im);
+                [best_proposal_tunings] = dwot_mcmc_proposal_region(renderer, hog_region_pyramids, im_regions,...
+                                                 detectors, param, im, false);
 
-%                 dwot_visualize_proposal_tuning(bbsNMS_dwot(detection_per_proposal_idx,:), bbs_tuning_per_proposal(detection_per_proposal_idx,:), ...
-%                                                 best_proposal_tunings{detection_per_proposal_idx}, proposal_im, detectors, param);
-%                                             
-                bbs_temp = bbsNMS_dwot_proposal(detection_per_proposal_idx,:);
-                bbs_temp(1:4) = bbs_temp(1:4)/proposal_resize_scale + clip_padded_bbox_offset;
-                bbs_tuning_temp = bbs_tuning_per_proposal(detection_per_proposal_idx,:);
-                bbs_tuning_temp(1:4) = bbs_tuning_temp(1:4)/proposal_resize_scale + clip_padded_bbox_offset;
+                fprintf(' tuning time : %0.4f\n', toc(tuningTic));
 
-%                 try
-%                     clf;
-%                 end
-                % Plot original image with GT bounding box
-                subplot(221);
-                dwot_visualize_result;
-                %     rectangle('position',dwot_bbox_xy_to_wh(GT_bbox),'edgecolor',[0.7 0.7 0.7],'LineWidth',3);
-                %     rectangle('position',dwot_bbox_xy_to_wh(GT_bbox),'edgecolor',[0   0   0.6],'LineWidth',2);
+                % Sort the scores 
+                [~, tuning_sorting_idx] = sort(cellfun(@(x) x.score, best_proposal_tunings),'descend');         
+                best_proposal_tunings = best_proposal_tunings(tuning_sorting_idx);
+                bbsNMS_dwot_proposal = bbsNMS_dwot_proposal(tuning_sorting_idx,:);
+                bbs_tuning_per_proposal = zeros(n_tuning_per_proposal,12);
 
-                % Plot proposal bbox 
-                subplot(222);
-                dwot_draw_overlap_rendering(proposal_im, bbsNMS_dwot_proposal(detection_per_proposal_idx,:), detectors, n_tuning_per_proposal, 10,...
-                                    visualize_detection, [0.3, 0.7, 0], param.color_range , 1 );
-                                
-                % dwot_draw_overlap_rendering(im, bbs_temp, detectors, 1, 50, true, [0.5, 0.5, 0] , param.color_range );
-                % axis equal; axis tight;
+                % For each of the proposal 
+                for detection_per_proposal_idx = n_tuning_per_proposal:-1:1
 
-                % Plot tuned bbox
-                subplot(223);
-                dwot_draw_overlap_rendering(proposal_im, bbs_tuning_per_proposal(detection_per_proposal_idx,:), {best_proposal_tunings{detection_per_proposal_idx}}, n_tuning_per_proposal, 10,...
-                                    visualize_detection, [0.3, 0.7, 0], param.color_range , 1 );
-                % dwot_draw_overlap_rendering(im, bbsProposal, {best_proposal}, 1, 50, true, [0.1, 0.9, 0] , param.color_range );
-                % axis equal; axis tight;
+                    % fill out the box proposal infomation
+                    bbs_tuning_per_proposal(detection_per_proposal_idx, 1:4) = best_proposal_tunings{detection_per_proposal_idx}.image_bbox;
+                    bb_clip = clip_to_image(bbs_tuning_per_proposal(detection_per_proposal_idx, :), [1 1 im_size(2) im_size(1)]);
+                    bb_clip = dwot_compute_positives(bb_clip, gt, param);
+                    bbs_tuning_per_proposal(detection_per_proposal_idx, 9) = bb_clip(9);
+                    bbs_tuning_per_proposal(detection_per_proposal_idx, 12) = best_proposal_tunings{detection_per_proposal_idx}.score;
+                    bbs_tuning_per_proposal(detection_per_proposal_idx, 11) = 1;
+
+                                      
+                    bbs_temp = bbsNMS_dwot_proposal(detection_per_proposal_idx,:);
+                    bbs_temp(1:4) = bbs_temp(1:4)/proposal_resize_scale + clip_padded_bbox_offset;
+                    bbs_tuning_temp = bbs_tuning_per_proposal(detection_per_proposal_idx,:);
+                    bbs_tuning_temp(1:4) = bbs_tuning_temp(1:4)/proposal_resize_scale + clip_padded_bbox_offset;
+
+                    % Plot original image with GT bounding box
+                    subplot(221);
+                    dwot_visualize_result;
+                    %     rectangle('position',dwot_bbox_xy_to_wh(GT_bbox),'edgecolor',[0.7 0.7 0.7],'LineWidth',3);
+                    %     rectangle('position',dwot_bbox_xy_to_wh(GT_bbox),'edgecolor',[0   0   0.6],'LineWidth',2);
+
+                    % Plot proposal bbox 
+                    subplot(222);
+                    dwot_draw_overlap_rendering(proposal_im, bbsNMS_dwot_proposal(detection_per_proposal_idx,:), detectors, n_tuning_per_proposal, 10,...
+                                        visualize_detection, [0.3, 0.7, 0], param.color_range , 1 );
+
+                    % dwot_draw_overlap_rendering(im, bbs_temp, detectors, 1, 50, true, [0.5, 0.5, 0] , param.color_range );
+                    % axis equal; axis tight;
+
+                    % Plot tuned bbox
+                    subplot(223);
+                    dwot_draw_overlap_rendering(proposal_im, bbs_tuning_per_proposal(detection_per_proposal_idx,:), {best_proposal_tunings{detection_per_proposal_idx}}, n_tuning_per_proposal, 10,...
+                                        visualize_detection, [0.3, 0.7, 0], param.color_range , 1 );
+                    % dwot_draw_overlap_rendering(im, bbsProposal, {best_proposal}, 1, 50, true, [0.1, 0.9, 0] , param.color_range );
+                    % axis equal; axis tight;
 
 
-                subplot(224);
-                dwot_draw_overlap_rendering(im, bbs_tuning_temp, {best_proposal_tunings{detection_per_proposal_idx}}, n_tuning_per_proposal, 10,...
-                                    visualize_detection, [0.3, 0.7, 0], param.color_range , 1 );
-                                
+                    subplot(224);
+                    dwot_draw_overlap_rendering(im, bbs_tuning_temp, {best_proposal_tunings{detection_per_proposal_idx}}, n_tuning_per_proposal, 10,...
+                                        visualize_detection, [0.3, 0.7, 0], param.color_range , 1 );
+
 %                 dwot_draw_overlap_rendering(proposal_im, bbs_tuning_per_proposal(detection_per_proposal_idx,:),...
 %                         {best_proposal_tunings{detection_per_proposal_idx}}, 1, 50, true, [0.3, 0.7, 0] , param.color_range );
 %                 axis equal; axis tight;
 %                 dwot_visualize_proposal_tuning(bbs_temp, bbs_tuning_temp, ...
 %                                                 best_proposal_tunings{detection_per_proposal_idx}, im, detectors, param);
-                spaceplots();
-                drawnow;
-                save_name = sprintf(['%s_img_%d_prop_%d_%d.jpg'],...
-                          detection_tuning_result_common_name, img_idx, proposal_idx, detection_per_proposal_idx);
+                    spaceplots();
+                    drawnow;
+                    save_name = sprintf(['%s_img_%d_prop_%d_%d.jpg'],...
+                              detection_tuning_result_common_name, img_idx, proposal_idx, detection_per_proposal_idx);
+                    print('-djpeg','-r150',fullfile(SAVE_PATH, save_name));
+                end
+
+                bbs_tuning{proposal_idx} = bbs_tuning_per_proposal;
+
+                % Modify to save into valid image coord
+                bbs_tuning{proposal_idx}(:,1:4) = bbs_tuning_per_proposal(:,1:4)/proposal_resize_scale + repmat(clip_padded_bbox_offset,n_tuning_per_proposal,1);
+                bbs_tuning{proposal_idx}(:,12)  = bbs_tuning_per_proposal(:,end);
+                             
+            else
+                % Draw original image and proposal region
+                subplot(121);
+                imagesc(im);
+                dwot_draw_bounding_box(bbsNMS(proposal_idx,:), param);
+                
+                % Plot proposal bbox 
+                subplot(122);
+                dwot_draw_overlap_rendering(im, esvm_nms(save_bbs_nms, param.nms_threshold), detectors, 3, 0,...
+                                    visualize_detection, [0.3, 0.7, 0], param.color_range , 1 );
+                save_name = sprintf(['%s_img_%d_prop_%d.jpg'], detection_tuning_result_common_name,...
+                                    img_idx, proposal_idx);
                 print('-djpeg','-r150',fullfile(SAVE_PATH, save_name));
             end
-            
-            bbs_tuning{proposal_idx} = bbs_tuning_per_proposal;
-
-            % Modify to save into valid image coord
-            bbs_tuning{proposal_idx}(:,1:4) = bbs_tuning_per_proposal(:,1:4)/proposal_resize_scale + repmat(clip_padded_bbox_offset,n_tuning_per_proposal,1);
-            bbs_tuning{proposal_idx}(:,12)  = bbs_tuning_per_proposal(:,end);
-            
         end
-        
-        bbs_tuning_mat = cell2mat(bbs_tuning);
-        bbs_tuning_mat_nms  = esvm_nms(bbs_tuning_mat , param.nms_threshold);
-    else   
+
+        % If tuning, save the final result after NMS
+        if strcmp(param.proposal_tuning_mode,'mcmc') 
+            bbs_tuning_mat_nms = esvm_nms(cell2mat(bbs_tuning), param.nms_threshold);
+            if numel(bbs_tuning_mat_nms) == 0
+                bbs_tuning_mat_nms = zeros(1,12);
+                bbs_tuning_mat_nms(12) = -inf;
+            end
+            dwot_save_detection(bbs_tuning_mat_nms, SAVE_PATH, detection_tuning_result_file, ...
+                                img_file_name, false, 1); % save mode != 0 to save template index
+        end
+    else
+        % If there is no proposal detection make dummy detection and save
         bbs_tuning_mat_nms = zeros(1,12);
         bbs_tuning_mat_nms(12) = -inf;
+        
+        if strcmp(param.proposal_tuning_mode,'mcmc') 
+             dwot_save_detection(bbs_tuning_mat_nms, SAVE_PATH, detection_tuning_result_file, ...
+                                         img_file_name, false, 1); % save mode != 0 to save template index
+        end             
     end
-    dwot_save_detection(bbs_tuning_mat_nms, SAVE_PATH, detection_tuning_result_file, ...
-                                 img_file_name, false, 1); % save mode != 0 to save template index
 end
 
 close all;  % space plot casues problem when using different subplot grid
@@ -448,6 +479,23 @@ for i = 1:numel(nms_thresholds)
 
      print('-dpng','-r150',fullfile(SAVE_PATH, ap_save_names{i}));
 end
+
+
+
+% Detection for regions before tuning
+for i = 1:numel(nms_thresholds)
+    nms_threshold = nms_thresholds(i);
+    ap(i) = dwot_analyze_and_visualize_pascal_results(fullfile(SAVE_PATH,detection_dwot_proposal_result_file), ...
+                        detectors, [], VOCopts, param, skip_criteria, param.color_range, ...
+                        nms_threshold, false);
+                        
+
+    ap_save_names{i} = sprintf(['AP_%s_nms_%0.2f.png'],...
+                        detection_dwot_proposal_result_file, nms_threshold);
+
+     print('-dpng','-r150',fullfile(SAVE_PATH, ap_save_names{i}));
+end
+
 
 if param.proposal_tuning_mode > 0
     ap_tuning = dwot_analyze_and_visualize_pascal_results(fullfile(SAVE_PATH,...
