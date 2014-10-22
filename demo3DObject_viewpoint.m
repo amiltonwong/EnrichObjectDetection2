@@ -34,17 +34,12 @@ if COMPUTING_MODE > 0
   cos(gpuArray(1));
 end
 
-daz = 45;
-del = 15;
-dyaw = 15;
-dfov = 20;
-
-azs = 0:45:315; 
+azs = 0:45:315;
 els = 0:20:20;
 fovs = [25 50];
 yaws = 0;
 n_cell_limit = [250];
-lambda = [0.02];
+lambda = [0.2];
 detection_threshold = 80;
 
 visualize_detection = true;
@@ -68,23 +63,25 @@ param.template_initialization_mode = 0;
 param.nms_threshold = 0.4;
 param.model_paths = model_paths;
 
-param.b_calibrate = 1;      % apply callibration if > 0
+param.b_calibrate = 0;      % apply callibration if > 0
 param.n_calibration_images = 100; 
 % Calibration mode == 'gaussian', fit gaussian
 %                  == 'linear' , put 0.01% of data to be above 1.
-param.calibration_mode = 'linear';
-if param.b_calibrate
-    switch param.calibration_mode
-      case 'gaussian'
-        param.color_range = [-inf 4:0.5:10 inf];
-        param.detection_threshold = 4;
-      case 'linear'
-        param.color_range = [-inf -0.2:0.1:3 inf];
-        param.detection_threshold = -0.2;
-    end
-else
-    param.color_range = [-inf 120:10:300 inf];
-    param.detection_threshold = 80;
+param.calibration_mode = 'none';
+
+switch param.calibration_mode
+  case 'gaussian'
+    param.color_range = [-inf 4:0.5:10 inf];
+    param.detection_threshold = 4;
+    param.b_calibrate = 1;
+  case 'linear'
+    param.color_range = [-inf -0.2:0.1:3 inf];
+    param.detection_threshold = -0.2;
+    param.b_calibrate = 1;
+  case 'none'
+    param.color_range = [-inf 30:5:100 inf];
+    param.detection_threshold = 30;
+    param.b_calibrate = 0;
 end
 
 param.image_scale_factor = 1; % scale image accordingly and detect on the scaled image
@@ -189,21 +186,23 @@ end
 
 
 %% Make empty detection save file
-detection_result_file = sprintf(['%s_%s_scale_',...
-        '%0.2f_sbin_%d_level_%d_server_%s.txt'],...
-        DATA_SET, detector_name, param.image_scale_factor, sbin,...
-        n_level, server_id.num);
-
+detection_result_file = sprintf(['%s_%s_%s_%s_lim_%d_lam_%0.3f_a_%d_e_%d_y_%d_f_%d_scale_',...
+            '%0.2f_sbin_%d_level_%d_server_%s.txt'],...
+            DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda,...
+            numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin,...
+            n_level, server_id.num);
+        
 % Check duplicate file name and return different name
 detection_result_file = dwot_save_detection([], SAVE_PATH, detection_result_file, [], true);
 detection_result_common_name = regexp(detection_result_file, '\/?(?<name>.+)\.txt','names');
 detection_result_common_name = detection_result_common_name.name;
 
 if param.proposal_tuning_mode > 0
-    detection_tuning_result_file = sprintf(['%s_%s_scale_',...
-        '%0.2f_sbin_%d_level_%d_server_%s_tuning.txt'],...
-        DATA_SET, detector_name, param.image_scale_factor, sbin,...
-        n_level, param.nms_threshold, server_id.num);
+    detection_tuning_result_file = sprintf(['%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_',...
+            '%0.2f_sbin_%d_level_%d_nms_%0.2f_server_%s_tuning.txt'],...
+            DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda,...
+            numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin,...
+            n_level, param.nms_threshold, server_id.num);
 
     % Check duplicate file name and return different name
     detection_tuning_result_file = dwot_save_detection([], SAVE_PATH, detection_tuning_result_file, [], true);
@@ -334,6 +333,7 @@ for imgIdx = 1:N_IMAGE
 
     if visualize_detection
         tpIdx = logical(tp{imgIdx});
+        
         % Original images
         subplot(221);
         imagesc(im); axis off; axis equal;
@@ -341,13 +341,15 @@ for imgIdx = 1:N_IMAGE
         % True positives
         subplot(222);
         % dwot_draw_overlap_detection(im, bbsNMS_per_template_nms_mat_nms(tpIdx,:), renderings, inf, 50, visualize_detection, [0.2, 0.8, 0] );
-        im_temp = dwot_draw_overlap_rendering(im, bbsNMS_per_template_nms_mat_nms(tpIdx,:), detectors, inf, 50, false, [0.2, 0.8, 0], param.color_range, 1 );
+        im_temp = dwot_draw_overlap_rendering(im, bbsNMS_per_template_nms_mat_nms(tpIdx,:),...
+                            detectors, inf, 50, false, [0.2, 0.8, 0], param.color_range, 1 );
         imagesc(im_temp); axis off; axis equal; axis tight;
         
         % True positives
         subplot(223);
         % dwot_draw_overlap_detection(im, bbsNMS_per_template_nms_mat_nms(tpIdx,:), renderings, inf, 50, visualize_detection, [0.2, 0.8, 0] );
-        dwot_draw_overlap_rendering(im, bbsNMS_per_template_nms_mat_nms(tpIdx,:), detectors, inf, 50, visualize_detection, [0.2, 0.8, 0], param.color_range, 1  );
+        dwot_draw_overlap_rendering(im, bbsNMS_per_template_nms_mat_nms(tpIdx,:), detectors,...
+                            inf, 50, visualize_detection, [0.2, 0.8, 0], param.color_range, 1  );
         
         % Tuning Result
         % subplot(223);
@@ -355,13 +357,12 @@ for imgIdx = 1:N_IMAGE
         % False positives
         subplot(224);
         % dwot_draw_overlap_detection(im, bbsNMS_per_template_nms_mat_nms(~tpIdx,:), renderings, n_proposals, 50, visualize_detection);
-
-        dwot_draw_overlap_rendering(im, bbsNMS_per_template_nms_mat_nms(~tpIdx,:), detectors, 5, 50, visualize_detection, [0.2, 0.8, 0], param.color_range, 1  );
+        dwot_draw_overlap_rendering(im, bbsNMS_per_template_nms_mat_nms(~tpIdx,:), detectors,...
+                            5, 50, visualize_detection, [0.2, 0.8, 0], param.color_range, 1  );
+        
         drawnow;
         spaceplots();
-        save_name = sprintf(['%s_img_%d.jpg'],...
-                      detection_result_common_name,...
-                      imgIdx);
+        save_name = sprintf('%s_img_%d.jpg', detection_result_common_name, imgIdx);
 %         print('-djpeg','-r150',fullfile(SAVE_PATH, save_name));
         % save_name = sprintf('%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_imgIdx_%d.png',...
         % DATA_SET, CLASS, TYPE, detector_model_name, n_cell_limit, lambda, numel(azs), numel(els), numel(yaws), numel(fovs),imgIdx);

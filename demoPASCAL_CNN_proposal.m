@@ -116,10 +116,11 @@ detector_file_name = sprintf('%s.mat', detector_name);
 
 %% Make empty detection save file
 % if ~isempty(strmatch(param.detection_mode,'dwot'))
-detection_result_file = sprintf(['%s_%s_scale_',...
-        '%0.2f_sbin_%d_level_%d_skp_%s_server_%s.txt'],...
-        DATA_SET, detector_name, param.image_scale_factor, sbin,...
-        n_level, skip_name, server_id.num);
+detection_result_file = sprintf(['%s_%s_%s_%s_lim_%d_lam_%0.3f_a_%d_e_%d_y_%d_f_%d_scale_',...
+            '%0.2f_sbin_%d_level_%d_server_%s.txt'],...
+            DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda,...
+            numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin,...
+            n_level, server_id.num);
 
 % Check duplicate file name and return different name
 detection_result_file = dwot_save_detection([], SAVE_PATH, detection_result_file, [], true);
@@ -128,10 +129,11 @@ detection_result_common_name = detection_result_common_name.name;
 fprintf('\nThe result will be saved on %s\n',detection_result_file);
 
 % For detection right after the 
-detection_dwot_proposal_result_file = sprintf(['%s_%s_scale_',...
-        '%0.2f_sbin_%d_level_%d_skp_%s_server_%s_cnn_proposal_dwot.txt'],...
-        DATA_SET, detector_name, param.image_scale_factor, sbin,...
-        n_level, skip_name, server_id.num);
+detection_dwot_proposal_result_file = sprintf(['%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_',...
+            '%0.2f_sbin_%d_level_%d_nms_%0.2f_server_%s_cnn_proposal_dwot.txt'],...
+            DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda,...
+            numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin,...
+            n_level, param.nms_threshold, server_id.num);
 
 % Check duplicate file name and return different name
 detection_dwot_proposal_result_file = dwot_save_detection([], SAVE_PATH, detection_dwot_proposal_result_file, [], true);
@@ -140,11 +142,12 @@ fprintf('\nThe result will be saved on %s\n',detection_dwot_proposal_result_file
 
 % If tuning mode is defined and not none.
 if isfield(param,'proposal_tuning_mode') && ~strcmp(param.proposal_tuning_mode,'none')
-    detection_tuning_result_file = sprintf(['%s_%s_scale_',...
-        '%0.2f_sbin_%d_level_%d_skp_%s_server_%s_tuning_%s.txt'],...
-        DATA_SET, detector_name, param.image_scale_factor, sbin,...
-        n_level, skip_name, server_id.num, param.proposal_tuning_mode);
-    
+    detection_tuning_result_file = sprintf(['%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_',...
+            '%0.2f_sbin_%d_level_%d_nms_%0.2f_server_%s_tuning.txt'],...
+            DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda,...
+            numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin,...
+            n_level, param.nms_threshold, server_id.num);
+        
     % Check duplicate file name and return different name
     detection_tuning_result_file = dwot_save_detection([], SAVE_PATH, detection_tuning_result_file, [], true);
     detection_tuning_result_common_name = regexp(detection_tuning_result_file, '\/?(?<name>.+)\.txt','names');
@@ -155,7 +158,7 @@ end
 
 
 %% Make Renderer
-if ~strcmp(param.proposal_tuning_mode, 'none') && (~exist('renderer','var') || ~exist(detector_file_name,'file') )
+if ~strcmp(param.proposal_tuning_mode, 'none') || (~exist('renderer','var') || ~exist(detector_file_name,'file') )
     % Initialize renderer
     renderer = Renderer();
     if ~renderer.initialize(model_paths, 700, 700, 0, 0, 0, 0, 25)
@@ -276,14 +279,22 @@ for img_idx=1:N_IMAGE
     
     bbsNMS = esvm_nms(bbsAllLevel, param.nms_threshold);
     % Automatically sort them according to the score and apply NMS
-    bbsNMS_clip = clip_to_image(bbsNMS, [1 1 im_size(2) im_size(1)]);
-    [ bbsNMS_clip, tp ] = dwot_compute_positives(bbsNMS_clip, gt, param);
-    if size(bbsNMS,1) == 0
+%     bbsNMS_clip = clip_to_image(bbsNMS, [1 1 im_size(2) im_size(1)]);
+%     [ bbsNMS_clip, tp ] = dwot_compute_positives(bbsNMS_clip, gt, param);
+    
+    if numel(bbsNMS) == 0 
         temp = zeros(1,5);
         temp( end ) = -inf;
     else
-        temp = bbsNMS;
+        bbsNMS = bbsNMS((bbsNMS(:,end) > -1),:);
+        if numel(bbsNMS) == 0 
+            temp = zeros(1,5);
+            temp( end ) = -inf;
+        else
+            temp = bbsNMS;
+        end
     end
+    
     dwot_save_detection(temp, SAVE_PATH, detection_result_file, ...
                                  img_file_name, false, 0); 
     
@@ -454,6 +465,9 @@ for img_idx=1:N_IMAGE
         bbs_tuning_mat_nms = zeros(1,12);
         bbs_tuning_mat_nms(12) = -inf;
         
+        dwot_save_detection(bbs_tuning_mat_nms, SAVE_PATH, detection_dwot_proposal_result_file, ...
+                                  img_file_name, false, 1);
+                              
         if strcmp(param.proposal_tuning_mode,'mcmc') 
              dwot_save_detection(bbs_tuning_mat_nms, SAVE_PATH, detection_tuning_result_file, ...
                                          img_file_name, false, 1); % save mode != 0 to save template index
@@ -490,8 +504,8 @@ for i = 1:numel(nms_thresholds)
                         nms_threshold, false);
                         
 
-    ap_save_names{i} = sprintf(['AP_%s_nms_%0.2f.png'],...
-                        detection_dwot_proposal_result_file, nms_threshold);
+    ap_save_names{i} = sprintf(['AP_%s_cnn_proposal_dwot_nms_%0.2f.png'],...
+                        detection_result_common_name, nms_threshold);
 
      print('-dpng','-r150',fullfile(SAVE_PATH, ap_save_names{i}));
 end

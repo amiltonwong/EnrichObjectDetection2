@@ -1,7 +1,7 @@
-param.azimuth_discretization 	= daz;
-param.elevation_discretization  = del;
-param.yaw_discretization		= dyaw;
-param.fov_discretization		= dfov;
+% param.azimuth_discretization 	= daz;
+% param.elevation_discretization  = del;
+% param.yaw_discretization		= dyaw;
+% param.fov_discretization		= dfov;
 
 param.azimuths 		= azs;
 param.elevations 	= els;

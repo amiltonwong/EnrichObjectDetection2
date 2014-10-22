@@ -82,7 +82,7 @@ for unique_image_from_detection_idx=1:n_unique_files
     % if dwot_skip_criteria(recs.objects(clsinds), skip_criteria); continue; end
     imgIdx = find(cellfun(@(x) ~isempty(strfind(x,file_name)), image_path));
     im = imread([image_path{imgIdx}]);
-    img_file_name = regexp(image_path{imgIdx}, '\/(car_\d+\/\w+)\.','tokens');
+    img_file_name = regexp(image_path{imgIdx}, [ '\/(' LOWER_CASE_CLASS '_\d+\/\w+)\.'],'tokens');
     img_file_name = img_file_name{1}{1};
     imSz = size(im);
 
@@ -92,12 +92,18 @@ for unique_image_from_detection_idx=1:n_unique_files
 %     gt{imgIdx}.det = zeros(length(clsinds),1);
 
 
-    bbs = [ detection.bbox(curr_file_idx,:) zeros(nnz(curr_file_idx),6) detection.detector_idx(curr_file_idx,:) detection.score(curr_file_idx)];
+    bbs = [ detection.bbox(curr_file_idx,:) zeros(nnz(curr_file_idx),6)...
+                            detection.detector_idx(curr_file_idx,:) detection.score(curr_file_idx)];
     bbsNMS = esvm_nms(bbs, nms_threshold);
 
     bbsNMS_clip = clip_to_image(bbsNMS, [1 1 imSz(2) imSz(1)]);
     [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, detScore{imgIdx}, gt{imgIdx}] = ...
                     dwot_compute_positives(bbsNMS_clip, gt{imgIdx}, param);
+                
+    [bbsNMS_clip_per_template_nms_mat_nms, tp_view{imgIdx}, fp_view{imgIdx}, detScore_view{imgIdx}, ~] =...
+            dwot_compute_positives_view(bbsNMS_clip_per_template_nms_mat_nms, gt{imgIdx}, detectors, param);
+
+
     bbsNMS(:,9) = bbsNMS_clip(:,9);
 
     %% Collect statistics
