@@ -111,13 +111,13 @@ for imgIdx=1:n_unique_files
   %% Collect statistics
   % Per Detector Statistics
   
-  for bbs_idx = 1:size(bbsNMS,1)
-    detector_idx = bbsNMS(bbs_idx, 11);
-    if numel(detector_struct) < detector_idx || isempty(detector_struct{detector_idx})
-      detector_struct{detector_idx} = {};
-    end
-    detector_struct{detector_idx}{numel(detector_struct{detector_idx}) + 1} = struct('BB',bbsNMS(bbs_idx,:),'im',recs.imgname);
-  end
+%   for bbs_idx = 1:size(bbsNMS,1)
+%     detector_idx = bbsNMS(bbs_idx, 11);
+%     if numel(detector_struct) < detector_idx || isempty(detector_struct{detector_idx})
+%       detector_struct{detector_idx} = {};
+%     end
+%     detector_struct{detector_idx}{numel(detector_struct{detector_idx}) + 1} = struct('BB',bbsNMS(bbs_idx,:),'im',recs.imgname);
+%   end
   
   % TP collection
   gtIdx = find(gt(imgIdx).det > 0);
@@ -276,7 +276,7 @@ if visualize
 
       % Overlay
       subplot(224);
-      dwot_draw_overlap_detection(im, [predBB' zeros(1,6) tp.detector_id(idx) tp.score(idx)], renderings, 1, 50, true, [0.5, 0.5, 0] );
+      dwot_draw_overlap_detection(im, [predBB' zeros(1,6) tp.detector_id(idx) tp.score(idx)], renderings, 1, 50, true, [0.5, 0.5, 0], param.color_range );
       axis equal; axis tight;
 
       drawnow;
@@ -325,7 +325,7 @@ if visualize
 
       % Overlay
       subplot(224);
-      dwot_draw_overlap_detection(im, [BB zeros(1,6) fp.detector_id(idx) fp.score(idx)], renderings, 1, 50, true, [0.5, 0.5, 0] );
+      dwot_draw_overlap_detection(im, [BB zeros(1,6) fp.detector_id(idx) fp.score(idx)], renderings, 1, 50, true, [0.5, 0.5, 0], param.color_range);
       axis equal; axis tight;
 
       drawnow;
@@ -350,7 +350,7 @@ if visualize
     for idx = 1:numel(fn.diff)
       im_cell = fn.im(idx);
       im = imread([VOCopts.datadir,im_cell{1}]);
-      im = imresize(im, image_scale_factor);
+%       im = imresize(im, image_scale_factor);
 
       BB = fn.BB(:,idx) ;
       plot_title = '';

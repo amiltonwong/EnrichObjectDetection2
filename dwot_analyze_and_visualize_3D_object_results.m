@@ -1,5 +1,5 @@
 function [ ap ] = dwot_analyze_and_visualize_3D_object_results( detection_result_txt, ...
-                            detectors, save_path, param, DATA_PATH, CLASS, color_range, nms_threshold, visualize)
+                            detectors, save_path, param, DATA_PATH, CLASS, color_range, nms_threshold, visualize, prediction_azimuth_rotation_direction, prediction_azimuth_offset)
 
 if ~exist('nms_threshold','var') || isempty(nms_threshold)
     if ~isfield(param, 'nms_threshold')
@@ -13,6 +13,13 @@ if ~exist('color_range','var')
   color_range = [-inf 100:20:300 inf];
 end
 
+if ~exist('detector_direction', 'var')
+    detector_direction = 1;
+end
+
+if ~exist('gt_offset', 'var')
+    gt_offset = 0;
+end
 
 % PASCAL_car_val_init_0_Car_each_7_lim_300_lam_0.0150_a_24_e_2_y_1_f_2_scale_2.00_sbin_6_level_10_nms_0.40_skp_e
 % Group inside group not supported in matlab
@@ -23,10 +30,16 @@ detection_params = dwot_detection_params_from_name(detection_result_txt);
 %     stuff = S.(SNames{loopIndex})
 % end
 
-detection_param_name = regexp(detection_result_txt,'\/?([\w\.]+)\.txt','tokens');
+detection_param_name = regexp(detection_result_txt,'\/?([-\w\.]+)\.txt','tokens');
 detection_name = detection_param_name{1}{1};
 
-[gt, image_path] = dwot_3d_object_dataset(DATA_PATH, CLASS);
+[gt_orig, image_path] = dwot_3d_object_dataset(DATA_PATH, CLASS);
+image_dir = regexp(image_path{1}, '([\w\/\.]+)\/\w+/\w+\.(\w+)', 'tokens');
+ext = image_dir{1}{2};
+image_dir = image_dir{1}{1};
+
+image_path = cellfun(@(x) regexp(x,'/(\w+/\w+)\.','tokens'), image_path);
+image_path = cellfun(@(x) x{1}, image_path, 'UniformOutput', false);
 
 % Find image scaling factor
 temp = regexp(detection_result_txt,'_scale_([\d+.]+)','tokens');
@@ -35,7 +48,7 @@ image_scale_factor = str2double(temp{1});
 
 % PASCAL_car_val_init_0_Car_each_7_lim_300_lam_0.0150_a_24_e_2_y_1_f_2_scale_2.00_sbin_6_level_15_nms_0.40_skp_e_server_102.txt
     
-N_IMAGE = length(gt);
+N_IMAGE = length(gt_orig);
 
 % gt(length(gt))=struct('BB',[],'diff',[],'det',[]);
 
@@ -64,14 +77,22 @@ detector_struct = {};
 npos = 0;
 tp = cell(1,N_IMAGE);
 fp = cell(1,N_IMAGE);
+tp_view = cell(1,N_IMAGE);
+fp_view = cell(1,N_IMAGE);
 detScore = cell(1,N_IMAGE);
+
+
+n_views = 8;
+max_azimuth_difference = 360/n_views/2;
+
+confusion_statistics = zeros(n_views, n_views);
 
 image_count = 1;
 
 for unique_image_from_detection_idx=1:n_unique_files
   
     file_name = unique_files{unique_image_from_detection_idx};
-    curr_file_idx = cellfun(@(x) ~isempty(strmatch(x,file_name)), detection.file_name);
+    curr_file_idx = find(cellfun(@(x) strcmp(x,file_name), detection.file_name));
     if nnz(curr_file_idx) == 0 
         continue;
     end
@@ -80,107 +101,177 @@ for unique_image_from_detection_idx=1:n_unique_files
     % read annotation
     % clsinds = strmatch(detection_params.LOWER_CASE_CLASS,{recs.objects(:).class},'exact');
     % if dwot_skip_criteria(recs.objects(clsinds), skip_criteria); continue; end
-    imgIdx = find(cellfun(@(x) ~isempty(strfind(x,file_name)), image_path));
-    im = imread([image_path{imgIdx}]);
-    img_file_name = regexp(image_path{imgIdx}, [ '\/(' LOWER_CASE_CLASS '_\d+\/\w+)\.'],'tokens');
-    img_file_name = img_file_name{1}{1};
+    image_idx = find(cellfun(@(x) strcmp(x, file_name), image_path));
+    im = imread(fullfile(image_dir, [image_path{image_idx}, '.' ext]));
+    % img_file_name = image_path{image_idx};
     imSz = size(im);
 
-    gt{imgIdx}.BB = image_scale_factor * gt{imgIdx}.BB;
-%     gt{imgIdx}.diff = [recs.objects(clsinds).difficult];
-%     gt{imgIdx}.truncated = [recs.objects(clsinds).truncated];
-%     gt{imgIdx}.det = zeros(length(clsinds),1);
+    % gt{image_idx}.BB = image_scale_factor * gt{image_idx}.BB;
+%     gt{image_idx}.diff = [recs.objects(clsinds).difficult];
+%     gt{image_idx}.truncated = [recs.objects(clsinds).truncated];
+%     gt{image_idx}.det = zeros(length(clsinds),1);
+    
+    prediction_score = detection.score(curr_file_idx);
+    valid_prediction_idx = find(prediction_score > -inf);
 
+    if ~isempty(valid_prediction_idx);
+        curr_file_idx = curr_file_idx(valid_prediction_idx);
+        
+        % only bounding box
+        prediction_bounding_box = detection.bbox(curr_file_idx,:)/image_scale_factor;
+        
+        % formatted such that it can be used in rendering
+        formatted_bounding_box = [ prediction_bounding_box zeros(nnz(curr_file_idx),6)...
+                        detection.detector_idx(curr_file_idx,:) detection.score(curr_file_idx)];
+        
+        % non maximal suppression on the bounding boxes
+        [formatted_bounding_box, bounding_box_idx] = esvm_nms(formatted_bounding_box, nms_threshold);
+        
+        % non maximal suppressed prediction boxes
+        prediction_bounding_box = prediction_bounding_box(bounding_box_idx,:);
 
-    bbs = [ detection.bbox(curr_file_idx,:) zeros(nnz(curr_file_idx),6)...
-                            detection.detector_idx(curr_file_idx,:) detection.score(curr_file_idx)];
-    bbsNMS = esvm_nms(bbs, nms_threshold);
+        % clip the prediction 
+        prediction_bounding_box_clip = clip_to_image(prediction_bounding_box, [1 1 imSz(2) imSz(1)]);
+        ground_truth_bounding_box = gt_orig{image_idx}.BB';
+        
+        n_prediction   = size(prediction_bounding_box,1);
+        n_ground_truth = size(ground_truth_bounding_box,1);
 
-    bbsNMS_clip = clip_to_image(bbsNMS, [1 1 imSz(2) imSz(1)]);
-    [bbsNMS_clip, tp{imgIdx}, fp{imgIdx}, detScore{imgIdx}, gt{imgIdx}] = ...
-                    dwot_compute_positives(bbsNMS_clip, gt{imgIdx}, param);
-                
-    [bbsNMS_clip_per_template_nms_mat_nms, tp_view{imgIdx}, fp_view{imgIdx}, detScore_view{imgIdx}, ~] =...
-            dwot_compute_positives_view(bbsNMS_clip_per_template_nms_mat_nms, gt{imgIdx}, detectors, param);
+        % evaluate prediction using the clipped prediction
+        [tp{image_idx}, fp{image_idx}, prediction_iou, ~] = ...
+                dwot_evaluate_prediction(prediction_bounding_box_clip,...
+                            ground_truth_bounding_box, param.min_overlap);
+        detScore{image_idx} = formatted_bounding_box(:,end)';
+        
+        % to evaluate also using viewpoint gather viewpoint info
+        prediction_azimuth = cellfun(@(x) x.az, detectors(formatted_bounding_box(:,11)));
+        ground_truth_azimuth = gt_orig{image_idx}.azimuth;
+        
+        [tp_view{image_idx}, fp_view{image_idx}, prediction_view_iou, gt_idx_of_prediction] =...
+                dwot_evaluate_prediction(prediction_bounding_box_clip, ground_truth_bounding_box,...
+                        param.min_overlap, false(1, n_ground_truth),...
+                        prediction_azimuth, ground_truth_azimuth, max_azimuth_difference,...
+                        prediction_azimuth_rotation_direction, prediction_azimuth_offset);
 
+        % Confusion Matrix
+        [confusion_statistics] = dwot_gather_confusion_statistics(confusion_statistics,...
+                ground_truth_azimuth, prediction_azimuth, gt_idx_of_prediction,...
+                n_views, prediction_azimuth_rotation_direction, prediction_azimuth_offset);
+            
+        if 1
+            formatted_bounding_box(:,9) = prediction_view_iou;
+            
+            subplot(121);
+            dwot_draw_overlap_rendering(im, formatted_bounding_box(tp_view{image_idx}, :),...
+                        detectors, 5, 50, true, [0.2, 0.8, 0], [-inf 50:10:100 inf], 1 );
 
-    bbsNMS(:,9) = bbsNMS_clip(:,9);
+            subplot(122);
+            dwot_draw_overlap_rendering(im, formatted_bounding_box(~tp_view{image_idx}, :),...
+                        detectors, 5, 50, true, [0.2, 0.8, 0], [-inf 50:10:100 inf], 1 );
+            
+            drawnow
+        end
+        
+        %% Collect statistics
+        % Per Detector Statistics
 
-    %% Collect statistics
-    % Per Detector Statistics
+        %   for bbs_idx = 1:size(bbsNMS,1)
+        %     detector_idx = bbsNMS(bbs_idx, 11);
+        %     if numel(detector_struct) < detector_idx || isempty(detector_struct{detector_idx})
+        %       detector_struct{detector_idx} = {};
+        %     end
+        %     detector_struct{detector_idx}{numel(detector_struct{detector_idx}) + 1} = struct('BB',bbsNMS(bbs_idx,:),'im',recs.imgname);
+        %   end
 
-    %   for bbs_idx = 1:size(bbsNMS,1)
-    %     detector_idx = bbsNMS(bbs_idx, 11);
-    %     if numel(detector_struct) < detector_idx || isempty(detector_struct{detector_idx})
-    %       detector_struct{detector_idx} = {};
-    %     end
-    %     detector_struct{detector_idx}{numel(detector_struct{detector_idx}) + 1} = struct('BB',bbsNMS(bbs_idx,:),'im',recs.imgname);
-    %   end
+        % TP collection
+        correct_prediction_idx = find(gt_idx_of_prediction > 0);
+        gt_idx = gt_idx_of_prediction(correct_prediction_idx);
+        if ~isempty(correct_prediction_idx )
+            tp_struct(image_count).gtBB = gt_orig{image_idx}.BB(:, gt_idx);
+            tp_struct(image_count).predBB = prediction_bounding_box(correct_prediction_idx ,:)';
+            tp_struct(image_count).diff = logical(gt_orig{image_idx}.diff(gt_idx));
+            % tp_struct(image_count).truncated = logical(gt{image_idx}.truncated(gt_idx));
+            tp_struct(image_count).score = formatted_bounding_box(correct_prediction_idx,end);
+            tp_struct(image_count).im = repmat({file_name}, numel(gt_idx), 1);
+            tp_struct(image_count).detector_id = formatted_bounding_box(correct_prediction_idx,11);
+        end
 
-    % TP collection
-    gtIdx = find(gt{imgIdx}.det > 0);
-    bbsIdx = gt{imgIdx}.det(gtIdx);
-    if ~isempty(gtIdx)
-    tp_struct(image_count).gtBB = gt{imgIdx}.BB(:, gtIdx);
-    tp_struct(image_count).predBB = bbsNMS(bbsIdx,1:4)';
-    tp_struct(image_count).diff = logical(gt{imgIdx}.diff(gtIdx));
-    % tp_struct(image_count).truncated = logical(gt{imgIdx}.truncated(gtIdx));
-    tp_struct(image_count).score = bbsNMS_clip(bbsIdx,end);
-    tp_struct(image_count).im = repmat({file_name}, numel(gtIdx), 1);
-    tp_struct(image_count).detector_id = bbsNMS_clip(bbsIdx,11);
+        % FP collection
+        bbsIdx = find(fp{image_idx});
+
+        if ~isempty(bbsIdx)
+            fp_struct(image_count).BB = formatted_bounding_box(bbsIdx,1:4)';
+            fp_struct(image_count).score = formatted_bounding_box(bbsIdx,end);
+            fp_struct(image_count).im = repmat({file_name}, numel(bbsIdx),1);
+            fp_struct(image_count).detector_id = formatted_bounding_box(bbsIdx,11);
+        end
+
+        % FN collection
+        gt_idx = 1;
+
+        if ~isempty(gt_idx)
+            fn_struct(image_count).BB = gt_orig{image_idx}.BB(:, gt_idx);
+            fn_struct(image_count).diff = logical(gt_orig{image_idx}.diff(gt_idx));
+            % fn_struct(image_count).truncated = logical(gt{image_idx}.truncated(gt_idx));
+            fn_struct(image_count).im = repmat({file_name}, numel(gt_idx), 1);
+        end
+        
     end
-
-    % FP collection
-    bbsIdx = find(fp{imgIdx});
-
-    if ~isempty(bbsIdx)
-    fp_struct(image_count).BB = bbsNMS_clip(bbsIdx,1:4)';
-    fp_struct(image_count).score = bbsNMS_clip(bbsIdx,end);
-    fp_struct(image_count).im = repmat({file_name}, numel(bbsIdx),1);
-    fp_struct(image_count).detector_id = bbsNMS_clip(bbsIdx,11);
-    end
-
-    % FN collection
-    gtIdx = find(gt{imgIdx}.det == 0);
-
-    if ~isempty(gtIdx)
-    fn_struct(image_count).BB = gt{imgIdx}.BB(:, gtIdx);
-    fn_struct(image_count).diff = logical(gt{imgIdx}.diff(gtIdx));
-    % fn_struct(image_count).truncated = logical(gt{imgIdx}.truncated(gtIdx));
-    fn_struct(image_count).im = repmat({file_name}, numel(gtIdx), 1);
-    end
-
     image_count = image_count + 1;
 
-    npos=npos+sum(~gt{imgIdx}.diff);
+    npos=npos+1;
 
 end
 
 
 detScore = cell2mat(detScore);
-fp = cell2mat(fp);
-tp = cell2mat(tp);
+fp = cell2mat(cellfun(@(x) double(x), fp, 'UniformOutput',false));
+tp = cell2mat(cellfun(@(x) double(x), tp, 'UniformOutput',false));
+fp_view = cell2mat(cellfun(@(x) double(x), fp_view, 'UniformOutput',false));
+tp_view = cell2mat(cellfun(@(x) double(x), tp_view, 'UniformOutput',false));
 
 [~, si] =sort(detScore,'descend');
 fpSort = cumsum(fp(si));
 tpSort = cumsum(tp(si));
+fpSort_view = cumsum(fp_view(si));
+tpSort_view = cumsum(tp_view(si));
 
 recall = tpSort/npos;
 precision = tpSort./(fpSort + tpSort);
 
+recall_view = tpSort_view/npos;
+precision_view = tpSort_view./(fpSort_view + tpSort_view);
+
+
 ap = VOCap(recall', precision');
-fprintf('\nAP = %.4f\n', ap);
+aa = VOCap(recall_view', precision_view');
 
+fprintf('\nAP = %.4f AA = %.4f\n', ap, aa);
+
+clf;
+subplot(121);
 plot(recall, precision, 'r', 'LineWidth',3);
-xlabel('Recall');
+hold on;
+plot(recall_view, precision_view, 'g', 'LineWidth',3);
 
-tit = sprintf('Average Precision = %.3f', 100*ap);
-title(tit);
+xlabel('Recall');
+ti = sprintf('Average Precision = %.3f Average Accuracy = %.3f', 100*ap, 100*aa);
+title(ti);
 axis([0 1 0 1]);
+axis equal; axis tight;
+    
+subplot(122);
+confusion_precision = bsxfun(@rdivide, confusion_statistics, sum(confusion_statistics));
+colormap cool;
+imagesc(confusion_precision); colormap; colorbar; axis equal; axis tight;
+ti = sprintf('Viewpoint confusion matrix', 100*aa);
+title(ti);
+xlabel('ground truth viewpoint index');
+ylabel('prediction viewpoint index');
+
 set(gcf,'color','w');
 drawnow;
-    
-    
+
 % Sort the scores for each detectors and print  
 if visualize
     renderings = cellfun(@(x) x.rendering_image, detectors, 'UniformOutput', false);

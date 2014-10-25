@@ -117,7 +117,7 @@ detector_file_name = sprintf('%s.mat', detector_name);
 
 
 %% Make Renderer
-if ~exist('renderer','var') || (~exist(detector_file_name,'file')  && param.proposal_tuning_mode > 0)
+if ~exist('renderer','var') || ~exist(detector_file_name,'file')  && param.proposal_tuning_mode > 0
     if exist('renderer','var')
         renderer.delete();
         clear renderer;
@@ -156,7 +156,7 @@ if param.b_calibrate
 
     %%%%%%%%%% Since we do not have VOCopt for 3DObject, embed the ugly
     % loading part
-    if isempty(server_id) || ~isempty(strmatch(server_id.num,'capri7'))
+    if isempty(server_id) || ~strcmp(server_id.num,'capri7')
         VOC_PATH = '/home/chrischoy/Dataset/VOCdevkit/';
     else
         VOC_PATH = '/scratch/chrischoy/Dataset/VOCdevkit/';
@@ -279,7 +279,7 @@ for imgIdx = 1:N_IMAGE
     imgTic = tic;
 
     im = imread([image_path{imgIdx}]);
-    img_file_name = regexp(image_path{imgIdx}, '\/(car_\d+\/\w+)\.','tokens');
+    img_file_name = regexp(image_path{imgIdx}, ['\/(' LOWER_CASE_CLASS '_\d+\/\w+)\.'],'tokens');
     img_file_name = img_file_name{1}{1};
     imSz = size(im);
     if COMPUTING_MODE == 0
@@ -329,7 +329,7 @@ for imgIdx = 1:N_IMAGE
     [bbsNMS_clip_per_template_nms_mat_nms, tp_view{imgIdx}, fp_view{imgIdx}, detScore_view{imgIdx}, ~] = dwot_compute_positives_view(bbsNMS_clip_per_template_nms_mat_nms, gt{imgIdx}, detectors, param);
     
     % Confusion Matrix
-    confusion_statistics = dwot_gather_confusion_statistics(confusion_statistics, detectors, gt{imgIdx}, bbsNMS_clip_per_template_nms_mat_nms, n_views);
+    % confusion_statistics = dwot_gather_confusion_statistics(confusion_statistics, detectors, gt{imgIdx}, bbsNMS_clip_per_template_nms_mat_nms, n_views);
 
     if visualize_detection
         tpIdx = logical(tp{imgIdx});
@@ -395,21 +395,21 @@ for i = 1:numel(nms_thresholds)
 end
 
 % If it runs on server copy to host
-if ~isempty(server_id) && isempty(strmatch(server_id.num,'capri7'))
+if ~isempty(server_id) && ~strcmp(server_id.num,'capri7')
     for i = 1:numel(nms_thresholds)
         system(['scp ', fullfile(SAVE_PATH, ap_save_names{i}),...
-            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/',...
-            LOWER_CASE_CLASS '_' TEST_TYPE]);
+            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/',...
+            SAVE_PATH]);
     end
     system(['scp ' fullfile(SAVE_PATH, detection_result_file),...
-        ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/']);
+        ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/', SAVE_PATH]);
     
-    if param.proposal_tuning_mode > 1
+    if ~strcmp(param.proposal_tuning_mode, 'none')
         system(['scp ', fullfile(SAVE_PATH, ap_tuning_save_name),...
-            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/',...
-            LOWER_CASE_CLASS '_' TEST_TYPE]);
+            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/',...
+            SAVE_PATH]);
         system(['scp ' fullfile(SAVE_PATH, detection_tuning_result_file),...
-            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/']);
+            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/', SAVE_PATH]);
     end
 end
 

@@ -1,6 +1,6 @@
 [~, sys_host_name] = system('hostname');
 server_id = regexp(sys_host_name, '^napoli(?<num>\d+).*','names');
-fprintf('Using server %s\n', server_id.num);
+fprintf('Using server %s\n', sys_host_name);
 if strcmp(DATA_SET,'PASCAL')
     if isempty(server_id)
         VOC_PATH = '/home/chrischoy/Dataset/VOCdevkit/';
@@ -21,8 +21,10 @@ if strcmp(DATA_SET,'PASCAL')
 elseif strcmp(DATA_SET,'PASCAL12')
     if isempty(server_id)
         VOC_PATH = '/home/chrischoy/Dataset/PASCAL3D+_release1.1/PASCAL12/VOCdevkit/';
+        PASCAL3D_ANNOTATION_PATH = '/home/chrischoy/Dataset/PASCAL3D+_release1.1/Annotations';
     else
         VOC_PATH = '/scratch/chrischoy/Dataset/PASCAL12/VOCdevkit/';
+        PASCAL3D_ANNOTATION_PATH = '/scratch/chrischoy/Dataset/PASCAL12/Annotations';
     end
     if ismac
         VOC_PATH = '~/dataset/VOCdevkit/';

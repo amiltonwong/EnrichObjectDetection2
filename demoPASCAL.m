@@ -40,7 +40,7 @@ azs = 0:15:345; % azs = [azs , azs - 10, azs + 10];
 els = 0:20:20;
 fovs = [25 50];
 yaws = 0;
-n_cell_limit = [300];
+n_cell_limit = [250];
 lambda = [0.015];
 detection_threshold = 80;
 
@@ -61,14 +61,42 @@ n_max_proposals = 10;
 %               'glx_bike',...
 %               'road_bike'};
 
+% models_to_use = {'2012-VW-beetle-turbo',...
+%               'Kia_Spectra5_2006',...
+%               '2008-Jeep-Cherokee',...
+%               'Ford Ranger Updated',...
+%               'BMW_X1_2013',...
+%               'Honda_Accord_Coupe_2009',...
+%               'Porsche_911',...
+%               '2009 Toyota Cargo'};
+
 models_to_use = {'2012-VW-beetle-turbo',...
-              'Kia_Spectra5_2006',...
-              '2008-Jeep-Cherokee',...
-              'Ford Ranger Updated',...
-              'BMW_X1_2013',...
-              'Honda_Accord_Coupe_2009',...
-              'Porsche_911',...
-              '2009 Toyota Cargo'};
+            'Peugeot-207',...
+            'Scion_xB',...
+            '2007-Nissan-Versa-_-Tiida-SL',...
+            '2010-Chevrolet-Aveo5-LT',...
+            '2012-Citroen-DS4',...
+            'Kia_Spectra5_2006',...
+            'Opel-Meriva',...
+            'NM07',...
+            'Portugal_Racing_Junior',...
+            '2008-Jeep-Cherokee',...
+            '2012-Mercedes-Benz-M-Class',...
+            'BMW_X1_2013',...
+            'Benz_SL500_roofdown_2013',...
+            'Chevrolet Camaro',...
+            'Honda-Accord-3',...
+            'Honda_Accord_Coupe_2009',...
+            'Mercedes-Benz-C63-2012',...
+            'Nissan-Maxima_2009',...
+            'Porsche_911_wing_2014',...
+            '2001-2004 Ford Ranger Edge',...
+            '2013-Ford-F150-Eco-Boost-King-Ranch-4X4-Crew-Cab',...
+            'Ford Ranger Updated',...
+            '2002 Dodge Ram FedEx',...
+            '2009 Toyota Cargo',...
+            'Maserati-3500GT',...
+            'Skylark_Cruiser_1971'};
 
 use_idx = ismember(model_names,models_to_use);
 
@@ -77,7 +105,7 @@ model_paths = model_paths(use_idx);
 
 % skip_criteria = {'empty', 'truncated','difficult'};
 skip_criteria = {'empty'};
-skip_name = cellfun(@(x) x(1), skip_criteria);
+skip_name = cellfun(@(x) x(1), skip_criteria); % get the first character of the criteria
 
 %%%%%%%%%%%%%%% Set Parameters %%%%%%%%%%%%
 dwot_get_default_params;
@@ -145,7 +173,7 @@ end
 fprintf('\nThe result will be saved on %s\n',detection_result_file);
 
 %% Make Renderer
-if ~exist(detector_file_name,'file')  || param.proposal_tuning_mode > 0
+if ~strcmp(param.proposal_tuning_mode, 'none') || ~exist('renderer','var') || ~exist(detector_file_name,'file')
     if exist('renderer','var')
         renderer.delete();
         clear renderer;
@@ -180,14 +208,14 @@ end
 % calibration_mode == 'linear'
 %     follow 'Seeing 3D chair' CVPR 14, calibration stage. Performs worse
 if param.b_calibrate
-  calibrated_detector_file_name = sprintf('%s_cal_%s.mat', detector_name, param.calibration_mode);
-  if exist(calibrated_detector_file_name,'file')
-    load(calibrated_detector_file_name);
-  else
-    detectors = dwot_calibrate_detectors(detectors, LOWER_CASE_CLASS, VOCopts, param);
-    eval(sprintf(['save -v7.3 ' calibrated_detector_file_name ' detectors']));
-  end
-  param.detectors = detectors;
+    calibrated_detector_file_name = sprintf('%s_cal_%s.mat', detector_name, param.calibration_mode);
+    if exist(calibrated_detector_file_name,'file')
+        load(calibrated_detector_file_name);
+    else
+        detectors = dwot_calibrate_detectors(detectors, LOWER_CASE_CLASS, VOCopts, param);
+        eval(sprintf(['save -v7.3 ' calibrated_detector_file_name ' detectors']));
+    end
+    param.detectors = detectors;
 end
 
 %%%%% For Debuggin purpose only
@@ -202,16 +230,16 @@ param.detect_pyramid_padding = 10;
 % The GPU templates accelerates the computation time since it is already loaded
 % on GPU.
 if COMPUTING_MODE == 0
-  % for CPU convolution, use fconvblas which handles template inversion
-  templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
+    % for CPU convolution, use fconvblas which handles template inversion
+    templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
 elseif COMPUTING_MODE == 1
-  % for GPU convolution, we use FFT based convolution. invert template
-  templates_gpu = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
+    % for GPU convolution, we use FFT based convolution. invert template
+    templates_gpu = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
 elseif COMPUTING_MODE == 2
-  templates_gpu = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
-  templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
+    templates_gpu = cellfun(@(x) gpuArray(single(x.whow(end:-1:1,end:-1:1,:))), detectors,'UniformOutput',false);
+    templates_cpu = cellfun(@(x) single(x.whow), detectors,'UniformOutput',false);
 else
-  error('Computing mode undefined');
+	error('Computing mode undefined');
 end
 
 %% Set variables for detection
@@ -229,7 +257,7 @@ for imgIdx=1:N_IMAGE
     % read annotation
     recs = PASreadrecord(sprintf(VOCopts.annopath,gtids{imgIdx}));
     
-    clsinds = strmatch(LOWER_CASE_CLASS,{recs.objects(:).class},'exact');
+    clsinds = find(strcmp(LOWER_CASE_CLASS,{recs.objects(:).class}));
 
     if dwot_skip_criteria(recs.objects(clsinds), skip_criteria); continue; end
 
@@ -278,7 +306,7 @@ for imgIdx=1:N_IMAGE
     
     
     %% Proposal Tuning
-    if param.proposal_tuning_mode > 0
+    if ~strcmp(param.proposal_tuning_mode,'none')
         tuningTic = tic;
 
         n_proposals = min(n_max_proposals, size(bbsNMS,1));
@@ -311,14 +339,18 @@ for imgIdx=1:N_IMAGE
             bb_clip = clip_to_image(bbsProposal(proposal_idx, :), [1 1 im_size(2) im_size(1)]);
             bb_clip = dwot_compute_positives(bb_clip, gt, param);
             bbsProposal(proposal_idx, 9) = bb_clip(9);
-            bbsProposal(proposal_idx, 12) = best_proposals{proposal_idx}.score;
             bbsProposal(proposal_idx, 11) = 1;
-            dwot_visualize_proposal_tuning(bbsNMS(proposal_idx,:), bbsProposal(proposal_idx,:), ...
-                                            best_proposals{proposal_idx}, im, detectors, param);
-            save_name = sprintf(['%s_tuning_%d_img_%d_obj_%d.jpg'],...
-                      detection_tuning_result_common_name, param.proposal_tuning_mode,...
-                      imgIdx, proposal_idx);
-            print('-djpeg','-r150',fullfile(SAVE_PATH, save_name));
+            bbsProposal(proposal_idx, 12) = best_proposals{proposal_idx}.score;
+
+            if visualize_detection
+                dwot_visualize_proposal_tuning(bbsNMS(proposal_idx,:), bbsProposal(proposal_idx,:), ...
+                                                best_proposals{proposal_idx}, im, detectors, param);
+
+                save_name = sprintf(['%s_tuning_%d_img_%d_obj_%d.jpg'],...
+                          detection_tuning_result_common_name, param.proposal_tuning_mode,...
+                          imgIdx, proposal_idx);
+                print('-djpeg','-r150',fullfile(SAVE_PATH, save_name));
+            end
         end
         
         bbsNMS(1:n_proposals,:) = bbsProposal;
@@ -333,6 +365,7 @@ close all;  % space plot casues problem when using different subplot grid
 nms_thresholds = 0.2 : 0.05 : 0.7;
 ap = zeros(numel(nms_thresholds),1);
 ap_save_names = cell(numel(nms_thresholds),1);
+ap_tuning_save_name = cell(numel(nms_thresholds),1);
 for i = 1:numel(nms_thresholds)
     nms_threshold = nms_thresholds(i);
     ap(i) = dwot_analyze_and_visualize_pascal_results(fullfile('Result',detection_result_file), ...
@@ -346,33 +379,41 @@ for i = 1:numel(nms_thresholds)
      print('-dpng','-r150',fullfile(SAVE_PATH, ap_save_names{i}));
 end
 
-if param.proposal_tuning_mode > 0
-    ap_tuning = dwot_analyze_and_visualize_pascal_results(fullfile(SAVE_PATH,...
-                        detection_tuning_result_file), detectors, [], VOCopts, param,...
-                        skip_criteria, param.color_range, param.nms_threshold, false);
-                        
-    ap_tuning_save_name = sprintf(['AP_%s_tuning_%d_nms_%.2f.png'],...
-                        detection_result_common_name, param.proposal_tuning_mode,...
-                        param.nms_threshold);
+if ~strcmp(param.proposal_tuning_mode,'none')
+    for i = 1:numel(nms_thresholds)
+        nms_threshold = nms_thresholds(i);
+        ap_tuning = dwot_analyze_and_visualize_pascal_results(fullfile(SAVE_PATH,...
+                            detection_tuning_result_file), detectors, [], VOCopts, param,...
+                            skip_criteria, param.color_range, nms_threshold, false);
 
-     print('-dpng','-r150',fullfile(SAVE_PATH, ap_tuning_save_name));
+        ap_tuning_save_name{i} = sprintf(['AP_%s_tuning_%d_nms_%.2f.png'],...
+                            detection_result_common_name, param.proposal_tuning_mode,...
+                            nms_threshold);
+
+         print('-dpng','-r150',fullfile(SAVE_PATH, ap_tuning_save_name{i}));
+    end
 end
 
 % If it runs on server copy to host
-if ~isempty(server_id) && isempty(strmatch(server_id.num,'capri7'))
+if ~isempty(server_id) && ~strcmp(server_id.num,'capri7')
     for i = 1:numel(nms_thresholds)
         system(['scp ', fullfile(SAVE_PATH, ap_save_names{i}),...
-            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/',...
-            LOWER_CASE_CLASS '_' TEST_TYPE]);
+            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/',...
+            SAVE_PATH]);
+        if ~strcmp(param.proposal_tuning_mode,'none')
+            system(['scp ', fullfile(SAVE_PATH, ap_tuning_save_name{i}),...
+                ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/',...
+                SAVE_PATH]);
+        end
     end
-    system(['scp ' fullfile(SAVE_PATH, detection_result_file),...
-        ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/']);
     
-    if param.proposal_tuning_mode > 1
-        system(['scp ', fullfile(SAVE_PATH, ap_tuning_save_name),...
-            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/',...
-            LOWER_CASE_CLASS '_' TEST_TYPE]);
+    system(['scp ' fullfile(SAVE_PATH, detection_result_file),...
+        ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/',...
+        SAVE_PATH]);
+    
+    if ~strcmp(param.proposal_tuning_mode,'none')
         system(['scp ' fullfile(SAVE_PATH, detection_tuning_result_file),...
-            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/']);
+            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/',...
+            SAVE_PATH]);
     end
 end

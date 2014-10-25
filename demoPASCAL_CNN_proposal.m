@@ -33,7 +33,7 @@ dfov = 10;
 dyaw = 10;
 
 azs = 0:15:345; % azs = [azs , azs - 10, azs + 10];
-els = 0:20:20;
+els = 0:10:20;
 fovs = [25];
 yaws = 0;
 n_cell_limit = [250];
@@ -57,19 +57,19 @@ n_max_tuning = 1;
 %               'glx_bike',...
 %               'road_bike'};
 
-models_to_use = {'2012-VW-beetle-turbo',...
-              'Kia_Spectra5_2006',...
-              '2008-Jeep-Cherokee',...
-              'Ford Ranger Updated',...
-              'BMW_X1_2013',...
-              'Honda_Accord_Coupe_2009',...
-              'Porsche_911',...
-              '2009 Toyota Cargo'};
-
-use_idx = ismember(model_names,models_to_use);
-
-model_names = model_names(use_idx);
-model_paths = model_paths(use_idx);
+% models_to_use = {'2012-VW-beetle-turbo',...
+%               'Kia_Spectra5_2006',...
+%               '2008-Jeep-Cherokee',...
+%               'Ford Ranger Updated',...
+%               'BMW_X1_2013',...
+%               'Honda_Accord_Coupe_2009',...
+%               'Porsche_911',...
+%               '2009 Toyota Cargo'};
+% 
+% use_idx = ismember(model_names,models_to_use);
+% 
+% model_names = model_names(use_idx);
+% model_paths = model_paths(use_idx);
 
 % skip_criteria = {'empty', 'truncated','difficult'};
 skip_criteria = {'none'};
@@ -101,6 +101,8 @@ param.proposal_tuning_mode = 'none';
 param.detection_mode = 'cnn';
 
 % image_region_extraction.padding_ratio = 0.2;
+param.PASCAL3D_ANNOTATION_PATH = PASCAL3D_ANNOTATION_PATH;
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 param.color_range = [-inf 20:5:100 inf];
@@ -109,13 +111,13 @@ param.cnn_color_range = [ -inf -4:0.1:3 inf];
 % detector name
 [ detector_model_name ] = dwot_get_detector_name(CLASS, SUB_CLASS, model_names, param);
 detector_name = sprintf('%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d',...
-        LOWER_CASE_CLASS,  detector_model_name, n_cell_limit, lambda,...
-        numel(azs), numel(els), numel(yaws), numel(fovs));
+            LOWER_CASE_CLASS,  detector_model_name, n_cell_limit, lambda,...
+            numel(azs), numel(els), numel(yaws), numel(fovs));
 
 detector_file_name = sprintf('%s.mat', detector_name);
 
 %% Make empty detection save file
-% if ~isempty(strmatch(param.detection_mode,'dwot'))
+% if ~strcmp(param.detection_mode,'dwot')
 detection_result_file = sprintf(['%s_%s_%s_%s_lim_%d_lam_%0.3f_a_%d_e_%d_y_%d_f_%d_scale_',...
             '%0.2f_sbin_%d_level_%d_server_%s.txt'],...
             DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda,...
@@ -158,7 +160,7 @@ end
 
 
 %% Make Renderer
-if ~strcmp(param.proposal_tuning_mode, 'none') || (~exist('renderer','var') || ~exist(detector_file_name,'file') )
+if ~strcmp(param.proposal_tuning_mode, 'none') || ~exist('renderer','var') || ~exist(detector_file_name,'file')
     % Initialize renderer
     renderer = Renderer();
     if ~renderer.initialize(model_paths, 700, 700, 0, 0, 0, 0, 25)
@@ -214,7 +216,7 @@ min_template_size = min(template_size, [],2);
 %% Load CNN Proposals
 if ~exist('cnn_detection','var')
     cnn_detection = load('3dpascal_pascal12val_rcnn_detections');
-    cnn_class_idx = strmatch(LOWER_CASE_CLASS, cnn_detection.classes);
+    cnn_class_idx = find(strcmp(LOWER_CASE_CLASS, cnn_detection.classes));
 end
 
 [gtids,t] = textread(sprintf(VOCopts.imgsetpath,[LOWER_CASE_CLASS '_' TEST_TYPE]),'%s %d');
@@ -235,7 +237,9 @@ for img_idx=1:N_IMAGE
     % read annotation
     recs = PASreadrecord(sprintf(VOCopts.annopath, img_file_name));
     
-    clsinds = strmatch(LOWER_CASE_CLASS, {recs.objects(:).class},'exact');
+    % Read 3D viewpoint annotation
+    
+    clsinds = find(strcmp(LOWER_CASE_CLASS, {recs.objects(:).class}));
 
     [skip_img, object_idx] = dwot_skip_criteria(recs.objects(clsinds), skip_criteria);
     
@@ -261,7 +265,7 @@ for img_idx=1:N_IMAGE
         fprintf('convolution time: %0.4f\n', toc(imgTic));
       case 'cnn'
         bounding_box_proposals = cnn_detection.detBoxes{cnn_class_idx}{img_idx};
-        bounding_box_proposals = bounding_box_proposals(find(bounding_box_proposals(:,end) > -inf ),:);
+        bounding_box_proposals = bounding_box_proposals((bounding_box_proposals(:,end) > -inf ),:);
         bbsAllLevel = double(bounding_box_proposals);
         bbsAllLevel(:,1:4) = param.image_scale_factor * bbsAllLevel(:,1:4);
       case 'dpm'
@@ -478,12 +482,14 @@ end
 close all;  % space plot casues problem when using different subplot grid
 
 %% Vary NMS threshold
-nms_thresholds = 0.5;
+nms_thresholds = 0.3:0.1:0.7;
 ap = zeros(numel(nms_thresholds),1);
+ap_dwot_cnn = zeros(numel(nms_thresholds),1);
 ap_save_names = cell(numel(nms_thresholds),1);
+ap_detection_save_names = cell(numel(nms_thresholds),1);
 for i = 1:numel(nms_thresholds)
     nms_threshold = nms_thresholds(i);
-    ap(i) = dwot_analyze_and_visualize_pascal_results(fullfile(SAVE_PATH,detection_result_file), ...
+    ap(i) = dwot_analyze_and_visualize_pascal_results(fullfile(SAVE_PATH, detection_result_file), ...
                         detectors, [], VOCopts, param, skip_criteria, param.color_range, ...
                         nms_threshold, false);
                         
@@ -495,23 +501,22 @@ for i = 1:numel(nms_thresholds)
 end
 
 
-
 % Detection for regions before tuning
 for i = 1:numel(nms_thresholds)
     nms_threshold = nms_thresholds(i);
-    ap(i) = dwot_analyze_and_visualize_pascal_results(fullfile(SAVE_PATH,detection_dwot_proposal_result_file), ...
+    ap_dwot_cnn(i) = dwot_analyze_and_visualize_pascal_results(fullfile(SAVE_PATH,detection_dwot_proposal_result_file), ...
                         detectors, [], VOCopts, param, skip_criteria, param.color_range, ...
                         nms_threshold, false);
                         
 
-    ap_save_names{i} = sprintf(['AP_%s_cnn_proposal_dwot_nms_%0.2f.png'],...
+    ap_detection_save_names{i} = sprintf(['AP_%s_cnn_proposal_dwot_nms_%0.2f.png'],...
                         detection_result_common_name, nms_threshold);
 
-     print('-dpng','-r150',fullfile(SAVE_PATH, ap_save_names{i}));
+     print('-dpng','-r150',fullfile(SAVE_PATH, ap_detection_save_names{i}));
 end
 
 
-if param.proposal_tuning_mode > 0
+if ~strcmp(param.proposal_tuning_mode,'none')
     ap_tuning = dwot_analyze_and_visualize_pascal_results(fullfile(SAVE_PATH,...
                         detection_tuning_result_file), detectors, [], VOCopts, param,...
                         skip_criteria, param.color_range, param.nms_threshold, false);
@@ -524,20 +529,25 @@ if param.proposal_tuning_mode > 0
 end
 
 % If it runs on server copy to host
-if ~isempty(server_id) && isempty(strmatch(server_id.num,'capri7'))
+if ~isempty(server_id) && ~strcmp(server_id.num,'capri7')
     for i = 1:numel(nms_thresholds)
         system(['scp ', fullfile(SAVE_PATH, ap_save_names{i}),...
-            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/',...
-            LOWER_CASE_CLASS '_' TEST_TYPE]);
+            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/',...
+            SAVE_PATH]);
+        system(['scp ', fullfile(SAVE_PATH, ap_detection_save_names{i}),...
+            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/',...
+            SAVE_PATH]);
     end
     system(['scp ' fullfile(SAVE_PATH, detection_result_file),...
-        ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/']);
+        ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/' SAVE_PATH]);
     
-    if param.proposal_tuning_mode > 1
+    if ~strcmp(param.proposal_tuning_mode,'none')
         system(['scp ', fullfile(SAVE_PATH, ap_tuning_save_name),...
-            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/',...
-            LOWER_CASE_CLASS '_' TEST_TYPE]);
+            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/',...
+            SAVE_PATH]);
         system(['scp ' fullfile(SAVE_PATH, detection_tuning_result_file),...
-            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/Result/']);
+            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/',...
+            SAVE_PATH]);
     end
 end
+
