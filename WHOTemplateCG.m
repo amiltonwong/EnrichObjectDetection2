@@ -101,6 +101,10 @@ if i == MAX_ITER
   disp('fail to get x within threshold');
 end
 
+if (param.template_initialization_mode == 3)
+  x_cache = x_cache/nnz(nonEmptyCells);
+end
+
 WHOTemplate = zeros(prod(HOGTemplatesz),1);
 WHOTemplate(onlyNonEmptyIdx) = x_cache(:,1);
 WHOTemplate =  reshape(WHOTemplate,[HOGDim, wHeight, wWidth]);

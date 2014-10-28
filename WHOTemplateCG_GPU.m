@@ -55,7 +55,7 @@ paddedIm = padarray(im2double(im), [padding, padding, 0], 1);
 bbox = [1 1 size(im,2) size(im,1)] + padding;
 
 % TODO replace it
-if (param.template_initialization_mode == 0 || param.template_initialization_mode == 2)
+if (param.template_initialization_mode == 0 || param.template_initialization_mode == 2 || param.template_initialization_mode == 3)
   [HOGTemplate, scale] = dwot_initialize_template(paddedIm, bbox, param);
 else
   [HOGTemplate, scale] = dwot_initialize_template_const_active_cell(paddedIm, bbox, param);
@@ -145,6 +145,10 @@ end
 
 if i == CG_MAX_ITER
   disp('fail to get x within threshold');
+end
+
+if (param.template_initialization_mode == 3)
+  x_min = x_min/nnz(nonEmptyCells);
 end
 
 WHOTemplate_CG = zeros(prod(HOGTemplateSz),1,'single');

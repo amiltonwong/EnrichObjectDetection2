@@ -1,5 +1,5 @@
 function [ ap ] = dwot_analyze_and_visualize_cnn_results( detection_result_txt, ...
-    detectors, save_path, VOCopts, param, skip_criteria, color_range, nms_threshold, visualize, prediction_azimuth_rotation_direction, prediction_azimuth_offset)
+    detectors, save_path, VOCopts, param, skip_criteria, color_range, nms_threshold, visualize, n_views, prediction_azimuth_rotation_direction, prediction_azimuth_offset)
 
 if nargin < 6
   % skip_criteria = {'empty', 'difficult','truncated'};
@@ -23,6 +23,11 @@ if nargin < 9
 end
 
 if nargin < 10
+    b_compute_view = false;
+    n_views = 16;
+end
+
+if nargin >= 10 && nargin < 11
     prediction_azimuth_rotation_direction = 1;
     prediction_azimuth_offset = 0;
 end
@@ -39,6 +44,8 @@ image_scale_factor = detection_params.scale;
 % for loopIndex = 1:numel(SNames) 
 %     stuff = S.(SNames{loopIndex})
 % end
+
+skip_criteria = dwot_recover_skip_criterion(detection_params.skip_criterion);
 
 detection_param_name = regexp(detection_result_txt,'\/?([-\w\.]+)\.txt','tokens');
 detection_name = detection_param_name{1}{1};
@@ -74,7 +81,6 @@ fn_struct(n_unique_files)   = struct('BB',[],'diff',[],'truncated',[],'im',[]);
 
 detector_struct = {};
 
-n_views = 8;
 max_azimuth_difference = 360/n_views/2;
 
 npos = 0;
@@ -103,7 +109,8 @@ for unique_image_idx=1:n_unique_files
     % read annotation
     clsinds = strmatch(detection_params.LOWER_CASE_CLASS,{recs.objects(:).class},'exact');
   
-    if dwot_skip_criteria(recs.objects(clsinds), skip_criteria); continue; end
+    [b_skip, ground_truth_obj_idx ] =dwot_skip_criteria(recs.objects(clsinds), skip_criteria);
+    if b_skip; continue; end
   
     im = imread([VOCopts.datadir, recs.imgname]);
     imSz = size(im);
@@ -145,11 +152,40 @@ for unique_image_idx=1:n_unique_files
         % evaluate prediction using the clipped prediction
         [tp{unique_image_idx}, fp{unique_image_idx}, prediction_iou, gt_idx_of_prediction] = ...
                 dwot_evaluate_prediction(prediction_bounding_box_clip,...
-                            ground_truth_bounding_box, param.min_overlap);
+                            ground_truth_bounding_box, param.min_overlap, ~ground_truth_obj_idx);
         detScore{unique_image_idx} = formatted_bounding_box(:,end)';
 
+        if 0
+            formatted_bounding_box(:,9) = prediction_iou;
+            
+            subplot(221);
+            imagesc(im); axis equal; axis off; axis tight;
+            
+            subplot(222);
+            imagesc(im);
+            for draw_gt_idx = find(ground_truth_obj_idx)
+                box_text = sprintf('id:%d %s', draw_gt_idx);
+                current_draw_gt_bbox = ground_truth_bounding_box(draw_gt_idx,:);
+                rectangle('position', dwot_bbox_xy_to_wh(current_draw_gt_bbox),'edgecolor',[0.5 0.5 0.5],'LineWidth',3);
+                text(current_draw_gt_bbox(1) + 1 , current_draw_gt_bbox(2), box_text, 'BackgroundColor','w','EdgeColor',[0.5 0.5 0.5],'VerticalAlignment','bottom');
+            end
+            axis equal; axis off; axis tight;
+            
+            
+            subplot(223);
+            dwot_draw_overlap_rendering(im, formatted_bounding_box(tp{unique_image_idx}, :),...
+                        detectors, 5, 50, true, [0.2, 0.8, 0], [-inf 50:10:100 inf], 1 );
+
+            subplot(224);
+            dwot_draw_overlap_rendering(im, formatted_bounding_box(fp{unique_image_idx}, :),...
+                        detectors, 5, 50, true, [0.2, 0.8, 0], [-inf 50:10:100 inf], 1 );
+            
+            drawnow
+            waitforbuttonpress;
+        end
+        
         % Read viewpoint annotation
-        if strcmp(detection_params.DATA_SET, 'PASCAL12') && ~isempty(clsinds)
+        if b_compute_view && ~isempty(clsinds)
             filename = fullfile(param.PASCAL3D_ANNOTATION_PATH,...
                                 sprintf('%s_pascal/%s.mat', detection_params.LOWER_CASE_CLASS, file_name));
             view_annotation = load(filename);
@@ -162,9 +198,9 @@ for unique_image_idx=1:n_unique_files
             prediction_azimuth = cellfun(@(x) x.az, detectors(formatted_bounding_box(:,11)));
             ground_truth_azimuth = cellfun(@(x) x.azimuth, {object_annotations.viewpoint});
 
-            [tp_view{unique_image_idx}, fp_view{unique_image_idx}, prediction_view_iou, gt_idx_of_prediction] =...
+            [tp_view{unique_image_idx}, fp_view{unique_image_idx}, prediction_view_iou, gt_idx_of_view_prediction] =...
                     dwot_evaluate_prediction(prediction_bounding_box_clip, ground_truth_bounding_box,...
-                            param.min_overlap, false(1, n_ground_truth),...
+                            param.min_overlap, ~ground_truth_obj_idx,...
                             prediction_azimuth, ground_truth_azimuth, max_azimuth_difference,...
                             prediction_azimuth_rotation_direction, prediction_azimuth_offset);
 
@@ -173,31 +209,17 @@ for unique_image_idx=1:n_unique_files
                     ground_truth_azimuth, prediction_azimuth, gt_idx_of_prediction,...
                     n_views, prediction_azimuth_rotation_direction, prediction_azimuth_offset);
 
-            if 1
+            if 0
+                tp_logical = tp_view{image_idx};
                 formatted_bounding_box(:,9) = prediction_view_iou;
+                formatted_bounding_box(:,10) = mod(prediction_azimuth_rotation_direction * prediction_azimuth +...
+                                                    prediction_azimuth_offset,360)';
                 
-                subplot(221);
-                imagesc(im);axis equal; axis off; axis tight;
+                dwot_visualize_result_with_azimuth(im, formatted_bounding_box, tp_logical,...
+                                      ground_truth_bounding_box, ground_truth_azimuth, detectors, param.color_range);
                 
-                subplot(222);
-                imagesc(im);
-                for draw_gt_idx = 1:n_ground_truth
-                    box_text = sprintf('id:%d a:%0.2f', draw_gt_idx, ground_truth_azimuth(draw_gt_idx));
-                    current_draw_gt_bbox = ground_truth_bounding_box(draw_gt_idx,:);
-                    rectangle('position', dwot_bbox_xy_to_wh(current_draw_gt_bbox),'edgecolor',[0.5 0.5 0.5],'LineWidth',3);
-                    text(current_draw_gt_bbox(1) + 1 , current_draw_gt_bbox(2), box_text, 'BackgroundColor','w','EdgeColor',[0.5 0.5 0.5],'VerticalAlignment','bottom');
-                end
-                axis equal; axis off; axis tight;
-
-                subplot(223);
-                dwot_draw_overlap_rendering(im, formatted_bounding_box(tp_view{unique_image_idx}, :),...
-                    detectors, 5, 0, true, [0.2, 0.8, 0], color_range, 1 );
-
-                subplot(224);
-                dwot_draw_overlap_rendering(im, formatted_bounding_box(~tp_view{unique_image_idx}, :),...
-                    detectors, 5, 0, true, [0.2, 0.8, 0], color_range, 1 );
-
-                drawnow
+                save_name = sprintf('%s_img_%s.jpg', detection_name, file_name);
+                print('-djpeg','-r150',fullfile(save_path, save_name));
             end
         else
             tp_view{unique_image_idx} = false(1, n_prediction);
@@ -258,57 +280,79 @@ for unique_image_idx=1:n_unique_files
     end
     image_count = image_count + 1;
     
-    npos=npos+sum(~gt_orig.diff);
+    % npos=npos+sum(~gt_orig.diff);
+    npos = npos + nnz(ground_truth_obj_idx);
 end
 
 
 detScore = cell2mat(detScore);
 fp = cell2mat(cellfun(@(x) double(x), fp, 'UniformOutput',false));
 tp = cell2mat(cellfun(@(x) double(x), tp, 'UniformOutput',false));
-fp_view = cell2mat(cellfun(@(x) double(x), fp_view, 'UniformOutput',false));
-tp_view = cell2mat(cellfun(@(x) double(x), tp_view, 'UniformOutput',false));
 
 [~, si] =sort(detScore,'descend');
 fpSort = cumsum(fp(si));
 tpSort = cumsum(tp(si));
-fpSort_view = cumsum(fp_view(si));
-tpSort_view = cumsum(tp_view(si));
 
 recall = tpSort/npos;
 precision = tpSort./(fpSort + tpSort);
 
-recall_view = tpSort_view/npos;
-precision_view = tpSort_view./(fpSort_view + tpSort_view);
-
-
 ap = VOCap(recall', precision');
-aa = VOCap(recall_view', precision_view');
 
-fprintf('\nAP = %.4f AA = %.4f\n', ap, aa);
+close all
 
-clf;
-subplot(121);
-plot(recall, precision, 'r', 'LineWidth',3);
-hold on;
-plot(recall_view, precision_view, 'g', 'LineWidth',3);
+if b_compute_view
+    fp_view = cell2mat(cellfun(@(x) double(x), fp_view, 'UniformOutput',false));
+    tp_view = cell2mat(cellfun(@(x) double(x), tp_view, 'UniformOutput',false));
+    fpSort_view = cumsum(fp_view(si));
+    tpSort_view = cumsum(tp_view(si));
 
-xlabel('Recall');
-ti = sprintf('Average Precision = %.3f Average Accuracy = %.3f', 100*ap, 100*aa);
-title(ti);
-axis([0 1 0 1]);
-axis equal; axis tight;
+    recall_view = tpSort_view/npos;
+    precision_view = tpSort_view./(fpSort_view + tpSort_view);
+
+    aa = VOCap(recall_view', precision_view');
     
-subplot(122);
-confusion_precision = bsxfun(@rdivide, confusion_statistics, sum(confusion_statistics));
-colormap cool;
-imagesc(confusion_precision); colormap; colorbar; axis equal; axis tight;
-ti = sprintf('Viewpoint confusion matrix', 100*aa);
-title(ti);
-xlabel('ground truth viewpoint index');
-ylabel('prediction viewpoint index');
+    fprintf('\nAP = %.4f AA = %.4f\n', ap, aa);
+    
+    subplot(121);
+    plot(recall, precision, 'r', 'LineWidth',3);
+    hold on;
+    plot(recall_view, precision_view, 'g', 'LineWidth',3);
 
-set(gcf,'color','w');
-drawnow;
+    xlabel('Recall');
+    ti = sprintf('Average Precision = %.3f Average Accuracy = %.3f', 100*ap, 100*aa);
+    title(ti);
+    axis equal; axis tight;
+    axis([0 1 0 1]);
+
+    confusion_precision = bsxfun(@rdivide, confusion_statistics, sum(confusion_statistics));
+    mppe = mean(diag(confusion_precision));
+
+    subplot(122);
+    colormap cool;
+    imagesc(confusion_precision); colormap; colorbar; axis equal; axis tight;
+    ti = sprintf('Viewpoint confusion matrix MPPE=%0.2f', 100*mppe);
+    title(ti);
+    xlabel('ground truth viewpoint index');
+    ylabel('prediction viewpoint index');
+
+    set(gcf,'color','w');
+    drawnow;
+else
+    fprintf('\nAP = %.4f\n', ap);
+    
+    plot(recall, precision, 'r', 'LineWidth',3);
+
+    xlabel('Recall');
+    ti = sprintf('Average Precision = %.3f', 100*ap);
+    title(ti);
+    axis equal; axis tight;
+    axis([0 1 0 1]);
+    
+    set(gcf,'color','w');
+    drawnow;
+end
+
+return;
 
 % Sort the scores for each detectors and print  
 if visualize

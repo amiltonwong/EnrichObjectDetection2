@@ -15,7 +15,7 @@ if ~isempty(SUB_CLASS)
 end
 
 
-if nModels < 5
+if nModels < 3
   detector_model_name = [ detector_model_name '_each_' strjoin(strrep(model_names, '/','_'),'_')];
 else
   detector_model_name = [ detector_model_name '_each_' num2str(nModels)];

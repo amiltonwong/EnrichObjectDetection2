@@ -1,4 +1,4 @@
-function [ ap ] = dwot_analyze_and_visualize_3D_object_results( detection_result_txt, ...
+function [ ap, aa, mppe ] = dwot_analyze_and_visualize_3D_object_results( detection_result_txt, ...
                             detectors, save_path, param, DATA_PATH, CLASS, color_range, nms_threshold, visualize, prediction_azimuth_rotation_direction, prediction_azimuth_offset)
 
 if ~exist('nms_threshold','var') || isempty(nms_threshold)
@@ -36,7 +36,13 @@ detection_name = detection_param_name{1}{1};
 [gt_orig, image_path] = dwot_3d_object_dataset(DATA_PATH, CLASS);
 image_dir = regexp(image_path{1}, '([\w\/\.]+)\/\w+/\w+\.(\w+)', 'tokens');
 ext = image_dir{1}{2};
-image_dir = image_dir{1}{1};
+
+if ismac
+  image_dir = image_dir{1}{1};
+  image_dir = ['~' image_dir];
+else
+  image_dir = image_dir{1}{1};
+end
 
 image_path = cellfun(@(x) regexp(x,'/(\w+/\w+)\.','tokens'), image_path);
 image_path = cellfun(@(x) x{1}, image_path, 'UniformOutput', false);
@@ -138,7 +144,7 @@ for unique_image_from_detection_idx=1:n_unique_files
         n_ground_truth = size(ground_truth_bounding_box,1);
 
         % evaluate prediction using the clipped prediction
-        [tp{image_idx}, fp{image_idx}, prediction_iou, ~] = ...
+        [tp{image_idx}, fp{image_idx}, prediction_iou, gt_idx_of_prediction] = ...
                 dwot_evaluate_prediction(prediction_bounding_box_clip,...
                             ground_truth_bounding_box, param.min_overlap);
         detScore{image_idx} = formatted_bounding_box(:,end)';
@@ -147,7 +153,7 @@ for unique_image_from_detection_idx=1:n_unique_files
         prediction_azimuth = cellfun(@(x) x.az, detectors(formatted_bounding_box(:,11)));
         ground_truth_azimuth = gt_orig{image_idx}.azimuth;
         
-        [tp_view{image_idx}, fp_view{image_idx}, prediction_view_iou, gt_idx_of_prediction] =...
+        [tp_view{image_idx}, fp_view{image_idx}, prediction_view_iou, gt_idx_of_view_prediction] =...
                 dwot_evaluate_prediction(prediction_bounding_box_clip, ground_truth_bounding_box,...
                         param.min_overlap, false(1, n_ground_truth),...
                         prediction_azimuth, ground_truth_azimuth, max_azimuth_difference,...
@@ -158,7 +164,7 @@ for unique_image_from_detection_idx=1:n_unique_files
                 ground_truth_azimuth, prediction_azimuth, gt_idx_of_prediction,...
                 n_views, prediction_azimuth_rotation_direction, prediction_azimuth_offset);
             
-        if 1
+        if 0
             formatted_bounding_box(:,9) = prediction_view_iou;
             
             subplot(121);
@@ -257,14 +263,16 @@ plot(recall_view, precision_view, 'g', 'LineWidth',3);
 xlabel('Recall');
 ti = sprintf('Average Precision = %.3f Average Accuracy = %.3f', 100*ap, 100*aa);
 title(ti);
-axis([0 1 0 1]);
 axis equal; axis tight;
-    
-subplot(122);
+axis([0 1 0 1]);
+
 confusion_precision = bsxfun(@rdivide, confusion_statistics, sum(confusion_statistics));
+mppe = mean(diag(confusion_precision));
+
+subplot(122);
 colormap cool;
 imagesc(confusion_precision); colormap; colorbar; axis equal; axis tight;
-ti = sprintf('Viewpoint confusion matrix', 100*aa);
+ti = sprintf('Viewpoint confusion matrix AA=%0.2f MPPE=%0.2f', 100*aa, 100*mppe);
 title(ti);
 xlabel('ground truth viewpoint index');
 ylabel('prediction viewpoint index');

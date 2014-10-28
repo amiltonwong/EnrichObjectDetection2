@@ -69,18 +69,21 @@ end
     
 %%%%% Visualize %%%%
 if visualize
-    hist_range = -200:5:200;
-    detection_scores_temp = {};
+    hist_range = -200:2:200;
     for det_idx = 1:n_detectors
-        detection_scores_temp{det_idx} = cell2mat(detection_scores{det_idx}');
-        count_per_bin = histc(detection_scores_temp{det_idx}, hist_range);
-        plot(hist_range + 5, count_per_bin,'r-');
-
-        mean(detection_scores_temp{det_idx});
+        detection_score_temp = cell2mat(detection_scores{det_idx}');
+        count_per_bin = histc(detection_score_temp, hist_range);
+        
+        % Divide by area to normalize the disbribution
+        plot(hist_range + 5, count_per_bin/trapz(hist_range, count_per_bin),'r-');
+        
+        mean(detection_score_temp);
         hold on;
         drawnow;
         % waitforbuttonpress;
     end
+    xlabel('detection score');
+    ylabel('probability');
 end
 %%%%%%%%%%%%%
 
@@ -90,9 +93,9 @@ for det_idx = 1:n_detectors
     switch param.calibration_mode
         case 'gaussian'
             % normalize score by normalizing the negative instances score distribution
-            detection_scores_temp = cell2mat(detection_scores{det_idx}');
-            detectors{det_idx}.mean = mean(detection_scores_temp);
-            detectors{det_idx}.var = var(detection_scores_temp);
+            detection_scores{det_idx} = cell2mat(detection_scores{det_idx}');
+            detectors{det_idx}.mean = mean(detection_scores{det_idx});
+            detectors{det_idx}.var = var(detection_scores{det_idx});
             detectors{det_idx}.sigma = sqrt(detectors{det_idx}.var);
         case 'linear'
             % Seeing 3D Chair, CVPR 14 approach
@@ -118,6 +121,25 @@ for det_idx = 1:n_detectors
     end
 end
 
+if visualize
+    hist_range = -10:0.05:10;
+    for det_idx = 1:n_detectors
+        detection_score_temp = ...
+          dwot_calibrate_score(detection_scores{det_idx},...
+              det_idx, detectors, param);
+            
+        count_per_bin = histc(detection_score_temp, hist_range);
+        
+        % Divide by area to normalize the disbribution
+        plot(hist_range, count_per_bin/trapz(hist_range, count_per_bin),'r-');
+        
+        hold on;
+        drawnow;
+        % waitforbuttonpress;
+    end
+    xlabel('detection score');
+    ylabel('probability');
+end
 
 %     if COMPUTING_MODE == 0
 %       [bbsAllLevel, hog, scales] = dwot_detect( im, templates_cpu, param);

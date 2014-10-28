@@ -33,7 +33,7 @@ detection_params_temp = regexp(name,...
 detection_params = add_fields(detection_params, detection_params_temp);
 
 detection_params_temp = regexp(name,...
-  'skp_(?<skip_criterion>\w)','names');
+  'skp_(?<skip_criterion>[a-z]+)_','names');
 
 detection_params = add_fields(detection_params, detection_params_temp);
 

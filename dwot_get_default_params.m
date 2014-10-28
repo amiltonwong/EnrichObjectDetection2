@@ -98,6 +98,13 @@ param.init_params = init_params;
 % TEMPLATE_INITIALIZATION_MODE == 2
 %     Create templates that have approximately same number of cells but
 % decorrelate all cells even including zero HOG cells
+% TEMPLATE_INITIALIZATION_MODE == 3
+%     Create templates that have approximately same number of cells and
+%     decorrelate only non-zero cells. But normalized by the number of
+%     non-zero cells
+% TEMPLATE_INITIALIZATION_MODE == 4
+%     Create templates that have approximately same number of cells and 
+%     center the HOG feature but do not decorrelate
 param.template_initialization_mode = 0; 
 param.image_padding       = 50;
 param.lambda              = lambda;

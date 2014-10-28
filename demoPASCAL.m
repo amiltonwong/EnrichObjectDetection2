@@ -125,7 +125,7 @@ param.image_scale_factor = 2; % scale image accordingly and detect on the scaled
 %             == 1, MCMC
 %             == 2, Breadth first search
 %             == 3, Quasi-Newton method (BFGS)
-param.proposal_tuning_mode = 1;
+param.proposal_tuning_mode = 'none';
 
 
 % Detection mode == 'dwot' ours
@@ -157,7 +157,7 @@ detection_result_file = dwot_save_detection([], SAVE_PATH, detection_result_file
 detection_result_common_name = regexp(detection_result_file, '\/?(?<name>.+)\.txt','names');
 detection_result_common_name = detection_result_common_name.name;
 
-if param.proposal_tuning_mode > 0
+if ~strcmp(param.proposal_tuning_mode,'none')
     detection_tuning_result_file = sprintf(['%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_',...
         '%0.2f_sbin_%d_level_%d_skp_%s_server_%s_tuning.txt'],...
         DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda,...
@@ -294,7 +294,7 @@ for imgIdx=1:N_IMAGE
     end
     [~, img_file_name] = fileparts(recs.imgname);
     dwot_save_detection(esvm_nms(bbsAllLevel, 0.7), SAVE_PATH, detection_result_file, ...
-                                 img_file_name, false, 1); % save mode != 0 to save template index
+                                 img_file_name, false, 2); % save mode != 0 to save template index
     
     if visualize_detection && ~isempty(clsinds)
         tpIdx = logical(tp); % Index of bounding boxes that will be printed as ground truth

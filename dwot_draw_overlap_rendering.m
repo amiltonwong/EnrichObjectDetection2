@@ -135,10 +135,12 @@ if box_text
     % if detector id available (positive number), print it
     if bbsNMS(bbsIdx,11) > 0 && (text_mode == 0)
       box_text = sprintf(' s:%0.2f o:%0.2f t:%d',bbsNMS(bbsIdx,12),bbsNMS(bbsIdx,9),bbsNMS(bbsIdx,11));
-    elseif (text_mode == 0)
-      box_text = sprintf(' s:%0.2f o:%0.2f ',bbsNMS(bbsIdx,12),bbsNMS(bbsIdx,9));
     elseif (text_mode == 1)
+      box_text = sprintf(' s:%0.2f o:%0.2f ',bbsNMS(bbsIdx,12),bbsNMS(bbsIdx,9));
+    elseif (text_mode == 2)
       box_text = sprintf(' s:%0.2f ',bbsNMS(bbsIdx,12));
+    elseif (text_mode == 3)
+      box_text = sprintf(' s:%0.2f a:%0.0f o:%0.2f',bbsNMS(bbsIdx,12), bbsNMS(bbsIdx,10), bbsNMS(bbsIdx,9));
     end
     
     rectangle('position', box_position,'edgecolor',[0.5 0.5 0.5],'LineWidth',3);

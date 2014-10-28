@@ -87,7 +87,12 @@ for imgIdx=1:n_unique_files
   % read annotation
   clsinds = strmatch(detection_params.LOWER_CASE_CLASS,{recs.objects(:).class},'exact');
 
-  if dwot_skip_criteria(recs.objects(clsinds), skip_criteria); continue; end
+  [b_skip_img, gt_to_use] = dwot_skip_criteria(recs.objects(clsinds), skip_criteria); 
+  
+  if b_skip_img
+      continue;
+  end
+gt_to_use
 
 %   im = imread([VOCopts.datadir, recs.imgname]);
 %   im = imresize(im, image_scale_factor);

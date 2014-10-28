@@ -482,6 +482,10 @@ end
 close all;  % space plot casues problem when using different subplot grid
 
 %% Vary NMS threshold
+% for n_view = [4,8,16,24]
+%     dwot_analyze_and_visualize_cnn_results( fullfile('Result/car_val', 'PASCAL12_car_val_init_0_Car_each_27_lim_250_lam_0.1500_a_24_e_3_y_1_f_1_scale_2.00_sbin_6_level_20_nms_0.30_server_104_cnn_proposal_dwot_tmp_2.txt') , detectors, '/home/chrischoy/DWOT_CNN5', VOCopts, param, skip_criteria, param.color_range, param.nms_threshold, false, n_view, -1, 0);
+%     print('-dpng','-r200',fullfile(SAVE_PATH, ['AP_PASCAL12_car_val_init_0_Car_each_27_lim_250_lam_0.1500_a_24_e_3_y_1_f_1_scale_2.00_sbin_6_level_20_nms_0.30_server_104_cnn_proposal_dwot_tmp_2_nms_' sprintf('%0.2f',param.nms_threshold) '_nview_' num2str(n_view) '.png' ] ));
+% end
 nms_thresholds = 0.3:0.1:0.7;
 ap = zeros(numel(nms_thresholds),1);
 ap_dwot_cnn = zeros(numel(nms_thresholds),1);
@@ -521,7 +525,7 @@ if ~strcmp(param.proposal_tuning_mode,'none')
                         detection_tuning_result_file), detectors, [], VOCopts, param,...
                         skip_criteria, param.color_range, param.nms_threshold, false);
                         
-    ap_tuning_save_name = sprintf(['AP_%s_tuning_%d_nms_%.2f.png'],...
+    ap_tuning_save_name = sprintf(['AP_%s_tuning_%s_nms_%.2f.png'],...
                         detection_result_common_name, param.proposal_tuning_mode,...
                         param.nms_threshold);
 
@@ -539,6 +543,9 @@ if ~isempty(server_id) && ~strcmp(server_id.num,'capri7')
             SAVE_PATH]);
     end
     system(['scp ' fullfile(SAVE_PATH, detection_result_file),...
+        ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/' SAVE_PATH]);
+    
+    system(['scp ' fullfile(SAVE_PATH, detection_dwot_proposal_result_file),...
         ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/' SAVE_PATH]);
     
     if ~strcmp(param.proposal_tuning_mode,'none')

@@ -46,7 +46,7 @@ paddedIm = padarray(im2double(im), [padding, padding, 0], 1);
 bbox = [1 1 size(im,2) size(im,1)] + padding;
 
 % TODO replace it
-if (param.template_initialization_mode == 0 || param.template_initialization_mode == 2)
+if (param.template_initialization_mode == 0 || param.template_initialization_mode == 2 || param.template_initialization_mode == 3 )
   [HOGTemplate, scale] = dwot_initialize_template(paddedIm, bbox, param);
 else
   [HOGTemplate, scale] = dwot_initialize_template_const_active_cell(paddedIm, bbox, param);
@@ -88,6 +88,9 @@ nonEmptyHOG = permHOG(onlyNonEmptyIdx);
 
 [WHO_ACTIVE_CELLS] = cudaDecorrelateFeature(param.hog_gamma_gpu, single(nonEmptyHOG(:)),nonEmptyRows, nonEmptyCols, HOGDim, lambda);
 
+if (param.template_initialization_mode == 3)
+  WHO_ACTIVE_CELLS = WHO_ACTIVE_CELLS/nnz(nonEmptyCells);
+end
 
 WHOTemplate_CG = zeros(prod(HOGTemplateSz),1,'single');
 % WHOTemplate_CG(onlyNonEmptyIdx) = gather(x_min) / double(n_non_empty_cells);

@@ -24,9 +24,9 @@ for i = 1:n_object
     b_skip(i) = b_curr;
 end
 
-object_idx = find(~b_skip);
+object_idx = ~b_skip;
 if ~ismember('none', criteria)
-    b_skip_im = isempty(object_idx);
+    b_skip_im = nnz(object_idx) == 0;
 else
     b_skip_im = false;
 end

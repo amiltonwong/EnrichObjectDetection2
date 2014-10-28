@@ -35,9 +35,8 @@ else
   f = fopen(fullfile(save_path, file_name),'a');
 end
 
-new_file_name = file_name;
-
 n_detection = size(detection_result,1);
+
 for det_idx = 1:n_detection
   % The read detection uses the following line to read data
   % [ids,conf,x1,y1,x2,y2]=textread(detfn,'%s %f %f %f %f %f');
@@ -46,11 +45,18 @@ for det_idx = 1:n_detection
                       image_name,...
                       detection_result(det_idx, end),...
                       detection_result(det_idx, 1:4)));
-  else
+  elseif save_mode == 1
     fwrite(f,sprintf('%s %f %f %f %f %f %d\n',...
                       image_name,...
                       detection_result(det_idx, end),... % detection score
                       detection_result(det_idx, 1:4),... % bbox
+                      detection_result(det_idx, 11)));  % templateIdx
+  elseif save_mode == 2
+      fwrite(f,sprintf('%s %f %f %f %f %f %f %d\n',...
+                      image_name,...
+                      detection_result(det_idx, end),... % detection score
+                      detection_result(det_idx, 1:4),... % bbox
+                      detection_result(det_idx, 1:5),... % cnn_score
                       detection_result(det_idx, 11)));  % templateIdx
   end
 end

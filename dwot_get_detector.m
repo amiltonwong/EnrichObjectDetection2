@@ -9,7 +9,11 @@ if isempty(im)
   error('Rendering error');
 end
 % [ WHOTemplate, HOGTemplate] = WHOTemplateDecompNonEmptyCell( im, Mu, Gamma, n_cell_limit, lambda, 50);
-[ WHOTemplate, ~, scale] = WHOTemplateCG_CUDA( im, param);
+if param.template_initialization_mode == 4
+    [ WHOTemplate, scale] = HOGTemplate(im, param);
+else
+    [ WHOTemplate, ~, scale] = WHOTemplateCG_CUDA( im, param);
+end
 
 detector = [];
 detector.whow = WHOTemplate;
