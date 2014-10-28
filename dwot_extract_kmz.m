@@ -26,7 +26,7 @@ function [ model_names, file_paths ] = recurse_extract_models(PATH, model_names,
           continue;
         end
         % system(['unzip ' fullfile(PATH,file.name) ' -d ' fullfile(PATH,substrs.name)]);
-        system(['osgconv -i ' file.name ' -o ' file.name '.3ds']);
+        system(['osgconv ' fullfile(PATH,file.name) ' ' fullfile(PATH,substrs.name) '.3ds']);
         model_names = { model_names{:}, substrs.name};
         file_paths = { file_paths{:}  fullfile(PATH,file.name) };
     end

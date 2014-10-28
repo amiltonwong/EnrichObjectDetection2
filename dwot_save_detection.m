@@ -34,6 +34,7 @@ if b_new_file
 else
   f = fopen(fullfile(save_path, file_name),'a');
 end
+new_file_name = file_name;
 
 n_detection = size(detection_result,1);
 
