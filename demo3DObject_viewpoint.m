@@ -19,8 +19,8 @@ dwot_set_datapath;
 %                 = 1, GPU
 %                 = 2, Combined
 COMPUTING_MODE = 1;
-CLASS = 'Car';
-SUB_CLASS = 'Sedan';
+CLASS = 'Bicycle';
+SUB_CLASS = [];
 LOWER_CASE_CLASS = lower(CLASS);
 TEST_TYPE = 'val';
 SAVE_PATH = fullfile('Result',[LOWER_CASE_CLASS '_' TEST_TYPE]);
@@ -35,11 +35,11 @@ if COMPUTING_MODE > 0
 end
 
 azs = 0:15:345;
-els = 0:10:30;
-fovs = [25 50];
-yaws = 0;
+els = 0:10:40;
+fovs = [25];
+yaws = -0;
 n_cell_limit = [250];
-lambda = [0.015];
+lambda = [0.15];
 detection_threshold = 50;
 
 visualize_detection = true;
@@ -52,14 +52,26 @@ n_proposals = 5;
 % Get all possible sub-classes
 [ model_names, model_paths ] = dwot_get_cad_models('Mesh', CLASS, SUB_CLASS, {'3ds','dae'});
 
-honda_idx = ismember(model_names,'Honda-Accord-3');
-model_names = model_names(honda_idx);
-model_paths = model_paths(honda_idx);
+% honda_idx = ismember(model_names,'Honda-Accord-3');
+
+models_to_use = {'atx_bike',...
+              'atx_bike_rot',...
+              'bmx_bike_4',...
+              'brooklyn_machine_works_bike',...
+              'downhill_bike',...
+              'glx_bike',...
+              'road_bike',...
+              'road_bike_rot'};
+
+use_idx = ismember(model_names,models_to_use);
+          
+model_names = model_names(use_idx);
+model_paths = model_paths(use_idx);
 %%%%%%%%%%%%%%% Set Parameters %%%%%%%%%%%%
 
 dwot_get_default_params;
 
-param.template_initialization_mode = 4; 
+param.template_initialization_mode = 0; 
 param.nms_threshold = 0.4;
 param.model_paths = model_paths;
 
@@ -80,8 +92,9 @@ switch param.calibration_mode
     param.detection_threshold = -0.2;
     param.b_calibrate = 1;
   case 'none'
-    param.color_range = [-inf 3:0.1:10 inf];
-    param.detection_threshold = 3;
+    % param.color_range = [-inf 3:0.1:10 inf];
+    param.color_range = [-inf 30:5:100 inf];
+    param.detection_threshold = 40;
     param.b_calibrate = 0;
 end
 
@@ -275,8 +288,8 @@ fp_per_template = cell(1,numel(templates_gpu));
 n_views = 8;
 max_azimuth_difference = 360/n_views/2;
 
-prediction_azimuth_offset = 180;
-prediction_azimuth_rotation_direction = 1;
+prediction_azimuth_offset = -90;
+prediction_azimuth_rotation_direction = -1;
 
 for image_idx = 1:N_IMAGE
     fprintf('%d/%d ',image_idx,N_IMAGE);
@@ -288,10 +301,7 @@ for image_idx = 1:N_IMAGE
     image_size = size(im);
     if COMPUTING_MODE == 0
       [formatted_bounding_box_all, hog, scales] = dwot_detect( im, templates_cpu, param);
-      % [hog_region_pyramid, im_region] = dwot_extract_region_conv(im, hog, scales, bbsNMS, param);
-      % [bbsNMS_MCMC] = dwot_mcmc_proposal_region(im, hog, scale, hog_region_pyramid, param);
     elseif COMPUTING_MODE == 1
-      % [bbsNMS ] = dwot_detect_gpu_and_cpu( im, templates, templates_cpu, param);
       [formatted_bounding_box_all, hog, scales] = dwot_detect_gpu( im, templates_gpu, param);
     elseif COMPUTING_MODE == 2
       [formatted_bounding_box_all, hog, scales] = dwot_detect_combined( im, templates_gpu, templates_cpu, param);
@@ -320,10 +330,6 @@ for image_idx = 1:N_IMAGE
                                                         [1 1 image_size(2) image_size(1)]);
     
 
-                                                        
-    % [bbsNMS_clip_per_template_nms_mat_nms, nms_idx]=esvm_nms(formatted_bounding_box_nms_per_template_clip, param.nms_threshold);
-    % formatted_bounding_box_nms_per_template = formatted_bounding_box_nms_per_template(nms_idx,:);
-
     % evaluate prediction using the clipped prediction
     ground_truth_bounding_box = gt{image_idx}.BB';
     ground_truth_azimuth = gt{image_idx}.azimuth;    
@@ -333,28 +339,17 @@ for image_idx = 1:N_IMAGE
     n_prediction   = size(formatted_bounding_box_nms_per_template,1);
     n_ground_truth = size(ground_truth_bounding_box,1);
 
-    [tp_view, fp_view, prediction_view_iou, gt_idx_of_view_prediction] =...
-                dwot_evaluate_prediction(prediction_bounding_box, ground_truth_bounding_box,...
-                        param.min_overlap, false(1, n_ground_truth),...
-                        prediction_azimuth, ground_truth_azimuth, max_azimuth_difference,...
-                        prediction_azimuth_rotation_direction, prediction_azimuth_offset);
-
-
-    % compute true viewpoint positives
-    % [formatted_bounding_box_nms_per_template_clip, ~, ~, ~] = dwot_compute_positives_view(formatted_bounding_box_nms_per_template_clip, gt{image_idx}, detectors, param);
-    % if numel(formatted_bounding_box_nms_per_template_clip) > 0
-    %     formatted_bounding_box_nms_per_template(:,9) = formatted_bounding_box_nms_per_template_clip(:,9); % copy overlap to original non-clipped detection
-    % end
-
-    % NMS again
-        % [bbsNMS_clip_per_template, tp_view{image_idx}, fp_view{image_idx}, ~] = dwot_compute_positives_view(formatted_bounding_box_nms_per_template_clip, gt{image_idx}, detectors, param);
-    % Applying NMS dramatically reduce false positives
-    % [bbsNMS_clip_per_template_nms_mat_nms, tp{image_idx}, fp{image_idx}, detScore{image_idx}, ~] = dwot_compute_positives(bbsNMS_clip_per_template_nms_mat_nms, gt{image_idx}, param);
-
-    % dwot_compute_positives_view will return GT index at the 10th column of bbsNMS
-    % [bbsNMS_clip_per_template_nms_mat_nms, tp_view{image_idx}, fp_view{image_idx}, detScore_view{image_idx}, ~] = dwot_compute_positives_view(bbsNMS_clip_per_template_nms_mat_nms, gt{image_idx}, detectors, param);
-
     if visualize_detection
+%     [tp_view, fp_view, prediction_view_iou, gt_idx_of_view_prediction] =...
+%                 dwot_evaluate_prediction(prediction_bounding_box, ground_truth_bounding_box,...
+%                         param.min_overlap, false(1, n_ground_truth),...
+%                         prediction_azimuth, ground_truth_azimuth, max_azimuth_difference,...
+%                         prediction_azimuth_rotation_direction, prediction_azimuth_offset);
+
+        [tp_view, fp_view, prediction_view_iou, gt_idx_of_view_prediction] =...
+                dwot_evaluate_prediction(prediction_bounding_box, ground_truth_bounding_box,...
+                        param.min_overlap, false(1, n_ground_truth));
+                    
         tp_logical = logical(tp_view);
         
         formatted_bounding_box_nms_per_template(:,9) = prediction_view_iou;
@@ -363,9 +358,9 @@ for image_idx = 1:N_IMAGE
                                                   
         dwot_visualize_result_with_azimuth(im, formatted_bounding_box_nms_per_template, tp_logical,...
                               ground_truth_bounding_box, ground_truth_azimuth, detectors, param.color_range);
-                                              
-%         save_name = sprintf('%s_img_%d.jpg', detection_result_common_name, image_idx);
-%         print('-djpeg','-r150',fullfile(SAVE_PATH, save_name));
+        drawnow;
+        save_name = sprintf('%s_img_%d.jpg', detection_result_common_name, image_idx);
+        print('-djpeg','-r150',fullfile(SAVE_PATH, save_name));
     end
 end
 
@@ -373,13 +368,13 @@ end
 close all;  % space plot casues problem when using different subplot grid
 
 %% Vary NMS threshold
-nms_thresholds = 0.2 : 0.05 : 0.6;
+nms_thresholds = 0.1 : 0.05 : 0.6;
 ap = zeros(numel(nms_thresholds),1);
 ap_save_names = cell(numel(nms_thresholds),1);
 for i = 1:numel(nms_thresholds)
     nms_threshold = nms_thresholds(i);
     ap(i) = dwot_analyze_and_visualize_3D_object_results(fullfile(SAVE_PATH, detection_result_file),...
-        detectors, SAVE_PATH, param, DATA_PATH, CLASS, param.color_range, nms_threshold, false, 1, 180);
+        detectors, SAVE_PATH, param, DATA_PATH, CLASS, param.color_range, nms_threshold, false, -1, 90);
                         
 
     ap_save_names{i} = sprintf(['AP_%s_nms_%0.2f.png'],...

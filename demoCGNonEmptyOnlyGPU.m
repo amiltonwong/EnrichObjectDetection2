@@ -46,7 +46,7 @@ for caseIdx = 1:numel(n_cell_limits)
   
   tic;
   
-  [WHOTemplate_CG, ~, r_hist, residual] = WHOTemplateCG_GPU( im, scrambleKernel, mu, GammaGPU, gammaDim(1), n_cell_limit, lambda, padding, hog_cell_threshold, CG_THREASHOLD, CG_MAX_ITER, N_THREAD);
+  [WHOTemplate_CG, ~, r_hist, residual] = WHOTemplateCG_GPU( im, param);
   
   cg_time_per_case(caseIdx) = toc
 

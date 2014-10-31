@@ -8,20 +8,24 @@ b_skip    = false(1, n_object);
 
 for i = 1:n_object
     cur_object_annotation = object_annotations(i);
-    b_curr = false;
+    b_curr_skip = false;
     for criterion = criteria
       switch criterion{1}
         case 'truncated'
-          b_curr  = b_curr || cur_object_annotation.truncated;
+            b_curr_skip  = b_curr_skip || cur_object_annotation.truncated;
         case 'difficult'    
-          b_curr  = b_curr || cur_object_annotation.difficult;
+            b_curr_skip  = b_curr_skip || cur_object_annotation.difficult;
         case 'occluded'
-          b_curr  = b_curr || cur_object_annotation.occluded;      
+            b_curr_skip  = b_curr_skip || cur_object_annotation.occluded;      
+        case 'none'
+            b_curr_skip  = b_curr_skip || cur_object_annotation.difficult;      
+        case 'empty'
+            % Nothing
         otherwise
-          continue;
+          error('undefined criterion');
       end
     end
-    b_skip(i) = b_curr;
+    b_skip(i) = b_curr_skip;
 end
 
 object_idx = ~b_skip;

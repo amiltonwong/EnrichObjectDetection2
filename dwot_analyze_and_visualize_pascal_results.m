@@ -92,7 +92,6 @@ for imgIdx=1:n_unique_files
   if b_skip_img
       continue;
   end
-gt_to_use
 
 %   im = imread([VOCopts.datadir, recs.imgname]);
 %   im = imresize(im, image_scale_factor);
@@ -159,7 +158,7 @@ gt_to_use
   
   image_count = image_count + 1;
   
-  npos=npos+sum(~gt(imgIdx).diff);
+  npos=npos+sum(gt_to_use);
   
 end
 

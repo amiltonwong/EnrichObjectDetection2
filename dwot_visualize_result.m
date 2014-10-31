@@ -16,7 +16,7 @@ switch param.detection_mode
     [~, width_sort_idx ] = sort(widths, 'descend');
     bbsNMSDraw = bbsNMSDraw(width_sort_idx, :);
     tpIdxSort = tpIdx(width_sort_idx);
-
+    rendering_image_weight = [0.85, 0.15];
     % Original images
     subplot(221);
     imagesc(im); axis off; axis equal;
@@ -24,18 +24,20 @@ switch param.detection_mode
     % True positives
     subplot(222);
     result_im = dwot_draw_overlap_rendering(im, bbsNMSDraw(tpIdxSort,:), detectors,...
-                                            inf, 50, false, [0.15, 0.85, 0], param.color_range  );
+                                            inf, 50, false, rendering_image_weight, param.color_range  );
     imagesc(result_im); axis off; axis equal;
 
     % Draw True Positives with bounding box annotations
     subplot(223);
     dwot_draw_overlap_rendering(im, bbsNMSDraw(tpIdxSort,:), detectors, inf, 50,...
-                                visualize_detection, [0.2, 0.8, 0], param.color_range  );
+                                visualize_detection, rendering_image_weight, param.color_range  );
 
     % False positives
     subplot(224);
-    dwot_draw_overlap_rendering(im, bbsNMS_ov(~tpIdx,:), detectors, 5, 50,...
-                                visualize_detection, [0.2, 0.8, 0], param.color_range  );
+    dwot_visualize_formatted_bounding_box(im, detectors, bbsNMS, param.color_range, 1, rendering_image_weight, jet(numel(param.color_range)), 0)
+    
+%     dwot_draw_overlap_rendering(im, bbsNMS_ov(~tpIdx,:), detectors, 5, 50,...
+%                                 visualize_detection, rendering_image_weight, param.color_range  );
 
     drawnow;
     spaceplots();

@@ -14,8 +14,8 @@ detection_params = add_fields(detection_params, detection_params_temp);
 
 detection_params_temp = regexp(name,...
    'scale_(?<scale>[\d.]+)_','names');
-
 detection_params = add_fields(detection_params, detection_params_temp);
+detection_params.scale = str2num(detection_params.scale);
 
 detection_params_temp = regexp(name,...
   'sbin_(?<sbin>\d+)','names');
@@ -33,7 +33,12 @@ detection_params_temp = regexp(name,...
 detection_params = add_fields(detection_params, detection_params_temp);
 
 detection_params_temp = regexp(name,...
-  'skp_(?<skip_criterion>[a-z]+)_','names');
+  'skp_(?<skip_name>[a-z]+)_','names');
+
+detection_params = add_fields(detection_params, detection_params_temp);
+
+detection_params_temp = regexp(name,...
+  'sm_(?<save_mode>[a-z]+)_','names');
 
 detection_params = add_fields(detection_params, detection_params_temp);
 

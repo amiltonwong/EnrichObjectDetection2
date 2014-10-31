@@ -1,4 +1,4 @@
-function [ ap, aa, mppe ] = dwot_analyze_and_visualize_3D_object_results( detection_result_txt, ...
+function [ ap, avp, mppe ] = dwot_analyze_and_visualize_3D_object_results( detection_result_txt, ...
                             detectors, save_path, param, DATA_PATH, CLASS, color_range, nms_threshold, visualize, prediction_azimuth_rotation_direction, prediction_azimuth_offset)
 
 if ~exist('nms_threshold','var') || isempty(nms_threshold)
@@ -250,9 +250,9 @@ precision_view = tpSort_view./(fpSort_view + tpSort_view);
 
 
 ap = VOCap(recall', precision');
-aa = VOCap(recall_view', precision_view');
+avp = VOCap(recall_view', precision_view');
 
-fprintf('\nAP = %.4f AA = %.4f\n', ap, aa);
+fprintf('\nAP = %.4f AVP = %.4f\n', ap, avp);
 
 clf;
 subplot(121);
@@ -261,7 +261,7 @@ hold on;
 plot(recall_view, precision_view, 'g', 'LineWidth',3);
 
 xlabel('Recall');
-ti = sprintf('Average Precision = %.3f Average Accuracy = %.3f', 100*ap, 100*aa);
+ti = sprintf('Average Precision = %.3f Average Viewpoint Precision = %.3f', 100*ap, 100*avp);
 title(ti);
 axis equal; axis tight;
 axis([0 1 0 1]);
@@ -272,7 +272,7 @@ mppe = mean(diag(confusion_precision));
 subplot(122);
 colormap cool;
 imagesc(confusion_precision); colormap; colorbar; axis equal; axis tight;
-ti = sprintf('Viewpoint confusion matrix AA=%0.2f MPPE=%0.2f', 100*aa, 100*mppe);
+ti = sprintf('Viewpoint confusion matrix MPPE=%0.2f', 100*mppe);
 title(ti);
 xlabel('ground truth viewpoint index');
 ylabel('prediction viewpoint index');

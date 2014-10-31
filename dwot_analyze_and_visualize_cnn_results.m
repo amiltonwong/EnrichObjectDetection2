@@ -1,35 +1,26 @@
 function [ ap ] = dwot_analyze_and_visualize_cnn_results( detection_result_txt, ...
-    detectors, save_path, VOCopts, param, skip_criteria, color_range, nms_threshold, visualize, n_views, prediction_azimuth_rotation_direction, prediction_azimuth_offset)
-
+                        detectors, VOCopts, param, nms_threshold, visualize, save_path,...
+                        n_views, prediction_azimuth_rotation_direction, prediction_azimuth_offset)
 if nargin < 6
-  % skip_criteria = {'empty', 'difficult','truncated'};
-  skip_criteria = {'empty'};
-end
-
-if nargin < 7
-  color_range = [-inf -2:0.05:3 inf];
-end
-
-if nargin < 8
-    if ~isfield(param, 'nms_threshold')
-      nms_threshold = 0.4;
-    else
-      nms_threshold = param.nms_threshold;
-    end
-end
-
-if nargin < 9 
     visualize = false;
 end
 
-if nargin < 10
+if nargin < 8
     b_compute_view = false;
-    n_views = 16;
 end
 
-if nargin >= 10 && nargin < 11
+if nargin == 8
     prediction_azimuth_rotation_direction = 1;
     prediction_azimuth_offset = 0;
+    b_compute_view = true;
+    max_azimuth_difference = 360/n_views/2;
+    confusion_statistics = zeros(n_views, n_views);
+end
+
+if nargin > 8
+    b_compute_view = true;
+    max_azimuth_difference = 360/n_views/2;
+    confusion_statistics = zeros(n_views, n_views);
 end
 
 % renderings = cellfun(@(x) x.rendering_image, detectors, 'UniformOutput', false);
@@ -37,7 +28,6 @@ end
 % PASCAL_car_val_init_0_Car_each_7_lim_300_lam_0.0150_a_24_e_2_y_1_f_2_scale_2.00_sbin_6_level_10_nms_0.40_skp_e
 % Group inside group not supported in matlab
 detection_params = dwot_detection_params_from_name(detection_result_txt);
-detection_params.scale = str2num(detection_params.scale);
 image_scale_factor = detection_params.scale;
 
 % SNames = fieldnames(temp); 
@@ -45,34 +35,31 @@ image_scale_factor = detection_params.scale;
 %     stuff = S.(SNames{loopIndex})
 % end
 
-skip_criteria = dwot_recover_skip_criterion(detection_params.skip_criterion);
+skip_criteria = dwot_recover_skip_criteria(detection_params.skip_name);
 
 detection_param_name = regexp(detection_result_txt,'\/?([-\w\.]+)\.txt','tokens');
 detection_name = detection_param_name{1}{1};
 
-[gtids,t] = textread(sprintf(VOCopts.imgsetpath,...
-                  [detection_params.LOWER_CASE_CLASS '_' detection_params.TYPE]),'%s %d');
-
-% PASCAL_car_val_init_0_Car_each_7_lim_300_lam_0.0150_a_24_e_2_y_1_f_2_scale_2.00_sbin_6_level_15_nms_0.40_skp_e_server_102.txt
-    
-N_IMAGE = length(gtids);
-
-
 fileID = fopen(detection_result_txt,'r');
-detection_result = textscan(fileID,'%s %f %f %f %f %f %d');
+[~, detection_result] = dwot_save_load_delegate(fileID, detection_params.save_mode);
 fclose(fileID);
+
 %                       detection_result(det_idx, end),... % detection score
 %                       detection_result(det_idx, 1:4),... % bbox
 %                       detection_result(det_idx, 11)));  % templateIdx
+% detection.file_name    = detection_result.file_names;
+% detection.bbox         = detection_result.prediction_boxes;
+% detection.score        = detection_result.prediction_scores;
+% detection.detector_idx = double(detection_result.prediction_template_indexes);
+% detection.cnn_score    = double(detection_result.proposal_scores);
 
-% Sort files to corresponding filed
-detection.file_name = detection_result{1};
-detection.bbox = cell2mat(detection_result(3:6));
-detection.score = detection_result{2};
-detection.detector_idx = double(detection_result{7});
-
-[unique_files, ~, unique_file_idx] = unique(detection.file_name);
+[unique_files, ~, unique_file_idx] = unique(detection_result.file_names);
 n_unique_files = numel(unique_files);
+
+[gtids,t] = textread(sprintf(VOCopts.imgsetpath,...
+                  [detection_params.LOWER_CASE_CLASS '_' detection_params.TYPE]),'%s %d');
+
+N_IMAGE = length(gtids);
 
 tp_struct(n_unique_files)   = struct('gtBB',[],'prdBB',[],'diff',[],'truncated',[],'score',[],...
                                      'im',[],'detector_id',[]);
@@ -81,19 +68,17 @@ fn_struct(n_unique_files)   = struct('BB',[],'diff',[],'truncated',[],'im',[]);
 
 detector_struct = {};
 
-max_azimuth_difference = 360/n_views/2;
-
 npos = 0;
 tp = cell(1,N_IMAGE);
 fp = cell(1,N_IMAGE);
-tp_view = cell(1,N_IMAGE);
-fp_view = cell(1,N_IMAGE);
 detScore = cell(1,N_IMAGE);
 
-confusion_statistics = zeros(n_views, n_views);
+if b_compute_view
+    tp_view = cell(1,N_IMAGE);
+    fp_view = cell(1,N_IMAGE);
+end
 
 image_count = 1;
-
 gt_orig =struct('BB',[],'diff',[],'det',[],'truncated',[],'occluded',[]);
 
 for unique_image_idx=1:n_unique_files
@@ -104,7 +89,7 @@ for unique_image_idx=1:n_unique_files
     if nnz(curr_file_idx) == 0 
       continue;
     end
-    if mod(unique_image_idx,10) == 0; fprintf('.'); end;
+    if mod(unique_image_idx,50) == 0; fprintf('.'); end;
   
     % read annotation
     clsinds = strmatch(detection_params.LOWER_CASE_CLASS,{recs.objects(:).class},'exact');
@@ -115,26 +100,35 @@ for unique_image_idx=1:n_unique_files
     im = imread([VOCopts.datadir, recs.imgname]);
     imSz = size(im);
     
-    gt_orig.BB = cat(1, recs.objects(clsinds).bbox)';
-    gt_orig.diff = [recs.objects(clsinds).difficult];
-    gt_orig.truncated = [recs.objects(clsinds).truncated];
-    gt_orig.det = zeros(length(clsinds),1);
+    ground_truth_bounding_boxes = cat(1, recs.objects(clsinds).bbox);
+    difficult_object_indexes = [recs.objects(clsinds).difficult];
+    truncated_object_indexes = [recs.objects(clsinds).truncated];
+
+    % gt_orig.BB = cat(1, recs.objects(clsinds).bbox)';
+    % gt_orig.diff = [recs.objects(clsinds).difficult];
+    % gt_orig.truncated = [recs.objects(clsinds).truncated];
+    % gt_orig.det = zeros(length(clsinds),1);
+   
+    % PASCAL 12 has additional annotation
     if strcmp(detection_params.DATA_SET, 'PASCAL12')
-      gt_orig.occluded = [recs.objects(clsinds).occluded];
+      occluded_object_indexes = [recs.objects(clsinds).occluded];
     end
     
-    prediction_score = detection.score(curr_file_idx);
+    prediction_score = detection_result.prediction_scores(curr_file_idx);
     valid_prediction_idx = find(prediction_score > -inf);
     
     if ~isempty(valid_prediction_idx)
         curr_file_idx = curr_file_idx(valid_prediction_idx);
-        
+%         [~, unique_cnn_idx] = unique(detection.score(curr_file_idx));
+%         curr_file_idx = curr_file_idx(unique_cnn_idx);
+
         % only bounding box
-        prediction_bounding_box = detection.bbox(curr_file_idx,:)/image_scale_factor;
+        prediction_bounding_box = detection_result.prediction_boxes(curr_file_idx,:)/image_scale_factor;
 
         % formatted such that it can be used in rendering
-        formatted_bounding_box = [ prediction_bounding_box zeros(nnz(curr_file_idx),6)...
-                        detection.detector_idx(curr_file_idx,:) detection.score(curr_file_idx)];
+        formatted_bounding_box = [ prediction_bounding_box zeros(nnz(curr_file_idx),6),...
+            double(detection_result.prediction_template_indexes(curr_file_idx,:)),...
+            detection_result.prediction_scores(curr_file_idx)];
 
         % non maximal suppression on the bounding boxes
         [formatted_bounding_box, bounding_box_idx] = esvm_nms(formatted_bounding_box, nms_threshold);
@@ -144,18 +138,17 @@ for unique_image_idx=1:n_unique_files
 
         % clip the prediction 
         prediction_bounding_box_clip = clip_to_image(prediction_bounding_box, [1 1 imSz(2) imSz(1)]);
-        ground_truth_bounding_box = gt_orig.BB';
 
         n_prediction   = size(prediction_bounding_box,1);
-        n_ground_truth = size(ground_truth_bounding_box,1);
+        n_ground_truth = size(ground_truth_bounding_boxes,1);
 
         % evaluate prediction using the clipped prediction
         [tp{unique_image_idx}, fp{unique_image_idx}, prediction_iou, gt_idx_of_prediction] = ...
                 dwot_evaluate_prediction(prediction_bounding_box_clip,...
-                            ground_truth_bounding_box, param.min_overlap, ~ground_truth_obj_idx);
+                            ground_truth_bounding_boxes, param.min_overlap, ~ground_truth_obj_idx);
         detScore{unique_image_idx} = formatted_bounding_box(:,end)';
 
-        if 0
+        if 1
             formatted_bounding_box(:,9) = prediction_iou;
             
             subplot(221);
@@ -164,21 +157,40 @@ for unique_image_idx=1:n_unique_files
             subplot(222);
             imagesc(im);
             for draw_gt_idx = find(ground_truth_obj_idx)
-                box_text = sprintf('id:%d %s', draw_gt_idx);
-                current_draw_gt_bbox = ground_truth_bounding_box(draw_gt_idx,:);
+                box_text = sprintf('id:%d', draw_gt_idx);
+                current_draw_gt_bbox = ground_truth_bounding_boxes(draw_gt_idx,:);
                 rectangle('position', dwot_bbox_xy_to_wh(current_draw_gt_bbox),'edgecolor',[0.5 0.5 0.5],'LineWidth',3);
                 text(current_draw_gt_bbox(1) + 1 , current_draw_gt_bbox(2), box_text, 'BackgroundColor','w','EdgeColor',[0.5 0.5 0.5],'VerticalAlignment','bottom');
             end
             axis equal; axis off; axis tight;
             
-            
             subplot(223);
-            dwot_draw_overlap_rendering(im, formatted_bounding_box(tp{unique_image_idx}, :),...
-                        detectors, 5, 50, true, [0.2, 0.8, 0], [-inf 50:10:100 inf], 1 );
-
+            imagesc(im);
+            for draw_pred_idx = find(tp{unique_image_idx})
+                box_text = sprintf('s:%0.2f ov:%0.2f', formatted_bounding_box(draw_pred_idx, end), formatted_bounding_box(draw_pred_idx, 9));
+                current_draw_gt_bbox = prediction_bounding_box(draw_pred_idx,:);
+                rectangle('position', dwot_bbox_xy_to_wh(current_draw_gt_bbox),'edgecolor',[0.5 0.5 0.5],'LineWidth',3);
+                text(current_draw_gt_bbox(1) + 1 , current_draw_gt_bbox(2), box_text, 'BackgroundColor','w','EdgeColor',[0.5 0.5 0.5],'VerticalAlignment','bottom');
+            end
+            axis equal; axis off; axis tight;
+            
             subplot(224);
-            dwot_draw_overlap_rendering(im, formatted_bounding_box(fp{unique_image_idx}, :),...
-                        detectors, 5, 50, true, [0.2, 0.8, 0], [-inf 50:10:100 inf], 1 );
+            imagesc(im);
+            for draw_pred_idx = find(fp{unique_image_idx})
+                box_text = sprintf('s:%0.2f ov:%0.2f', formatted_bounding_box(draw_pred_idx, end), formatted_bounding_box(draw_pred_idx, 9));
+                current_draw_gt_bbox = prediction_bounding_box(draw_pred_idx,:);
+                rectangle('position', dwot_bbox_xy_to_wh(current_draw_gt_bbox),'edgecolor',[0.5 0.5 0.5],'LineWidth',3);
+                text(current_draw_gt_bbox(1) + 1 , current_draw_gt_bbox(2), box_text, 'BackgroundColor','w','EdgeColor',[0.5 0.5 0.5],'VerticalAlignment','bottom');
+            end
+            axis equal; axis off; axis tight;
+            
+%             subplot(223);
+%             dwot_draw_overlap_rendering(im, formatted_bounding_box(tp{unique_image_idx}, :),...
+%                         detectors, 5, 50, true, [0.2, 0.8, 0], param.color_range, 1 );
+% 
+%             subplot(224);
+%             dwot_draw_overlap_rendering(im, formatted_bounding_box(fp{unique_image_idx}, :),...
+%                         detectors, 5, 50, true, [0.2, 0.8, 0], [-inf 50:10:100 inf], 1 );
             
             drawnow
             waitforbuttonpress;
@@ -192,14 +204,14 @@ for unique_image_idx=1:n_unique_files
             object_annotations = view_annotation.record.objects;
             object_annotations = object_annotations(clsinds); % Select only the object with the same class
 
-            ground_truth_bounding_box = reshape([object_annotations.bbox],4,[])';
+            ground_truth_bounding_boxes = reshape([object_annotations.bbox],4,[])';
 
             % to evaluate also using viewpoint gather viewpoint info
             prediction_azimuth = cellfun(@(x) x.az, detectors(formatted_bounding_box(:,11)));
             ground_truth_azimuth = cellfun(@(x) x.azimuth, {object_annotations.viewpoint});
 
             [tp_view{unique_image_idx}, fp_view{unique_image_idx}, prediction_view_iou, gt_idx_of_view_prediction] =...
-                    dwot_evaluate_prediction(prediction_bounding_box_clip, ground_truth_bounding_box,...
+                    dwot_evaluate_prediction(prediction_bounding_box_clip, ground_truth_bounding_boxes,...
                             param.min_overlap, ~ground_truth_obj_idx,...
                             prediction_azimuth, ground_truth_azimuth, max_azimuth_difference,...
                             prediction_azimuth_rotation_direction, prediction_azimuth_offset);
@@ -241,12 +253,12 @@ for unique_image_idx=1:n_unique_files
         correct_prediction_idx = find(gt_idx_of_prediction > 0);
         gt_idx = gt_idx_of_prediction(correct_prediction_idx);
         if ~isempty(gt_idx)
-            tp_struct(image_count).gtBB = gt_orig.BB(:, gt_idx);
+            tp_struct(image_count).gtBB = ground_truth_bounding_boxes(gt_idx, :);
             tp_struct(image_count).predBB = formatted_bounding_box(correct_prediction_idx ,1:4)';
-            tp_struct(image_count).diff = logical(gt_orig.diff(gt_idx));
-            tp_struct(image_count).truncated = logical(gt_orig.truncated(gt_idx));
+            tp_struct(image_count).diff = difficult_object_indexes;
+            tp_struct(image_count).truncated = truncated_object_indexes;
             if strcmp(detection_params.DATA_SET, 'PASCAL12')
-                tp_struct(image_count).occluded = logical(gt_orig.occluded(gt_idx));
+                tp_struct(image_count).occluded = occluded_object_indexes;
             end
             tp_struct(image_count).score = formatted_bounding_box(correct_prediction_idx, end);
             tp_struct(image_count).im = repmat({recs.imgname}, numel(gt_idx), 1);
@@ -267,12 +279,12 @@ for unique_image_idx=1:n_unique_files
         gt_idx = find(gt_orig.det == 0);
 
         if ~isempty(gt_idx)
-            fn_struct(image_count).BB = gt_orig.BB(:, gt_idx);
-            fn_struct(image_count).diff = logical(gt_orig.diff(gt_idx));
-            fn_struct(image_count).truncated = logical(gt_orig.truncated(gt_idx));
+            fn_struct(image_count).BB = ground_truth_bounding_boxes(:, gt_idx);
+            fn_struct(image_count).diff = difficult_object_indexes;
+            fn_struct(image_count).truncated = truncated_object_indexes;
             % Only PASCAL 11,12 have the label
             if strcmp(detection_params.DATA_SET, 'PASCAL12')
-                fn_struct(image_count).occluded = logical(gt_orig.occluded(gt_idx));
+                fn_struct(image_count).occluded = occluded_object_indexes;
             end
             fn_struct(image_count).im = repmat({recs.imgname}, numel(gt_idx), 1);
         end
@@ -309,9 +321,9 @@ if b_compute_view
     recall_view = tpSort_view/npos;
     precision_view = tpSort_view./(fpSort_view + tpSort_view);
 
-    aa = VOCap(recall_view', precision_view');
+    avp = VOCap(recall_view', precision_view');
     
-    fprintf('\nAP = %.4f AA = %.4f\n', ap, aa);
+    fprintf('\nAP = %.4f AA = %.4f\n', ap, avp);
     
     subplot(121);
     plot(recall, precision, 'r', 'LineWidth',3);
@@ -319,7 +331,7 @@ if b_compute_view
     plot(recall_view, precision_view, 'g', 'LineWidth',3);
 
     xlabel('Recall');
-    ti = sprintf('Average Precision = %.3f Average Accuracy = %.3f', 100*ap, 100*aa);
+    ti = sprintf('Average Precision = %.3f Average Viewpoint Precision = %.3f', 100*ap, 100*avp);
     title(ti);
     axis equal; axis tight;
     axis([0 1 0 1]);

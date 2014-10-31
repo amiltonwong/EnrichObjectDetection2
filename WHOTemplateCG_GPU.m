@@ -1,4 +1,4 @@
-function [ WHOTemplate_CG, HOGTemplate, scale, residual] = WHOTemplateCG_GPU(im, param)
+function [ WHOTemplate_CG, HOGTemplate, scale, residual, r_hist] = WHOTemplateCG_GPU(im, param)
   % ( im, scrambleKernel, Mu, Gamma_GPU, gammaDim, n_cell_limit, lambda, padding, hog_cell_threshold, CG_THREASHOLD, CG_MAX_ITER, N_THREAD_H, N_THREAD_W)
 %WHOTEMPLATEDECOMP Summary of this function goes here
 %   Detailed explanation goes here

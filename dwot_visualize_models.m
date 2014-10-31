@@ -1,7 +1,7 @@
 % visualize and save model images
-function dwot_visualize_models(renderer, model_files, azimuth, elevation, yaw, fov, save_path)
+function dwot_visualize_models(renderer, model_paths, azimuth, elevation, yaw, fov, save_path)
 
-n_models = numel(model_files);
+n_models = numel(model_paths);
 
 
 % Render the images and find optimal template size
@@ -18,7 +18,7 @@ for model_index = 1:n_models
     imagesc(im_model{model_index}); 
     axis equal;
     axis off;
-    title(strrep(model_files{model_index},'_',' '));
+    title(strrep(model_paths{model_index},'_',' '));
     waitforbuttonpress;
 end
 
@@ -34,10 +34,10 @@ if nargin > 6
         axis equal;
         axis off;
 
-        title(strrep(model_files{model_index},'_',' '));
+        title(strrep(model_paths{model_index},'_',' '));
 
         save_name = sprintf('%s/%s.png',...
-                save_path, model_files{model_index});
+                save_path, strrep(strrep(model_paths{model_index}, '.','_'),'/','_'));
         print('-dpng','-r100', save_name);
     end
 end

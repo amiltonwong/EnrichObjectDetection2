@@ -33,7 +33,7 @@ dfov = 10;
 dyaw = 10;
 
 azs = 0:15:345; % azs = [azs , azs - 10, azs + 10];
-els = 0:10:20;
+els = 0:20:20;
 fovs = [25];
 yaws = 0;
 n_cell_limit = [250];
@@ -65,11 +65,13 @@ n_max_tuning = 1;
 %               'Honda_Accord_Coupe_2009',...
 %               'Porsche_911',...
 %               '2009 Toyota Cargo'};
-% 
-% use_idx = ismember(model_names,models_to_use);
-% 
-% model_names = model_names(use_idx);
-% model_paths = model_paths(use_idx);
+
+models_to_use = {'Honda_Accord_Coupe_2009'};
+
+use_idx = ismember(model_names,models_to_use);
+
+model_names = model_names(use_idx);
+model_paths = model_paths(use_idx);
 
 % skip_criteria = {'empty', 'truncated','difficult'};
 skip_criteria = {'none'};
@@ -119,10 +121,10 @@ detector_file_name = sprintf('%s.mat', detector_name);
 %% Make empty detection save file
 % if ~strcmp(param.detection_mode,'dwot')
 detection_result_file = sprintf(['%s_%s_%s_%s_lim_%d_lam_%0.3f_a_%d_e_%d_y_%d_f_%d_scale_',...
-            '%0.2f_sbin_%d_level_%d_server_%s.txt'],...
+            '%0.2f_sbin_%d_level_%d_skp_%s_server_%s.txt'],...
             DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda,...
             numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin,...
-            n_level, server_id.num);
+            n_level, skip_name, server_id.num);
 
 % Check duplicate file name and return different name
 detection_result_file = dwot_save_detection([], SAVE_PATH, detection_result_file, [], true);
@@ -131,11 +133,11 @@ detection_result_common_name = detection_result_common_name.name;
 fprintf('\nThe result will be saved on %s\n',detection_result_file);
 
 % For detection right after the 
-detection_dwot_proposal_result_file = sprintf(['%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_',...
-            '%0.2f_sbin_%d_level_%d_nms_%0.2f_server_%s_cnn_proposal_dwot.txt'],...
+detection_dwot_proposal_result_file = sprintf(['%s_%s_%s_%s_lim_%d_lam_%0.3f_a_%d_e_%d_y_%d_f_%d_scale_',...
+            '%0.2f_sbin_%d_level_%d_skp_%s_nms_%0.2f_server_%s_cnn_proposal_dwot.txt'],...
             DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda,...
             numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin,...
-            n_level, param.nms_threshold, server_id.num);
+            n_level, skip_name, param.nms_threshold, server_id.num);
 
 % Check duplicate file name and return different name
 detection_dwot_proposal_result_file = dwot_save_detection([], SAVE_PATH, detection_dwot_proposal_result_file, [], true);
@@ -144,11 +146,11 @@ fprintf('\nThe result will be saved on %s\n',detection_dwot_proposal_result_file
 
 % If tuning mode is defined and not none.
 if isfield(param,'proposal_tuning_mode') && ~strcmp(param.proposal_tuning_mode,'none')
-    detection_tuning_result_file = sprintf(['%s_%s_%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d_scale_',...
-            '%0.2f_sbin_%d_level_%d_nms_%0.2f_server_%s_tuning.txt'],...
+    detection_tuning_result_file = sprintf(['%s_%s_%s_%s_lim_%d_lam_%0.3f_a_%d_e_%d_y_%d_f_%d_scale_',...
+            '%0.2f_sbin_%d_level_%d_skp_%s_nms_%0.2f_server_%s_tuning.txt'],...
             DATA_SET, LOWER_CASE_CLASS, TEST_TYPE, detector_model_name, n_cell_limit, lambda,...
             numel(azs), numel(els), numel(yaws), numel(fovs), param.image_scale_factor, sbin,...
-            n_level, param.nms_threshold, server_id.num);
+            n_level, skip_name, param.nms_threshold, server_id.num);
         
     % Check duplicate file name and return different name
     detection_tuning_result_file = dwot_save_detection([], SAVE_PATH, detection_tuning_result_file, [], true);
@@ -169,7 +171,6 @@ if ~strcmp(param.proposal_tuning_mode, 'none') || ~exist('renderer','var') || ~e
 end
 
 %% Make Detectors
-
 if exist(detector_file_name,'file')
     load(detector_file_name);
 else
@@ -250,15 +251,15 @@ for img_idx=1:N_IMAGE
     switch param.detection_mode
       case 'dwot'
         if COMPUTING_MODE == 0
-          [bbsAllLevel, hog, scales] = dwot_detect( im, templates_cpu, param);
+          [formatted_bounding_box, hog, scales] = dwot_detect( im, templates_cpu, param);
     %       [hog_region_pyramid, im_region] = dwot_extract_region_conv(im, hog, scales, bbsNMS, param);
     %       [bbsNMS_MCMC] = dwot_mcmc_proposal_region(im, hog, scale, hog_region_pyramid, param);
         elseif COMPUTING_MODE == 1
           % [bbsNMS ] = dwot_detect_gpu_and_cpu( im, templates, templates_cpu, param);
-          [bbsAllLevel, hog, scales] = dwot_detect_gpu( im, templates_gpu, param);
+          [formatted_bounding_box, hog, scales] = dwot_detect_gpu( im, templates_gpu, param);
     %       [hog_region_pyramid, im_region] = dwot_extract_region_fft(im, hog, scales, bbsNMS, param);
         elseif COMPUTING_MODE == 2
-          [bbsAllLevel, hog, scales] = dwot_detect_combined( im, templates_gpu, templates_cpu, param);
+          [formatted_bounding_box, hog, scales] = dwot_detect_combined( im, templates_gpu, templates_cpu, param);
         else
           error('Computing Mode Undefined');
         end
@@ -266,8 +267,8 @@ for img_idx=1:N_IMAGE
       case 'cnn'
         bounding_box_proposals = cnn_detection.detBoxes{cnn_class_idx}{img_idx};
         bounding_box_proposals = bounding_box_proposals((bounding_box_proposals(:,end) > -inf ),:);
-        bbsAllLevel = double(bounding_box_proposals);
-        bbsAllLevel(:,1:4) = param.image_scale_factor * bbsAllLevel(:,1:4);
+        formatted_bounding_box = double(bounding_box_proposals);
+        formatted_bounding_box(:,1:4) = param.image_scale_factor * formatted_bounding_box(:,1:4);
       case 'dpm'
         error('NOT SUPPORTED');
     end 
@@ -281,35 +282,40 @@ for img_idx=1:N_IMAGE
     im = imresize(im, param.image_scale_factor);
     im_size = size(im);
     
-    bbsNMS = esvm_nms(bbsAllLevel, param.nms_threshold);
+    formatted_bounding_box_nms = esvm_nms(formatted_bounding_box, param.nms_threshold);
     % Automatically sort them according to the score and apply NMS
 %     bbsNMS_clip = clip_to_image(bbsNMS, [1 1 im_size(2) im_size(1)]);
 %     [ bbsNMS_clip, tp ] = dwot_compute_positives(bbsNMS_clip, gt, param);
     
-    if numel(bbsNMS) == 0 
+    if numel(formatted_bounding_box_nms) == 0 
         temp = zeros(1,5);
         temp( end ) = -inf;
     else
-        bbsNMS = bbsNMS((bbsNMS(:,end) > -1),:);
-        if numel(bbsNMS) == 0 
+        % Prune out CNN detections with scores below certain threshold
+        formatted_bounding_box_nms = formatted_bounding_box_nms((formatted_bounding_box_nms(:,end) > -1),:);
+        if numel(formatted_bounding_box_nms) == 0 
             temp = zeros(1,5);
             temp( end ) = -inf;
         else
-            temp = bbsNMS;
+            temp = formatted_bounding_box_nms;
         end
     end
     
+    % Save initial detection result
     dwot_save_detection(temp, SAVE_PATH, detection_result_file, ...
                                  img_file_name, false, 0); 
     
     [~, img_file_name] = fileparts(recs.imgname);
-    % save mode != 0 to save template index
     
 %     if visualize_detection && ~isempty(clsinds)
+%         prediction_bounding_box = formatted_bounding_box_nms(:,1:4);
+%         ground_truth_bounding_box = gt.BB;
+%         n_ground_truth = numel(clsinds);
+%         [tp, fp, prediction_iou, gt_idx_of_prediction] =...
+%                 dwot_evaluate_prediction(prediction_bounding_box, ground_truth_bounding_box,...
+%                         param.min_overlap, false(1, n_ground_truth));
+% 
 %         tpIdx = logical(tp); % Index of bounding boxes that will be printed as ground truth
-%         try
-%             clf;
-%         end
 %         dwot_visualize_result;
 %         save_name = sprintf(['%s_img_%d.jpg'],...
 %                            detection_result_common_name, img_idx);
@@ -317,7 +323,7 @@ for img_idx=1:N_IMAGE
 %     end
     
     %% Proposal Detection
-    n_proposals = min([n_max_proposals, size(bbsNMS,1) ]);
+    n_proposals = min([n_max_proposals, size(formatted_bounding_box_nms,1) ]);
     if  n_proposals > 0
         tuningTic = tic;
 
@@ -325,7 +331,7 @@ for img_idx=1:N_IMAGE
         
         % For each proposals draw original, before and after
         for proposal_idx = 1:n_proposals
-            bbox = bbsNMS(proposal_idx, :);
+            bbox = formatted_bounding_box_nms(proposal_idx, :);
             
             extraction_padding_ratio = 0.3;
             
@@ -345,15 +351,16 @@ for img_idx=1:N_IMAGE
 
             
             % Detect object and get initial proposal regions
-            [bbsAllLevel, hog, scales] = dwot_detect_gpu( proposal_im, templates_gpu, param);
+            [formatted_bounding_box, hog, scales] = dwot_detect_gpu( proposal_im, templates_gpu, param);
             
-            if numel(bbsAllLevel) == 0; continue; end;
+            if numel(formatted_bounding_box) == 0; continue; end;
             
-            bbsNMS_dwot_proposal = esvm_nms(bbsAllLevel,param.nms_threshold);
+            bbsNMS_dwot_proposal = esvm_nms(formatted_bounding_box,param.nms_threshold);
             
             % Save detection result
-            save_bbs_nms = esvm_nms(bbsAllLevel,0.7);
+            save_bbs_nms = esvm_nms(formatted_bounding_box,0.7);
             save_bbs_nms(:,1:4) = bsxfun(@plus, save_bbs_nms(:,1:4)/proposal_resize_scale, clip_padded_bbox_offset);
+            save_bbs_nms(:,5) = formatted_bounding_box_nms(proposal_idx, end);
             dwot_save_detection(save_bbs_nms, SAVE_PATH, detection_dwot_proposal_result_file, ...
                                   img_file_name, false, 1); % save mode != 0 to save template index
                               
@@ -396,7 +403,8 @@ for img_idx=1:N_IMAGE
 
                     % Plot original image with GT bounding box
                     subplot(221);
-                    dwot_visualize_result;
+                    imagesc(im); axis equal; axis off;
+                    %     dwot_visualize_result;
                     %     rectangle('position',dwot_bbox_xy_to_wh(GT_bbox),'edgecolor',[0.7 0.7 0.7],'LineWidth',3);
                     %     rectangle('position',dwot_bbox_xy_to_wh(GT_bbox),'edgecolor',[0   0   0.6],'LineWidth',2);
 
@@ -442,7 +450,7 @@ for img_idx=1:N_IMAGE
                 % Draw original image and proposal region
                 subplot(121);
                 imagesc(im);
-                dwot_draw_bounding_box(bbsNMS(proposal_idx,:), param);
+                dwot_draw_bounding_box(formatted_bounding_box_nms(proposal_idx,:), param);
                 
                 % Plot proposal bbox 
                 subplot(122);
@@ -459,6 +467,7 @@ for img_idx=1:N_IMAGE
             bbs_tuning_mat_nms = esvm_nms(cell2mat(bbs_tuning), param.nms_threshold);
             if numel(bbs_tuning_mat_nms) == 0
                 bbs_tuning_mat_nms = zeros(1,12);
+                bbs_tuning_mat_nms(5) = -inf;
                 bbs_tuning_mat_nms(12) = -inf;
             end
             dwot_save_detection(bbs_tuning_mat_nms, SAVE_PATH, detection_tuning_result_file, ...
@@ -467,6 +476,7 @@ for img_idx=1:N_IMAGE
     else
         % If there is no proposal detection make dummy detection and save
         bbs_tuning_mat_nms = zeros(1,12);
+        bbs_tuning_mat_nms(5) = -inf;
         bbs_tuning_mat_nms(12) = -inf;
         
         dwot_save_detection(bbs_tuning_mat_nms, SAVE_PATH, detection_dwot_proposal_result_file, ...
@@ -493,9 +503,8 @@ ap_save_names = cell(numel(nms_thresholds),1);
 ap_detection_save_names = cell(numel(nms_thresholds),1);
 for i = 1:numel(nms_thresholds)
     nms_threshold = nms_thresholds(i);
-    ap(i) = dwot_analyze_and_visualize_pascal_results(fullfile(SAVE_PATH, detection_result_file), ...
-                        detectors, [], VOCopts, param, skip_criteria, param.color_range, ...
-                        nms_threshold, false);
+    ap(i) = dwot_analyze_and_visualize_cnn_results(fullfile(SAVE_PATH, detection_result_file), ...
+                        detectors, VOCopts, param, nms_threshold, false);
                         
 
     ap_save_names{i} = sprintf(['AP_%s_nms_%0.2f.png'],...
@@ -506,17 +515,21 @@ end
 
 
 % Detection for regions before tuning
-for i = 1:numel(nms_thresholds)
-    nms_threshold = nms_thresholds(i);
-    ap_dwot_cnn(i) = dwot_analyze_and_visualize_pascal_results(fullfile(SAVE_PATH,detection_dwot_proposal_result_file), ...
-                        detectors, [], VOCopts, param, skip_criteria, param.color_range, ...
-                        nms_threshold, false);
-                        
+n_views = [4, 8, 16, 24];
+count = 1;
+for view_idx = 1:numel(n_views)
+    for i = 1:numel(nms_thresholds)
+        nms_threshold = nms_thresholds(i);
+        ap_dwot_cnn(count) = dwot_analyze_and_visualize_cnn_results(fullfile(SAVE_PATH,detection_dwot_proposal_result_file), ...
+                            detectors, VOCopts, param, nms_threshold, false, [], n_views(view_idx), -1 ,0);
 
-    ap_detection_save_names{i} = sprintf(['AP_%s_cnn_proposal_dwot_nms_%0.2f.png'],...
-                        detection_result_common_name, nms_threshold);
 
-     print('-dpng','-r150',fullfile(SAVE_PATH, ap_detection_save_names{i}));
+        ap_detection_save_names{count} = sprintf(['AP_%s_cnn_proposal_dwot_nms_%0.2f_nview_%d.png'],...
+                            detection_result_common_name, nms_threshold, n_views(view_idx));
+
+         print('-dpng','-r150',fullfile(SAVE_PATH, ap_detection_save_names{count}));
+         count = count + 1;
+    end
 end
 
 
@@ -534,13 +547,17 @@ end
 
 % If it runs on server copy to host
 if ~isempty(server_id) && ~strcmp(server_id.num,'capri7')
+    count = 1;
     for i = 1:numel(nms_thresholds)
         system(['scp ', fullfile(SAVE_PATH, ap_save_names{i}),...
             ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/',...
             SAVE_PATH]);
-        system(['scp ', fullfile(SAVE_PATH, ap_detection_save_names{i}),...
-            ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/',...
-            SAVE_PATH]);
+        for view_idx = 1:numel(n_views)
+            system(['scp ', fullfile(SAVE_PATH, ap_detection_save_names{count}),...
+                ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/',...
+                SAVE_PATH]);
+            count = count + 1;
+        end
     end
     system(['scp ' fullfile(SAVE_PATH, detection_result_file),...
         ' @capri7:/home/chrischoy/Dropbox/Research/DetectionWoTraining/' SAVE_PATH]);
@@ -557,4 +574,5 @@ if ~isempty(server_id) && ~strcmp(server_id.num,'capri7')
             SAVE_PATH]);
     end
 end
+
 

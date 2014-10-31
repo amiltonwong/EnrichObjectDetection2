@@ -8,10 +8,12 @@ param.elevations 	= els;
 param.yaws 			= yaws;
 param.fovs 			= fovs;
 
+param.azs = azs;
+param.els = els;
+
 %Turn on image flips for detection/training. If enabled, processing
 %happes on each image as well as its left-right flipped version.
-param.detect_add_flip = 0;
-
+% param.detect_add_flip = 0;
 
 param.sbin = sbin;
 param.rendering_sbin = 8;
@@ -20,7 +22,7 @@ param.rendering_sbin = 8;
 %(denser pyramids will have more windows and thus be slower for
 %detection/training)
 param.detect_levels_per_octave = n_level;
-
+param.n_level = n_level;
 %By default dont save feature vectors of detections (training turns
 %this on automatically)
 % default_params.detect_save_features = 0;
@@ -58,27 +60,12 @@ param.detect_max_scale = 1.0;
 
 %The minimum scale to consider in the feature pyramid
 param.detect_min_scale = .01;
-
-% Number of NMSed detections per exemplar
-% default_params.detect_max_windows_per_exemplar = 40;
-
-%Only keep detections that have sufficient overlap with the input's
-%global bounding box.  If greater than 0, then only keep detections
-%that have this OS with the entire input image.
-% default_params.detect_min_scene_os = 0.0;
-
-% Choose the number of images to process in each chunk for detection.
-% This parameters tells us how many images each core will process at
-% at time before saving results.  A higher number of images per chunk
-% means there will be less constant access to hard disk by separate
-% processes than if images per chunk was 1.
-% default_params.detect_images_per_chunk = 4;
-
-%NOTE: If the number of specified models is greater than 20, use the
-%BLOCK-based method
-% default_params.max_models_before_block_method = 20;
-
 param.detection_threshold = detection_threshold;
+
+
+param.skip_criteria = skip_criteria;
+skip_name = cellfun(@(x) x(1), skip_criteria); % get the first character of the criteria
+param.skip_name = skip_name;
 
 %Initialize framing function
 init_params.features = @esvm_features;
@@ -112,6 +99,7 @@ param.n_level_per_octave  = n_level;
 param.detection_threshold = detection_threshold;
 param.n_cell_limit        = n_cell_limit;
 param.class               = CLASS;
+param.sub_class           = SUB_CLASS;
 param.type                = TEST_TYPE;
 param.hog_cell_threshold  = 1.0;
 param.feature_dim         = 31;
@@ -127,7 +115,6 @@ param.hog_gamma_cell_size = size(param.hog_gamma)/31;
 
 %% GPU Setting
 param.device_id = DEVICE_ID;
-
 
 %% CG setting
 param.N_THREAD_H = 32;

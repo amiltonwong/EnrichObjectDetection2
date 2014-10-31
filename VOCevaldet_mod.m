@@ -1,5 +1,5 @@
-function [rec,prec,ap] = VOCevaldet_mod(detection_file, scale, VOCopts,id,cls,draw)
-
+function [rec,prec,ap] = VOCevaldet_mod(detection_file, scale, VOCopts, cls, draw)
+% cls : string class name
 % load test set
 
 cp=sprintf(VOCopts.annocachepath,VOCopts.testset);
