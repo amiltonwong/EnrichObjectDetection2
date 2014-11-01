@@ -1,5 +1,4 @@
 function [detectors]= dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, model_indexes, model_class, param, visualize)
-
 if nargin < 7
   visualize = false;
 end
@@ -13,9 +12,10 @@ end
 %   end
 %   param.renderer = renderer;
 % end
-
+colormap hot;
 i = 1;
 start_time = tic;
+tic;
 detectors = cell(1,numel(azs) * numel(els) * numel(fovs));
 for model_index = model_indexes
   renderer.setModelIndex(model_index);
@@ -27,19 +27,27 @@ for model_index = model_indexes
           azGT = azs(azIdx);
           yawGT = yaws(yawIdx);
           fovGT = fovs(fovIdx);
-
+            
           detector = dwot_get_detector(renderer, azGT, elGT, yawGT, fovGT, model_index, 'not_supported_model_class', param);
           
           detectors{i} = detector;
           % param.detector_table( dwot_detector_key(azGT, elGT, yawGT, fovGT) ) = i;
 
-          if visualize
-            subplot(121);
-            imagesc(detector.rendering_image); axis equal; axis tight;
+          if visualize || (visualize && toc > 1)
+            tic;
+            subplot(221);
+            imagesc(detector.rendering_image); axis equal; axis tight; axis off;
+            
+            subplot(222);
+            imagesc(invertHOG(detector.whow)); axis equal; axis tight; axis off;
+
             % subplot(132);
             % imagesc(HOGpicture(HOGTemplate)); axis equal; axis tight;
-            subplot(122);
-            imagesc(HOGpicture(detector.whow)); axis equal; axis tight;
+            subplot(223);
+            imagesc(HOGpicture(detector.whow)); axis equal; axis tight; axis off;
+            
+            subplot(224);
+            imagesc(HOGpicture(-detector.whow)); axis equal; axis tight; axis off;
             drawnow;
 %            disp('press any button to continue');
 %            waitforbuttonpress;

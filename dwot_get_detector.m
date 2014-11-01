@@ -12,7 +12,7 @@ end
 if param.template_initialization_mode == 4
     [ WHOTemplate, scale] = HOGTemplate(im, param);
 else
-    [ WHOTemplate, ~, scale] = WHOTemplateCG_CUDA( im, param);
+    [ WHOTemplate, ~, scale] = WHOTemplateCG_CUDA_various_whitening( im, param);
 end
 
 detector = [];

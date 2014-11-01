@@ -13,7 +13,7 @@ DATA_SET = 'PASCAL12';
 dwot_set_datapath;
 
 COMPUTING_MODE = 1;
-CLASS = 'Bicycle';
+CLASS = 'Car';
 SUB_CLASS = [];     % Sub folders
 LOWER_CASE_CLASS = lower(CLASS);
 TEST_TYPE = 'val';
@@ -52,10 +52,10 @@ n_max_tuning = 1;
 % models_name = cellfun(@(x) strrep(x, '/', '_'), models_path, 'UniformOutput', false);
 [ model_names, model_paths ] = dwot_get_cad_models('Mesh', CLASS, [], {'3ds','obj'});
 
-models_to_use = {'bmx_bike',...
-              'fixed_gear_road_bike',...
-              'glx_bike',...
-              'road_bike'};
+% models_to_use = {'bmx_bike',...
+%               'fixed_gear_road_bike',...
+%               'glx_bike',...
+%               'road_bike'};
 
 % models_to_use = {'2012-VW-beetle-turbo',...
 %               'Kia_Spectra5_2006',...
@@ -66,7 +66,7 @@ models_to_use = {'bmx_bike',...
 %               'Porsche_911',...
 %               '2009 Toyota Cargo'};
 
-% models_to_use = {'Honda_Accord_Coupe_2009'};
+models_to_use = {'Honda_Accord_Coupe_2009'};
 
 use_idx = ismember(model_names,models_to_use);
 
@@ -81,7 +81,7 @@ skip_name = cellfun(@(x) x(1), skip_criteria);
 dwot_get_default_params;
 
 param.template_initialization_mode = 0; 
-param.nms_threshold = 0.4;
+param.nms_threshold = 0.3;
 param.model_paths = model_paths;
 
 param.b_calibrate = 0;      % apply callibration if > 0
@@ -111,7 +111,7 @@ param.color_range = [-inf 20:5:100 inf];
 param.cnn_color_range = [ -inf -4:0.1:3 inf];
 
 % detector name
-[ detector_model_name ] = dwot_get_detector_name(model_names, param);
+[ detector_model_name ] = dwot_get_detector_name( model_names, param);
 detector_name = sprintf('%s_%s_lim_%d_lam_%0.4f_a_%d_e_%d_y_%d_f_%d',...
             LOWER_CASE_CLASS,  detector_model_name, n_cell_limit, lambda,...
             numel(azs), numel(els), numel(yaws), numel(fovs));
@@ -229,17 +229,17 @@ clear gt;
 gt = struct('BB',[],'diff',[],'det',[]);
 
 for img_idx=1:N_IMAGE
-    fprintf('%d/%d ',img_idx,N_IMAGE);
+
+    imgTic = tic;
+    fprintf('%d/%d\n',img_idx,N_IMAGE);
     % Find file name
     img_file_name = regexp(cnn_detection.imgFilePaths{img_idx}, '\/(?<img>\w+)\.png','names');
     img_file_name = img_file_name.img;
 
-    imgTic = tic;
     % read annotation
     recs = PASreadrecord(sprintf(VOCopts.annopath, img_file_name));
     
     % Read 3D viewpoint annotation
-    
     clsinds = find(strcmp(LOWER_CASE_CLASS, {recs.objects(:).class}));
 
     [skip_img, object_idx] = dwot_skip_criteria(recs.objects(clsinds), skip_criteria);
@@ -266,46 +266,30 @@ for img_idx=1:N_IMAGE
         fprintf('convolution time: %0.4f\n', toc(imgTic));
       case 'cnn'
         bounding_box_proposals = cnn_detection.detBoxes{cnn_class_idx}{img_idx};
-        bounding_box_proposals = bounding_box_proposals((bounding_box_proposals(:,end) > -inf ),:);
-        formatted_bounding_box = double(bounding_box_proposals);
-        formatted_bounding_box(:,1:4) = param.image_scale_factor * formatted_bounding_box(:,1:4);
+        % bounding_box_proposals = bounding_box_proposals((bounding_box_proposals(:,end) > -inf ),:);
+        
+        prediction_box = param.image_scale_factor * bounding_box_proposals(:,1:4);
+        prediction_score = bounding_box_proposals(:,end);
+
+        formatted_bounding_box = zeros(size(bounding_box_proposals,1),12);
+        formatted_bounding_box(:,end) = bounding_box_proposals(:,end);
+        formatted_bounding_box(:,1:4) = param.image_scale_factor * double(bounding_box_proposals);
       case 'dpm'
         error('NOT SUPPORTED');
     end 
     
-    
-    gt.BB = param.image_scale_factor * cat(1, recs.objects(clsinds).bbox)';
-    gt.diff = [recs.objects(clsinds).difficult];
-    gt.det = zeros(length(clsinds),1);
+    ground_truth_bounding_box = param.image_scale_factor * cat(1, recs.objects(clsinds).bbox)';
     
     im = imread([VOCopts.datadir, recs.imgname]);
     im = imresize(im, param.image_scale_factor);
     im_size = size(im);
-    
+   
     formatted_bounding_box_nms = esvm_nms(formatted_bounding_box, param.nms_threshold);
-    % Automatically sort them according to the score and apply NMS
-%     bbsNMS_clip = clip_to_image(bbsNMS, [1 1 im_size(2) im_size(1)]);
-%     [ bbsNMS_clip, tp ] = dwot_compute_positives(bbsNMS_clip, gt, param);
-    
-    if numel(formatted_bounding_box_nms) == 0 
-        temp = zeros(1,5);
-        temp( end ) = -inf;
-    else
-        % Prune out CNN detections with scores below certain threshold
-        formatted_bounding_box_nms = formatted_bounding_box_nms((formatted_bounding_box_nms(:,end) > -1),:);
-        if numel(formatted_bounding_box_nms) == 0 
-            temp = zeros(1,5);
-            temp( end ) = -inf;
-        else
-            temp = formatted_bounding_box_nms;
-        end
-    end
-    
-    % Save initial detection result
-    dwot_save_detection(temp, SAVE_PATH, detection_result_file, ...
+   
+    % Save the file  
+    null_padded_box = dwot_return_null_padded_box(formatted_bounding_box, score_threshold, 12);
+    dwot_save_detection(null_box, SAVE_PATH, detection_result_file, ...
                                  img_file_name, false, 0); 
-    
-    [~, img_file_name] = fileparts(recs.imgname);
     
 %     if visualize_detection && ~isempty(clsinds)
 %         prediction_bounding_box = formatted_bounding_box_nms(:,1:4);
@@ -395,7 +379,7 @@ for img_idx=1:N_IMAGE
                     bbs_tuning_per_proposal(detection_per_proposal_idx, 12) = best_proposal_tunings{detection_per_proposal_idx}.score;
                     bbs_tuning_per_proposal(detection_per_proposal_idx, 11) = 1;
 
-                                      
+                    % add offset to the proposal regions
                     bbs_temp = bbsNMS_dwot_proposal(detection_per_proposal_idx,:);
                     bbs_temp(1:4) = bbs_temp(1:4)/proposal_resize_scale + clip_padded_bbox_offset;
                     bbs_tuning_temp = bbs_tuning_per_proposal(detection_per_proposal_idx,:);
@@ -403,7 +387,7 @@ for img_idx=1:N_IMAGE
 
                     % Plot original image with GT bounding box
                     subplot(221);
-                    imagesc(im); axis equal; axis off;
+                    imagesc(im); axis equal; axis tight; axis off;
                     %     dwot_visualize_result;
                     %     rectangle('position',dwot_bbox_xy_to_wh(GT_bbox),'edgecolor',[0.7 0.7 0.7],'LineWidth',3);
                     %     rectangle('position',dwot_bbox_xy_to_wh(GT_bbox),'edgecolor',[0   0   0.6],'LineWidth',2);
@@ -505,7 +489,6 @@ for i = 1:numel(nms_thresholds)
     nms_threshold = nms_thresholds(i);
     ap(i) = dwot_analyze_and_visualize_cnn_results(fullfile(SAVE_PATH, detection_result_file), ...
                         detectors, VOCopts, param, nms_threshold, false);
-                        
 
     ap_save_names{i} = sprintf(['AP_%s_nms_%0.2f.png'],...
                         detection_result_common_name, nms_threshold);
@@ -574,5 +557,3 @@ if ~isempty(server_id) && ~strcmp(server_id.num,'capri7')
             SAVE_PATH]);
     end
 end
-
-
