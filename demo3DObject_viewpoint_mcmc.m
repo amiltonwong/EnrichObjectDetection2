@@ -16,7 +16,7 @@ dwot_set_datapath;
 %                 = 1, GPU
 %                 = 2, Combined
 COMPUTING_MODE = 1;
-CLASS = 'Car';
+CLASS = 'Bicycle';
 SUB_CLASS = [];     % Sub folders
 LOWER_CASE_CLASS = lower(CLASS);
 TEST_TYPE = 'val';
@@ -33,7 +33,7 @@ end
 
 azs = 0:15:345; % azs = [azs , azs - 10, azs + 10];
 els = 0:20:20;
-fovs = [25 0];
+fovs = [25];
 yaws = 0;
 n_cell_limit = [250];
 lambda = [0.15];
@@ -51,10 +51,19 @@ n_max_proposals = 10;
 % models_name = cellfun(@(x) strrep(x, '/', '_'), models_path, 'UniformOutput', false);
 [ model_names, model_paths ] = dwot_get_cad_models('Mesh', CLASS, [], {'3ds','obj'});
 
-% models_to_use = {'bmx_bike',...
-%               'fixed_gear_road_bike',...
+models_to_use = {'bmx_bike',...
+              'fixed_gear_road_bike',...
+              'glx_bike',...
+              'road_bike'};
+
+% models_to_use = {'atx_bike',...
+%               'atx_bike_rot',...
+%               'bmx_bike_4',...
+%               'brooklyn_machine_works_bike',...
+%               'downhill_bike',...
 %               'glx_bike',...
-%               'road_bike'};
+%               'road_bike',...
+%               'road_bike_rot'};
 
 % models_to_use = {'2012-VW-beetle-turbo',...
 %               'Kia_Spectra5_2006',...
@@ -93,7 +102,7 @@ n_max_proposals = 10;
 %             'Maserati-3500GT',...
 %             'Skylark_Cruiser_1971'};
 
-models_to_use = {'Honda-Accord-3'};
+% models_to_use = {'Honda-Accord-3'};
 
 use_idx = ismember(model_names,models_to_use);
 
@@ -284,7 +293,7 @@ for image_idx=10:N_IMAGE
     % ground_truth_bounding_boxes = param.image_scale_factor * cat(1, recs.objects(clsinds).bbox);
     
     
-    ground_truth_bounding_box = gt{image_idx}.BB';
+    ground_truth_bounding_boxes =  param.image_scale_factor * gt{image_idx}.BB';
     ground_truth_azimuth = gt{image_idx}.azimuth;    
 
     
@@ -322,7 +331,7 @@ for image_idx=10:N_IMAGE
     
     if visualize_detection 
         dwot_visualize_predictions_in_quadrants(im, proposal_formatted_bounding_boxes,...
-                            ground_truth_bounding_box, detectors, param);
+                            ground_truth_bounding_boxes, detectors, param);
         if param.export_figure
             save_name = sprintf(['%s_img_%d.jpg'], detection_result_common_name, image_idx);
             print('-djpeg','-r150',fullfile(SAVE_PATH, save_name));

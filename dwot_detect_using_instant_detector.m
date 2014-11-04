@@ -38,10 +38,13 @@ else
     [y1, x1] = dwot_hog_to_img_conv(y_coord , x_coord, param.sbin, hog_pyramid.pyramid(max_level).scale, param.detect_pyramid_padding);
     [y2, x2] = dwot_hog_to_img_conv(y_coord + template_size(1), x_coord + template_size(2), param.sbin, hog_pyramid.pyramid(max_level).scale, param.detect_pyramid_padding);
   elseif param.computing_mode == 1
-    [y1, x1] = dwot_hog_to_img_fft(y_coord - 1, x_coord - 1, [0 0 ], param.sbin, hog_pyramid.pyramid(max_level).scale);
-    [y2, x2] = dwot_hog_to_img_fft(y_coord + template_size(1) + 1,...
-                                    x_coord + template_size(2) + 1,...
-                                    [1 1], param.sbin, hog_pyramid.pyramid(max_level).scale);
+          % detection
+%     [y1, x1] = dwot_hog_to_img_fft(y_coord - 0.5, x_coord - 0.5, sz{templateIdx}, sbin, scale);
+%     [y2, x2] = dwot_hog_to_img_fft(y_coord + sz{templateIdx}(1) + 0.5 , x_coord + sz{templateIdx}(2) + 0.5, sz{templateIdx}, sbin, scale);    
+    [y1, x1] = dwot_hog_to_img_fft(y_coord - 0.5, x_coord - 0.5, [1 1], param.sbin, hog_pyramid.pyramid(max_level).scale);
+    [y2, x2] = dwot_hog_to_img_fft(y_coord + template_size(1) + 0.5,...
+                                    x_coord + template_size(2) + 0.5,...
+                                    [ 1 1 ], param.sbin, hog_pyramid.pyramid(max_level).scale);
   else
     error('Computing mode not supported');
   end
