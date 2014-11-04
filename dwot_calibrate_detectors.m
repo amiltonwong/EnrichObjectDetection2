@@ -1,15 +1,16 @@
-function detectors = dwot_calibrate_detectors(detectors, LOWER_CASE_CLASS, VOCopts, param, visualize)
-% Calibrate the object detectors, from the negative images, we gather negative image patches
-% and make false positive rate to be 0.01 percent
+function detectors = dwot_calibrate_detectors(detectors, LOWER_CASE_CLASS, VOCopts, ...
+    param, visualize)
+% Calibrate the object detectors, from the negative images, we gather negative image
+% patches and make false positive rate to be 0.01 percent
 
-if nargin < 6
+if nargin < 5
     visualize = false;
 end
 
 sbin = param.sbin;
 n_detectors = numel(detectors);
 detection_scores = cell(1, n_detectors);
-templates = cellfun(@(x) x.whow, detectors, 'UniformOutput', false);
+templates = cellfun(@(x) single(x.whow), detectors, 'UniformOutput', false);
 sz = cellfun(@(x) size(x), templates, 'UniformOutput',false);
 
 % load dataset
@@ -66,26 +67,7 @@ end
 if n_processed < param.n_calibration_images
     warning('Number of requested calibration images was larger than the dataset size');
 end
-    
-%%%%% Visualize %%%%
-if visualize
-    hist_range = -200:2:200;
-    for det_idx = 1:n_detectors
-        detection_score_temp = cell2mat(detection_scores{det_idx}');
-        count_per_bin = histc(detection_score_temp, hist_range);
-        
-        % Divide by area to normalize the disbribution
-        plot(hist_range + 5, count_per_bin/trapz(hist_range, count_per_bin),'r-');
-        
-        mean(detection_score_temp);
-        hold on;
-        drawnow;
-        % waitforbuttonpress;
-    end
-    xlabel('detection score');
-    ylabel('probability');
-end
-%%%%%%%%%%%%%
+  
 
 % Compute the convolution score with mean HOG feature
 for det_idx = 1:n_detectors
@@ -121,8 +103,29 @@ for det_idx = 1:n_detectors
     end
 end
 
+  
+%%%%% Visualize %%%%
 if visualize
-    hist_range = -10:0.05:10;
+    figure(1);
+    color_map = jet(n_detectors);
+    hist_range = -100:1:100;
+    for det_idx = 1:n_detectors
+        detection_score_temp = detection_scores{det_idx};
+        count_per_bin = histc(detection_score_temp, hist_range);
+        
+        % Divide by area to normalize the disbribution
+        plot(hist_range + 5, count_per_bin/trapz(hist_range, count_per_bin),'Color',color_map(det_idx,:));
+        
+        mean(detection_score_temp)
+        hold on;
+        drawnow;
+        % waitforbuttonpress;
+    end
+    xlabel('Detection Score');
+    ylabel('Probability');
+
+    figure(2);
+    hist_range = -3:0.05:1;
     for det_idx = 1:n_detectors
         detection_score_temp = ...
           dwot_calibrate_score(detection_scores{det_idx},...
@@ -131,14 +134,17 @@ if visualize
         count_per_bin = histc(detection_score_temp, hist_range);
         
         % Divide by area to normalize the disbribution
-        plot(hist_range, count_per_bin/trapz(hist_range, count_per_bin),'r-');
+        plot(hist_range, count_per_bin/trapz(hist_range, count_per_bin),'Color',color_map(det_idx,:));
         
         hold on;
         drawnow;
         % waitforbuttonpress;
     end
-    xlabel('detection score');
-    ylabel('probability');
+    xlabel('Detection Score');
+    ylabel('Probability');
+    
+    set(findall(gcf,'type','text'),'FontSize',15,'fontWeight','normal')
+    % print('-dpng','-r100','before_4.png');
 end
 
 %     if COMPUTING_MODE == 0

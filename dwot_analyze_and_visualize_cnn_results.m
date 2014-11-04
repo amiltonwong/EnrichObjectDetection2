@@ -61,8 +61,8 @@ n_unique_files = numel(unique_files);
 
 N_IMAGE = length(gtids);
 
-tp_struct(n_unique_files)   = struct('gtBB',[],'prdBB',[],'diff',[],'truncated',[],'score',[],...
-                                     'im',[],'detector_id',[]);
+tp_struct(n_unique_files)   = struct('gtBB',[],'predBB',[],'diff',[],'truncated',[],'occluded',[],...
+        'score',[],'im',[],'detector_id',[]);
 fp_struct(n_unique_files)   = struct('BB',[],'score',[],'im',[],'detector_id',[]);
 fn_struct(n_unique_files)   = struct('BB',[],'diff',[],'truncated',[],'im',[]);
 
@@ -94,7 +94,7 @@ for unique_image_idx=1:n_unique_files
     % read annotation
     clsinds = strmatch(detection_params.LOWER_CASE_CLASS,{recs.objects(:).class},'exact');
   
-    [b_skip, ground_truth_obj_idx ] =dwot_skip_criteria(recs.objects(clsinds), skip_criteria);
+    [b_skip, ground_truth_obj_idx ] = dwot_skip_criteria(recs.objects(clsinds), skip_criteria);
     if b_skip; continue; end
   
     im = imread([VOCopts.datadir, recs.imgname]);
@@ -148,7 +148,7 @@ for unique_image_idx=1:n_unique_files
                             ground_truth_bounding_boxes, param.min_overlap, ~ground_truth_obj_idx);
         detScore{unique_image_idx} = formatted_bounding_box(:,end)';
 
-        if 1
+        if 0
             formatted_bounding_box(:,9) = prediction_iou;
             
             subplot(221);
@@ -221,7 +221,7 @@ for unique_image_idx=1:n_unique_files
                     ground_truth_azimuth, prediction_azimuth, gt_idx_of_prediction,...
                     n_views, prediction_azimuth_rotation_direction, prediction_azimuth_offset);
 
-            if 0
+            if 1
                 tp_logical = tp_view{image_idx};
                 formatted_bounding_box(:,9) = prediction_view_iou;
                 formatted_bounding_box(:,10) = mod(prediction_azimuth_rotation_direction * prediction_azimuth +...
@@ -230,8 +230,8 @@ for unique_image_idx=1:n_unique_files
                 dwot_visualize_result_with_azimuth(im, formatted_bounding_box, tp_logical,...
                                       ground_truth_bounding_box, ground_truth_azimuth, detectors, param.color_range);
                 
-                save_name = sprintf('%s_img_%s.jpg', detection_name, file_name);
-                print('-djpeg','-r150',fullfile(save_path, save_name));
+%                 save_name = sprintf('%s_img_%s.jpg', detection_name, file_name);
+%                 print('-djpeg','-r150',fullfile(save_path, save_name));
             end
         else
             tp_view{unique_image_idx} = false(1, n_prediction);
@@ -254,14 +254,14 @@ for unique_image_idx=1:n_unique_files
         gt_idx = gt_idx_of_prediction(correct_prediction_idx);
         if ~isempty(gt_idx)
             tp_struct(image_count).gtBB = ground_truth_bounding_boxes(gt_idx, :);
-            tp_struct(image_count).predBB = formatted_bounding_box(correct_prediction_idx ,1:4)';
+            tp_struct(image_count).predBB = formatted_bounding_box(correct_prediction_idx ,1:4);
             tp_struct(image_count).diff = difficult_object_indexes;
             tp_struct(image_count).truncated = truncated_object_indexes;
             if strcmp(detection_params.DATA_SET, 'PASCAL12')
                 tp_struct(image_count).occluded = occluded_object_indexes;
             end
             tp_struct(image_count).score = formatted_bounding_box(correct_prediction_idx, end);
-            tp_struct(image_count).im = repmat({recs.imgname}, numel(gt_idx), 1);
+            tp_struct(image_count).im =  repmat({recs.imgname}, numel(gt_idx),1);
             tp_struct(image_count).detector_id = formatted_bounding_box(correct_prediction_idx, 11);
         end
 
@@ -364,7 +364,7 @@ else
     drawnow;
 end
 
-return;
+% return;
 
 % Sort the scores for each detectors and print  
 if visualize
@@ -372,93 +372,103 @@ if visualize
       mkdir(save_path);
     end
 
-    if 0
-        for detector_idx = 1:numel(detector_struct)
-          if isempty(detector_struct{detector_idx})
-            continue;
-          end
-
-          score = cellfun(@(x) x.BB(end), detector_struct{detector_idx});
-          [~, sorted_idx] = sort(score,'descend');
-
-          count = 1;
-          for idx = sorted_idx(1:min(7,numel(sorted_idx)))
-            curr_detection = detector_struct{detector_idx}{idx};
-
-            im_name = curr_detection.im;
-            im = imread([VOCopts.datadir,im_name]);
-
-            BB = curr_detection.BB(1:4);
-
-            subplot(221);
-            imagesc(im);
-            rectangle('position', BB - [0 0 BB(1:2)],'edgecolor','b','linewidth',2);
-            axis equal; axis tight;
-
-            % Rendering
-            subplot(223);
-            imagesc(renderings{detector_idx});
-            axis equal; axis tight;
-
-            % Overlay
-            subplot(224);
-            dwot_draw_overlap_detection(im,  curr_detection.BB, renderings, 1, 50, true, [0.5, 0.5, 0], color_range);
-            axis equal; axis tight;
-
-            drawnow;
-            spaceplots();
-
-            save_name = sprintf('%s_detector_%d_sort_%04d.jpg', detection_name, detector_idx, count);
-            count = count + 1;
-            print('-djpeg','-r150',fullfile(save_path, save_name));
-          end
-        end
-    end
+%     if 0
+%         for detector_idx = 1:numel(detector_struct)
+%           if isempty(detector_struct{detector_idx})
+%             continue;
+%           end
+% 
+%           score = cellfun(@(x) x.BB(end), detector_struct{detector_idx});
+%           [~, sorted_idx] = sort(score,'descend');
+% 
+%           count = 1;
+%           for idx = sorted_idx(1:min(7,numel(sorted_idx)))
+%             curr_detection = detector_struct{detector_idx}{idx};
+% 
+%             im_name = curr_detection.im;
+%             im = imread([VOCopts.datadir,im_name]);
+% 
+%             BB = curr_detection.BB(1:4);
+% 
+%             subplot(221);
+%             imagesc(im);
+%             rectangle('position', BB - [0 0 BB(1:2)],'edgecolor','b','linewidth',2);
+%             axis equal; axis tight;
+% 
+%             % Rendering
+%             subplot(223);
+%             imagesc(renderings{detector_idx});
+%             axis equal; axis tight;
+% 
+%             % Overlay
+%             subplot(224);
+%             dwot_draw_overlap_detection(im,  curr_detection.BB, renderings, 1, 50, true, [0.5, 0.5, 0], color_range);
+%             axis equal; axis tight;
+% 
+%             drawnow;
+%             spaceplots();
+% 
+%             save_name = sprintf('%s_detector_%d_sort_%04d.jpg', detection_name, detector_idx, count);
+%             count = count + 1;
+%             print('-djpeg','-r150',fullfile(save_path, save_name));
+%           end
+%         end
+%     end
 
     % sort the TP and FP according to the score and and print them
     % Concatenate all arrays, we used structure to speed up memory allocation
 
     non_empty_idx = cellfun(@(x) ~isempty(x), {tp_struct.diff});
 
-    tp.gtBB       = cell2mat({tp_struct.gtBB});
-    tp.predBB     = cell2mat({tp_struct.predBB});
-    tp.diff       = cell2mat({tp_struct(non_empty_idx).diff});
-    tp.truncated  = cell2mat({tp_struct(non_empty_idx).truncated});
-    tp.occluded  = cell2mat({tp_struct(non_empty_idx).occluded});
-    tp.score      = cell2mat({tp_struct(non_empty_idx).score}');
-    tp.im         = convert_doubly_deep_cell({tp_struct(non_empty_idx).im});
-    tp.detector_id = cell2mat({tp_struct.detector_id}');
+    tp_combined.gtBB       = cell2mat({tp_struct.gtBB}');
+    tp_combined.predBB     = cell2mat({tp_struct.predBB}');
+    tp_combined.diff       = cell2mat({tp_struct(non_empty_idx).diff});
+    tp_combined.truncated  = cell2mat({tp_struct(non_empty_idx).truncated});
+    if strcmp(detection_params.DATA_SET, 'PASCAL12')
+        tp_combined.occluded  = cell2mat({tp_struct(non_empty_idx).occluded});
+    end
+    tp_combined.score      = cell2mat({tp_struct(non_empty_idx).score}');
+    tp_combined.im         = convert_doubly_deep_cell({tp_struct(non_empty_idx).im});
+    tp_combined.detector_id = cell2mat({tp_struct.detector_id}');
 
-    [~, sorted_idx] = sort(tp.score,'descend');
+    [~, sorted_idx] = sort(tp_combined.score,'descend');
 
     count = 1;
     for idx = sorted_idx'
-      im_cell = tp.im(idx);
+      im_cell = tp_combined.im(idx);
       im = imread([VOCopts.datadir,im_cell{1}]);
       % im = imresize(im, image_scale_factor);
 
-      gtBB = tp.gtBB(:,idx);
-      predBB = tp.predBB(:,idx);
+      gtBB = tp_combined.gtBB(idx,:);
+      predBB = tp_combined.predBB(idx,:);
+      template_idx = tp_combined.detector_id(idx);
 
-      subplot(121);
+      subplot(221);
       imagesc(im);
+      rectangle('position', gtBB - [0 0 gtBB(1:2)],'edgecolor','b','linewidth',2);
+      text( gtBB(1), gtBB(2), 'ground truth');
+      rectangle('position', predBB - [0 0 predBB(1:2)],'edgecolor','r','linewidth',2);
+      text( predBB(1), predBB(2), 'ground truth');
       axis equal; axis tight;
 
-      box_position = gtBB(1:4)' + [0 0 -gtBB(1:2)'];
-    
-      % if detector id available (positive number), print it
-      [~, color_idx] = histc(tp.score(idx), color_range);
-      curr_color = color_map(color_idx, :);
-      rectangle('position', box_position,'edgecolor',[0.5 0.5 0.5],'LineWidth',3);
-      rectangle('position', box_position,'edgecolor',curr_color,'LineWidth',1);
-      text(box_position(1) + 1 , box_position(2), sprintf(' s:%0.2f',tp.score(idx)),...
-          'BackgroundColor', curr_color,'EdgeColor',[0.5 0.5 0.5],'VerticalAlignment','bottom');
-      
-
-    
       % Crop
-      subplot(122);
+
+      subplot(222);
       imagesc(im(gtBB(2):gtBB(4), gtBB(1):gtBB(3), :));
+      axis equal; axis tight;
+
+      % Rendering
+      subplot(223);
+      imagesc(detectors{tp_combined.detector_id(idx)}.rendering_image);
+      axis equal; axis tight;
+
+      % Overlay
+      subplot(224);
+      curr_detector = detectors{template_idx};
+      overlay = dwot_draw_overlay_rendering(im, predBB, curr_detector.rendering_image, curr_detector.rendering_depth, [0.8, 0.2]);
+      imagesc(overlay);
+      dwot_visualize_bounding_box_and_text(predBB, sprintf('%0.2f', tp_combined.score(idx)), 'r');
+
       axis equal; axis tight;
 
       drawnow;
@@ -472,34 +482,34 @@ if visualize
 
 
     % False Positive
+    close all;
     non_empty_idx = cellfun(@(x) ~isempty(x), {fp_struct.score});
 
-    fp.BB       = cell2mat({fp_struct.BB});
-    fp.score      = cell2mat({fp_struct(non_empty_idx).score}');
-    fp.im         = convert_doubly_deep_cell({fp_struct(non_empty_idx).im});
-    fp.detector_id = cell2mat({fp_struct.detector_id}');
+    fp_combined.BB       = cell2mat({fp_struct.BB});
+    fp_combined.score      = cell2mat({fp_struct(non_empty_idx).score}');
+    fp_combined.im         = convert_doubly_deep_cell({fp_struct(non_empty_idx).im});
+    fp_combined.detector_id = cell2mat({fp_struct.detector_id}');
 
-    [~, sorted_idx] = sort(fp.score,'descend');
+    [~, sorted_idx] = sort(fp_combined.score,'descend');
     count = 1;
-
-    for idx = sorted_idx(1:600)'
-      im_cell = fp.im(idx);
+    clf;
+    for idx = sorted_idx(1:min(200, numel(sorted_idx)))'
+      im_cell = fp_combined.im(idx);
       im = imread([VOCopts.datadir,im_cell{1}]);
       % im = imresize(im, image_scale_factor);
       imSz = size(im);
 
-      BB = clip_to_image( round(fp.BB(:,idx))', [1 1 imSz(2) imSz(1)]) ;
-
+      BB = clip_to_image( round(fp_combined.BB(:,idx))', [1 1 imSz(2) imSz(1)]) ;
+      whBB= dwot_bbox_xy_to_wh(BB);
       subplot(121);
       imagesc(im);
-      rectangle('position', BB - [0 0 BB(1:2)],'edgecolor','r','linewidth',2);
+      rectangle('position', whBB,'edgecolor','r','linewidth',2);
       axis equal; axis tight;
 
-      [~, color_idx] = histc(fp.score(idx), color_range);
-      curr_color = color_map(color_idx, :);
-      rectangle('position', BB,'edgecolor',[0.5 0.5 0.5],'LineWidth',3);
-      rectangle('position', BB,'edgecolor',curr_color,'LineWidth',1);
-      text(BB(1) + 1 , BB(2), sprintf(' s:%0.2f',fp.score(idx)),...
+      curr_color = 'r';
+      rectangle('position', whBB,'edgecolor',[0.5 0.5 0.5],'LineWidth',3);
+      rectangle('position', whBB,'edgecolor',curr_color,'LineWidth',1);
+      text(BB(1) + 1 , BB(2), sprintf(' s:%0.2f',fp_combined.score(idx)),...
           'BackgroundColor', curr_color,'EdgeColor',[0.5 0.5 0.5],'VerticalAlignment','bottom');
       
       
@@ -507,8 +517,6 @@ if visualize
       subplot(122);
       imagesc(im(BB(2):BB(4), BB(1):BB(3), :));
       axis equal; axis tight;
-
-
 
       drawnow;
       spaceplots();
@@ -520,6 +528,8 @@ if visualize
 
 
     % False Negative
+    close all;
+
     non_empty_idx = cellfun(@(x) ~isempty(x), {fn_struct.diff});
 
     fn.BB       = cell2mat({fn_struct.BB});
@@ -528,7 +538,6 @@ if visualize
     fn.im         = convert_doubly_deep_cell({fn_struct(non_empty_idx).im});
     count = 1;
 
-    close all;
     for idx = 1:numel(fn.diff)
       im_cell = fn.im(idx);
       im = imread([VOCopts.datadir,im_cell{1}]);

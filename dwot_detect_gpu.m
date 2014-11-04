@@ -61,7 +61,7 @@ for level = length(hog):-1:1
     % bbs(:,9) = boxoverlap(bbs, annotation.bbox + [0 0 annotation.bbox(1:2)]);
     % bbs(:,10) = abs(detectors{templateIdx}.az - azGT) < 30; for 3D object
     % dataset
-
+    bbs(:,10) = param.detectors{templateIdx}.az;
     bbs(:,11) = templateIdx;
     bbs(:,12) = HM{templateIdx}(idx);
     bbsTemplate{templateIdx} = bbs;

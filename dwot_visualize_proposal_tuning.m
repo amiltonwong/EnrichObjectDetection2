@@ -63,6 +63,8 @@ subplot(224);
 imagesc([before_im after_im]); axis equal; axis tight; axis off;
 title('Before (left) and After (Right) tuning');
 
+drawnow;
+
 % Helper function get overlaid rendering
 function [result_im] = draw_rendering_and_box(im, rendering, depth, bounding_box, score,...
                     text_template, text_tuples, rendering_image_weight,  color_range, color_map)

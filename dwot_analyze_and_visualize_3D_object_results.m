@@ -59,22 +59,23 @@ N_IMAGE = length(gt_orig);
 % gt(length(gt))=struct('BB',[],'diff',[],'det',[]);
 
 fileID = fopen(detection_result_txt,'r');
-detection_result = textscan(fileID,'%s %f %f %f %f %f %d');
+[~, detection_result] = dwot_save_load_delegate(fileID, detection_params.save_mode);
+% detection_result = textscan(fileID,'%s %f %f %f %f %f %d');
 fclose(fileID);
 %                       detection_result(det_idx, end),... % detection score
 %                       detection_result(det_idx, 1:4),... % bbox
 %                       detection_result(det_idx, 11)));  % templateIdx
 
 % Sort files to corresponding filed
-detection.file_name = detection_result{1};
-detection.bbox = cell2mat(detection_result(3:6));
-detection.score = detection_result{2};
-detection.detector_idx = double(detection_result{7});
+% detection.file_name = detection_result{1};
+% detection.bbox = cell2mat(detection_result(3:6));
+% detection.score = detection_result{2};
+% detection.detector_idx = double(detection_result{7});
 
-unique_files = unique(detection.file_name);
+unique_files = unique(detection_result.file_names);
 n_unique_files = numel(unique_files);
 
-tp_struct   = struct('gtBB',[],'prdBB',[],'diff',[],'truncated',[],'score',[],'im',[],'detector_id',[]);
+tp_struct   = struct('gtBB',[],'predBB',[],'diff',[],'truncated',[],'score',[],'im',[],'detector_id',[]);
 fp_struct   = struct('BB',[],'score',[],'im',[],'detector_id',[]);
 fn_struct   = struct('BB',[],'diff',[],'truncated',[],'im',[]);
 
@@ -98,7 +99,7 @@ image_count = 1;
 for unique_image_from_detection_idx=1:n_unique_files
   
     file_name = unique_files{unique_image_from_detection_idx};
-    curr_file_idx = find(cellfun(@(x) strcmp(x,file_name), detection.file_name));
+    curr_file_idx = find(cellfun(@(x) strcmp(x,file_name), detection_result.file_names));
     if nnz(curr_file_idx) == 0 
         continue;
     end
@@ -117,25 +118,39 @@ for unique_image_from_detection_idx=1:n_unique_files
 %     gt{image_idx}.truncated = [recs.objects(clsinds).truncated];
 %     gt{image_idx}.det = zeros(length(clsinds),1);
     
-    prediction_score = detection.score(curr_file_idx);
+    prediction_score = detection_result.prediction_scores(curr_file_idx);
     valid_prediction_idx = find(prediction_score > -inf);
 
     if ~isempty(valid_prediction_idx);
         curr_file_idx = curr_file_idx(valid_prediction_idx);
         
         % only bounding box
-        prediction_bounding_box = detection.bbox(curr_file_idx,:)/image_scale_factor;
+        prediction_bounding_box = detection_result.prediction_boxes(curr_file_idx,:)/image_scale_factor;
         
         % formatted such that it can be used in rendering
-        formatted_bounding_box = [ prediction_bounding_box zeros(nnz(curr_file_idx),6)...
-                        detection.detector_idx(curr_file_idx,:) detection.score(curr_file_idx)];
-        
+        if isfield(detection_result,'prediction_template_indexes')
+            formatted_bounding_box = [ prediction_bounding_box zeros(nnz(curr_file_idx),6),...
+                            double(detection_result.prediction_template_indexes(curr_file_idx,:)),...
+                            detection_result.prediction_scores(curr_file_idx)];
+
+            prediction_azimuth = cellfun(@(x) x.az, detectors(formatted_bounding_box(:,11)));
+        elseif  isfield(detection_result,'prediction_viewpoints')
+            formatted_bounding_box = [ prediction_bounding_box zeros(nnz(curr_file_idx),5),...
+                            detection_result.prediction_viewpoints(curr_file_idx,:),...
+                            zeros(nnz(curr_file_idx),1),...
+                            detection_result.prediction_scores(curr_file_idx)];
+
+            prediction_azimuth = formatted_bounding_box(:,10);
+        else
+            error('No viewpoint');
+        end
         % non maximal suppression on the bounding boxes
         [formatted_bounding_box, bounding_box_idx] = esvm_nms(formatted_bounding_box, nms_threshold);
         
         % non maximal suppressed prediction boxes
         prediction_bounding_box = prediction_bounding_box(bounding_box_idx,:);
-
+        prediction_azimuth = prediction_azimuth(bounding_box_idx);
+        
         % clip the prediction 
         prediction_bounding_box_clip = clip_to_image(prediction_bounding_box, [1 1 imSz(2) imSz(1)]);
         ground_truth_bounding_box = gt_orig{image_idx}.BB';
@@ -150,7 +165,6 @@ for unique_image_from_detection_idx=1:n_unique_files
         detScore{image_idx} = formatted_bounding_box(:,end)';
         
         % to evaluate also using viewpoint gather viewpoint info
-        prediction_azimuth = cellfun(@(x) x.az, detectors(formatted_bounding_box(:,11)));
         ground_truth_azimuth = gt_orig{image_idx}.azimuth;
         
         [tp_view{image_idx}, fp_view{image_idx}, prediction_view_iou, gt_idx_of_view_prediction] =...

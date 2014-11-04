@@ -40,7 +40,7 @@ switch save_format
         % Detection, template index, score and boundingbox from proposal detection
         % filename, score, x1 y1 x2 y2 ,template index, proposal score, proposal_x1, proposal_y1, proposal x2, proposal y2
         matrix_data = [structure_data.prediction_scores, structure_data.prediction_boxes, structure_data.prediction_template_indexes,...
-                structure_data.proposal_scores, structure_data.proposal_boxes];
+            structure_data.proposal_scores, structure_data.proposal_boxes];
         assert(size(matrix_data,2) == 11);
     case 'dvp'
         % Detection, viewpoint, score and bounding box from proposal detection

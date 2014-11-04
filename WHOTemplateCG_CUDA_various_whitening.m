@@ -54,6 +54,7 @@ bbox = [1 1 size(im,2) size(im,1)] + padding;
 % 5 Whiten all
 % 6 Whiten all but zero our empty cells
 % 7 center non zero, whiten all, zero out empty
+% 8 Similar to 7 but find bias heuristically
 if (param.template_initialization_mode == 0 || param.template_initialization_mode == 2 || param.template_initialization_mode == 3 || param.template_initialization_mode == 5 || param.template_initialization_mode == 6 || param.template_initialization_mode == 7)
   [HOGTemplate, scale] = dwot_initialize_template(paddedIm, bbox, param);
 elseif (param.template_initialization_mode == 1)

@@ -61,7 +61,7 @@ detection.detector_idx = double(detection_result{7});
 [unique_files, ~, unique_file_idx] = unique(detection.file_name);
 n_unique_files = numel(unique_files);
 
-tp_struct   = struct('gtBB',[],'prdBB',[],'diff',[],'truncated',[],'score',[],'im',[],'detector_id',[]);
+tp_struct   = struct('gtBB',[],'predBB',[],'diff',[],'truncated',[],'score',[],'im',[],'detector_id',[]);
 fp_struct   = struct('BB',[],'score',[],'im',[],'detector_id',[]);
 fn_struct   = struct('BB',[],'diff',[],'truncated',[],'im',[]);
 

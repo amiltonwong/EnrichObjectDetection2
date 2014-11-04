@@ -15,10 +15,14 @@ if isempty(formatted_bounding_boxes)
     return;
 end
 save_structure.prediction_boxes            = formatted_bounding_boxes(:,1:4);
-save_structure.prediction_viewpoints       = formatted_bounding_boxes(:, 10);
+save_structure.prediction_viewpoints       = formatted_bounding_boxes(:,10);
 save_structure.prediction_template_indexes = formatted_bounding_boxes(:,11);
 save_structure.prediction_scores           = formatted_bounding_boxes(:,end);
 if nargin == 2
     save_structure.proposal_boxes          = proposal_formatted_bounding_boxes(:,1:4);
     save_structure.proposal_scores         = proposal_formatted_bounding_boxes(:,end);
+    if size(proposal_formatted_bounding_boxes,2) > 10
+        save_structure.proposal_viewpoints     = proposal_formatted_bounding_boxes(:,10);
+        save_structure.proposal_template_indexes= proposal_formatted_bounding_boxes(:,11);
+    end
 end

@@ -496,7 +496,13 @@ for i = 1:numel(nms_thresholds)
      print('-dpng','-r150',fullfile(SAVE_PATH, ap_save_names{i}));
 end
 
+if ~exist('/scratch/chrischoy/Result/','dir'); mkdir('/scratch/chrischoy/Result/'); end
+save_path = ['/scratch/chrischoy/Result/' detection_result_common_name];
+[~ ,max_nms_idx] = max(ap);
+dwot_analyze_and_visualize_cnn_results(fullfile(SAVE_PATH, detection_result_file), ...
+                        detectors, VOCopts, param, nms_thresholds(max_nms_idx), true, save_path);
 
+                    
 % Detection for regions before tuning
 n_views = [4, 8, 16, 24];
 count = 1;

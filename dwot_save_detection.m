@@ -1,4 +1,4 @@
-function new_file_name = dwot_save_detection(save_path, file_name, b_new_file, save_format, structure_data, image_name)
+function [new_file_name, curr_temp_idx]= dwot_save_detection(save_path, file_name, b_new_file, save_format, structure_data, image_name)
 
 if ~exist('b_new_file','var')
     b_new_file = false;
@@ -11,7 +11,7 @@ end
 % If we have to create new file, make one. Also if there is existing 
 % file name, make file name appended with temporary number
 if b_new_file
-    [f, new_file_name] = get_new_file(save_path, file_name);
+    [f, new_file_name, curr_temp_idx] = get_new_file(save_path, file_name);
 else
     f = fopen(fullfile(save_path, file_name),'a');
 end
@@ -26,10 +26,11 @@ fclose(f);
 
 
 
-function [fid, file_name] = get_new_file(save_path, file_name)
+function [fid, file_name, curr_temp_idx] = get_new_file(save_path, file_name)
 file_list = dir(save_path);
 file_list = file_list(~[file_list.isdir]);
 
+curr_temp_idx = -1;
 if exist(fullfile(save_path,file_name),'file')
   [~,file_name_wo_ext] = fileparts(file_name);
   

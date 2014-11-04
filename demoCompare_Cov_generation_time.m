@@ -26,7 +26,7 @@ paddedIm(end-padding+1 : end, :, :) = 1;
 bbox = [1 1 size(im,2) size(im,1)] + padding;
 
 % TODO replace it
-    gammaDim            = param.hog_gamma_dim;
+gammaDim            = param.hog_gamma_dim;
 for caseIdx = 1:numel(n_cell_limits)
   n_cell_limit = n_cell_limits(caseIdx);
 
