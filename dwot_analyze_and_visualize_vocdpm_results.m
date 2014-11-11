@@ -40,6 +40,7 @@ if nargin < 12
     clip_prediction_bounding_box = true;
 end
 
+score_threshold= 100;
 % renderings = cellfun(@(x) x.rendering_image, detectors, 'UniformOutput', false);
 
 % PASCAL_car_val_init_0_Car_each_7_lim_300_lam_0.0150_a_24_e_2_y_1_f_2_scale_2.00_sbin_6_level_10_nms_0.40_skp_e
@@ -169,7 +170,7 @@ for unique_image_idx=1:n_unique_files
                     prediction_bounding_box = detection_result.proposal_boxes(curr_file_idx,:)/image_scale_factor;
                     formatted_bounding_box = [ prediction_bounding_box,...
                                 zeros(nnz(curr_file_idx),5),...
-                                prediction_azimuth_rotation_direction * detection_result.proposal_viewpoints(curr_file_idx,:) - prediction_azimuth_offset,...
+                                prediction_azimuth_rotation_direction * detection_result.proposal_viewpoints(curr_file_idx,:) + prediction_azimuth_offset,...
                                 double(detection_result.prediction_template_indexes(curr_file_idx,:)),...
                                 detection_result.proposal_scores(curr_file_idx)];
                 case 'predboxpredview'
@@ -189,9 +190,9 @@ for unique_image_idx=1:n_unique_files
                                 detection_result.proposal_scores(curr_file_idx)];
                     for prediction_idx = 1:numel(curr_file_idx)
                         prediction_score = detection_result.prediction_scores(curr_file_idx(prediction_idx));
-                        if prediction_score < 75
+                        if prediction_score < score_threshold
                             formatted_bounding_box(prediction_idx, 10) = ...
-                                    prediction_azimuth_rotation_direction * detection_result.proposal_viewpoints(curr_file_idx(prediction_idx),:) - prediction_azimuth_offset;
+                                    prediction_azimuth_rotation_direction * detection_result.proposal_viewpoints(curr_file_idx(prediction_idx),:) + prediction_azimuth_offset;
                         else
                             if 0 % Change prediction box as well
                                 formatted_bounding_box(prediction_idx, :) = [ detection_result.prediction_boxes(curr_file_idx(prediction_idx),:)/image_scale_factor,...
@@ -234,9 +235,9 @@ for unique_image_idx=1:n_unique_files
                                 detection_result.proposal_scores(curr_file_idx)];
                     for prediction_idx = 1:numel(curr_file_idx)
                         prediction_score = detection_result.prediction_scores(curr_file_idx(prediction_idx));
-                        if prediction_score < 75
+                        if prediction_score < score_threshold
                             formatted_bounding_box(prediction_idx, 10) = ...
-                                    prediction_azimuth_rotation_direction * detection_result.proposal_viewpoints(curr_file_idx(prediction_idx),:) - prediction_azimuth_offset;
+                                    prediction_azimuth_rotation_direction * detection_result.proposal_viewpoints(curr_file_idx(prediction_idx),:) + prediction_azimuth_offset;
                         else
                             formatted_bounding_box(prediction_idx, 10) = ...
                                     detection_result.prediction_viewpoints(curr_file_idx(prediction_idx),:);
@@ -478,7 +479,7 @@ if b_compute_view
     plot(recall, precision, 'r', 'LineWidth',3);
     hold on;
     plot(recall_view, precision_view, 'g', 'LineWidth',3);
-
+    ylabel('Precision');
     xlabel('Recall');
     ti = sprintf('Average Precision = %.3f Average Viewpoint Precision = %.3f', 100*ap, 100*avp);
     title(ti);
@@ -502,7 +503,7 @@ else
     fprintf('\nAP = %.4f\n', ap);
     
     plot(recall, precision, 'r', 'LineWidth',3);
-
+    ylabel('Precision');
     xlabel('Recall');
     ti = sprintf('Average Precision = %.3f', 100*ap);
     title(ti);

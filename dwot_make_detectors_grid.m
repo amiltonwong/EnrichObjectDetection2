@@ -1,4 +1,4 @@
-function [detectors]= dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, model_indexes, model_class, param, visualize)
+function [detectors, generation_time]= dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, model_indexes, model_class, param, visualize)
 if nargin < 9
   visualize = false;
 end
@@ -14,9 +14,9 @@ end
 % end
 colormap hot;
 i = 1;
-start_time = tic;
-tic;
+
 detectors = cell(1,numel(azs) * numel(els) * numel(fovs));
+generation_time = zeros(numel(azs) * numel(els) * numel(fovs) , 1);
 for model_index = model_indexes
   renderer.setModelIndex(model_index);
   for azIdx = 1:numel(azs)
@@ -27,14 +27,15 @@ for model_index = model_indexes
           azGT = azs(azIdx);
           yawGT = yaws(yawIdx);
           fovGT = fovs(fovIdx);
-            
+          
+          tic
           detector = dwot_get_detector(renderer, azGT, elGT, yawGT, fovGT, model_index, 'not_supported_model_class', param);
+          generation_time(i) = toc;
           
           detectors{i} = detector;
           % param.detector_table( dwot_detector_key(azGT, elGT, yawGT, fovGT) ) = i;
 
           if visualize || (visualize && toc > 1)
-            tic;
             subplot(221);
             imagesc(detector.rendering_image); axis equal; axis tight; axis off;
             
