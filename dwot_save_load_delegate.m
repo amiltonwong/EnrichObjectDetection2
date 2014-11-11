@@ -17,7 +17,6 @@ else
 end
 
 
-
 function [matrix_data] = get_structure_data(save_format, structure_data)
 
 switch save_format
@@ -49,11 +48,22 @@ switch save_format
         matrix_data = [structure_data.prediction_scores, structure_data.prediction_boxes, structure_data.prediction_viewpoints,...
                 structure_data.proposal_scores, structure_data.proposal_boxes];
         assert(size(matrix_data,2) == 11);
+     case 'dtpv'
+        % Detection, template index, score and boundingbox from proposal detection
+        % filename, score, x1 y1 x2 y2 ,template index, proposal score, proposal_x1, proposal_y1, proposal x2, proposal y2
+        matrix_data = [structure_data.prediction_scores, structure_data.prediction_boxes, structure_data.prediction_template_indexes,...
+            structure_data.proposal_scores, structure_data.proposal_boxes, structure_data.proposal_viewpoints];
+        assert(size(matrix_data,2) == 12);
+    case 'dvpv'
+        % Detection, viewpoint, score and bounding box from proposal detection
+        % filename, score, x1 y1 x2 y2 ,template index, proposal score, proposal_x1, proposal_y1, proposal x2, proposal y2
+        % sprint_template = '%s %f %f %f %f %f %f %f %f %f %f %f';
+        matrix_data = [structure_data.prediction_scores, structure_data.prediction_boxes, structure_data.prediction_viewpoints,...
+                structure_data.proposal_scores, structure_data.proposal_boxes, structure_data.proposal_viewpoints];
+        assert(size(matrix_data,2) == 12);
     otherwise
         error('Undefied mode');
 end 
-
-
 
 function structure_data = convert_cell_data_to_structure_data(save_format, cell_data)
 % scores, prediction_boxes, template_indexes, viewpoints, proposal_scores, proposal_boxes)
@@ -91,14 +101,27 @@ switch save_format
         structure_data.prediction_viewpoints = cell_data{7};
         structure_data.proposal_scores = cell_data{8};
         structure_data.proposal_boxes = cell2mat(cell_data(9:12));
+     case 'dtpv'
+        % Detection, template index, score and boundingbox from proposal detection
+        % filename, score, x1 y1 x2 y2 ,template index, proposal score, proposal_x1, proposal_y1, proposal x2, proposal y2
+        % sprint_template = '%s %f %f %f %f %f %d %f %f %f %f %f';
+        structure_data.prediction_template_indexes = cell_data{7};
+        structure_data.proposal_scores = cell_data{8};
+        structure_data.proposal_boxes = cell2mat(cell_data(9:12));
+        structure_data.proposal_viewpoints =  cell_data{13};
+    case 'dvpv'
+        % Detection, viewpoint, score and bounding box from proposal detection
+        % filename, score, x1 y1 x2 y2 ,template index, proposal score, proposal_x1, proposal_y1, proposal x2, proposal y2
+        % sprint_template = '%s %f %f %f %f %f %f %f %f %f %f %f';
+        structure_data.prediction_viewpoints = cell_data{7};
+        structure_data.proposal_scores = cell_data{8};
+        structure_data.proposal_boxes = cell2mat(cell_data(9:12));
+        structure_data.proposal_viewpoints =  cell_data{13};
     otherwise
         error('Undefied mode');
 end 
 
-
-
 function [sprint_template] = get_sprint_template(save_format)
-
 switch save_format
     case 'd'  
         % Detection only, 
@@ -116,11 +139,18 @@ switch save_format
         % Detection, template index, score and boundingbox from proposal detection
         % filename, score, x1 y1 x2 y2 ,template index, proposal score, proposal_x1, proposal_y1, proposal x2, proposal y2
         sprint_template = '%s %f %f %f %f %f %d %f %f %f %f %f\n';
-
     case 'dvp'
         % Detection, viewpoint, score and bounding box from proposal detection
         % filename, score, x1 y1 x2 y2 ,template index, proposal score, proposal_x1, proposal_y1, proposal x2, proposal y2
         sprint_template = '%s %f %f %f %f %f %f %f %f %f %f %f\n';
+    case 'dtpv'
+        % Detection, template index, score and boundingbox from proposal detection
+        % filename, score, x1 y1 x2 y2 ,template index, proposal score, proposal_x1, proposal_y1, proposal x2, proposal y2
+        sprint_template = '%s %f %f %f %f %f %d %f %f %f %f %f %f\n';
+    case 'dvpv'
+        % Detection, viewpoint, score and bounding box from proposal detection
+        % filename, score, x1 y1 x2 y2 ,template index, proposal score, proposal_x1, proposal_y1, proposal x2, proposal y2
+        sprint_template = '%s %f %f %f %f %f %f %f %f %f %f %f %f\n';
     otherwise
         error('Undefied mode');
 end 

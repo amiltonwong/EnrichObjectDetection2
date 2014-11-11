@@ -1,6 +1,11 @@
 function [ ap ] = dwot_analyze_and_visualize_pascal_results( detection_result_txt, ...
     detectors, save_path, VOCopts, param, skip_criteria, color_range, nms_threshold, visualize)
-
+% It only evaluate the images that is in the prediction file. The user must
+% ensure that all the test/validation images is in the prediction file. For
+% instance, by including dummy prediction such as [-inf 0 0 0 0].
+% 
+% this allow user to use evaluation criteria of seeing 3D chair which uses 
+% subset of PASCAL images. But use with extreme caution.
 if ~exist('nms_threshold','var') || isempty(nms_threshold)
     if ~isfield(param, 'nms_threshold')
       nms_threshold = 0.4;
@@ -61,6 +66,10 @@ detection.detector_idx = double(detection_result{7});
 [unique_files, ~, unique_file_idx] = unique(detection.file_name);
 n_unique_files = numel(unique_files);
 
+if N_IMAGE ~= n_unique_files
+    warning('Number of images different from VOC images. If you are using a subset of PASCAL, ignore this message.');
+end
+    
 tp_struct   = struct('gtBB',[],'predBB',[],'diff',[],'truncated',[],'score',[],'im',[],'detector_id',[]);
 fp_struct   = struct('BB',[],'score',[],'im',[],'detector_id',[]);
 fn_struct   = struct('BB',[],'diff',[],'truncated',[],'im',[]);
@@ -82,6 +91,7 @@ for imgIdx=1:n_unique_files
   if nnz(curr_file_idx) == 0 
     continue;
   end
+  
   if mod(imgIdx,10) == 0; fprintf('.'); end;
 
   % read annotation

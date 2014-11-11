@@ -37,7 +37,7 @@ azs = 0:15:345;
 els = 0:10:40;
 fovs = [25];
 yaws = -0;
-n_cell_limit = [250];
+n_cell_limit = [200];
 lambda = [0.15];
 detection_threshold = 50;
 
@@ -124,7 +124,7 @@ param.detection_mode = 'dwot';
 param.calibration_mode='linear';
 
 %% Make Renderer
-if ~exist('renderer','var') || ~exist(detector_file_name,'file')  && param.proposal_tuning_mode > 0
+if ~exist('renderer','var') 
     if exist('renderer','var')
         renderer.delete();
         clear renderer;
@@ -157,17 +157,62 @@ fovs = [25];
 yaws =0;
 i = 1;
 detectors = {};
-for template_initialization_mode = [0 4 5 6 7]
-    param.template_initialization_mode = template_initialization_mode;
-    detectors{i} = dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_names),...
-                                LOWER_CASE_CLASS, param);
-    detectors_cal{i} = dwot_calibrate_detectors(detectors{i}, LOWER_CASE_CLASS, VOCopts, param,true);
-    figure(1);
-    print('-dpng','-r100',sprintf('CVPR14/figures/whitening/before_%d.png',template_initialization_mode));
-    
-    figure(2);
-    print('-dpng','-r100',sprintf('CVPR14/figures/whitening/after_%d.png',template_initialization_mode));
-    
-    i = i + 1;
+% n_cell_limits =  [100 150 200 250 300];
+n_cell_limits =  [50 100 150 200 250 300 350 400];
+% TODO replace it
+% 0 NZ-WHO
+% 1 Constant # active cell in NZ-WHO
+% 2 Decorrelate all but center only the non-zero cells
+% 3 NZ-WHO but normalize by # of active cells
+% 4 HOG feature
+% 5 Whiten all
+% 6 Whiten all but zero our empty cells
+% 7 center non zero, whiten all, zero out empty
+% 8 Similar to 7 but find bias heuristically
+% 9 Nonzero center Decomposition zero out textureless
+% 10 Standard Decomposition
+template_initialization_modes = [0 5 6 9];
+
+method = [];
+
+for template_initialization_idx = 1:numel(template_initialization_modes)
+        param.template_initialization_mode = template_initialization_modes(template_initialization_idx);
+        time_generation = zeros(1,numel(n_cell_limits) );
+        time_calibration = zeros(1,numel(n_cell_limits) );
+        for cell_limit_idx = 1:numel(n_cell_limits)
+            param.n_cell_limit = n_cell_limits( cell_limit_idx );
+            tic
+            dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, 1:length(model_names),...
+                                        LOWER_CASE_CLASS, param);
+            time_generation(cell_limit_idx) = toc
+
+%             tic
+%             detectors_cal{i} = dwot_calibrate_detectors(detectors{i}, LOWER_CASE_CLASS, VOCopts, param,false);
+%             time_calibration(cell_limit_idx) =  toc
+            %     figure(1);
+            %     print('-dpng','-r100',sprintf('CVPR14/figures/whitening/before_%d.png',template_initialization_mode));
+            %     
+            %     figure(2);
+            %     print('-dpng','-r100',sprintf('CVPR14/figures/whitening/after_%d.png',template_initialization_mode));
+
+            i = i + 1;
+        end
+        method(template_initialization_idx).time_generation = time_generation;
+        method(template_initialization_idx).time_calibration = time_calibration;
 end
-   
+
+color_map = jet(numel(template_initialization_modes));
+
+for template_initialization_idx = 1:numel(template_initialization_modes)
+    
+    plot(n_cell_limits , method(template_initialization_idx).time_generation / (numel(azs) * numel(els)), 'color', color_map(template_initialization_idx,:));
+    hold on;
+end
+
+
+% for template_initialization_idx = 1:numel(template_initialization_modes)
+%      (method(template_initialization_idx).time_generation + method(template_initialization_idx).time_calibration )/ (numel(azs) * numel(els))
+%     plot(n_cell_limits , (method(template_initialization_idx).time_generation + method(template_initialization_idx).time_calibration )/ (numel(azs) * numel(els)), 'color', color_map(template_initialization_idx,:));
+%     hold on;
+% end
+

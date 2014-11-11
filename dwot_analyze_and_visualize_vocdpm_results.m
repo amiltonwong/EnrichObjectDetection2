@@ -1,5 +1,5 @@
-function [ ap ] = dwot_analyze_and_visualize_cnn_results( detection_result_txt, ...
-                        detectors, VOCopts, param, nms_threshold, visualize, save_path,...
+function [ ap ] = dwot_analyze_and_visualize_vocdpm_results( detection_result_txt, ...
+                        detectors, VOCopts, param, nms_threshold, evaluation_mode, visualize, save_path,...
                         n_views, prediction_azimuth_rotation_direction, prediction_azimuth_offset,...
                         clip_prediction_bounding_box)
 % It only evaluate the images that is in the prediction file. The user must
@@ -8,15 +8,15 @@ function [ ap ] = dwot_analyze_and_visualize_cnn_results( detection_result_txt, 
 % 
 % this allow user to use evaluation criteria of seeing 3D chair which uses 
 % subset of PASCAL images. But use with extreme caution.
-if nargin < 6
+if nargin < 7
     visualize = false;
 end
 
-if nargin < 8
+if nargin < 9
     b_compute_view = false;
 end
 
-if nargin == 8
+if nargin == 9
     prediction_azimuth_rotation_direction = 1;
     prediction_azimuth_offset = 0;
     b_compute_view = true;
@@ -25,18 +25,20 @@ if nargin == 8
     azimuth_intervals = [0 (360/(n_views*2)):(360/n_views):360-(360/(n_views*2))];
 end
 
-if nargin > 8
+if nargin > 9
     b_compute_view = true;
     max_azimuth_difference = 360/n_views/2;
     confusion_statistics = zeros(n_views, n_views);
     azimuth_intervals = [0 (360/(n_views*2)):(360/n_views):360-(360/(n_views*2))];
 end
 
-if nargin < 11
-    clip_prediction_bounding_box = true;
+if nargin < 6
+    evaluation_mode = 'propboxpred';
 end
 
-evaluation_mode = 'propboxpredview';
+if nargin < 12
+    clip_prediction_bounding_box = true;
+end
 
 % renderings = cellfun(@(x) x.rendering_image, detectors, 'UniformOutput', false);
 
@@ -139,7 +141,10 @@ for unique_image_idx=1:n_unique_files
     
     prediction_score = detection_result.prediction_scores(curr_file_idx);
     valid_prediction_idx = find(prediction_score > -inf);
-    % valid_prediction_idx = 1:numel(prediction_score);
+    
+    % proposal_score = detection_result.proposal_scores(curr_file_idx);
+    % valid_proposal_idx = find(proposal_score > -inf);
+    valid_prediction_idx = 1:numel(prediction_score);
     
     if ~isempty(valid_prediction_idx)
         curr_file_idx = curr_file_idx(valid_prediction_idx);
@@ -209,17 +214,34 @@ for unique_image_idx=1:n_unique_files
         elseif  isfield(detection_result,'prediction_viewpoints')
             switch evaluation_mode
                 case 'propboxpredview'
-                prediction_bounding_box = detection_result.proposal_boxes(curr_file_idx,:)/image_scale_factor;
-                formatted_bounding_box = [ prediction_bounding_box zeros(nnz(curr_file_idx),5),...
-                                detection_result.prediction_viewpoints(curr_file_idx,:),...
+                    prediction_bounding_box = detection_result.proposal_boxes(curr_file_idx,:)/image_scale_factor;
+                    formatted_bounding_box = [ prediction_bounding_box zeros(nnz(curr_file_idx),5),...
+                                    detection_result.prediction_viewpoints(curr_file_idx,:),...
+                                    zeros(nnz(curr_file_idx),1),...
+                                    detection_result.proposal_scores(curr_file_idx)];
+                case 'predboxpredview'
+                    prediction_bounding_box = detection_result.prediction_boxes(curr_file_idx,:)/image_scale_factor;
+                    formatted_bounding_box = [ prediction_bounding_box zeros(nnz(curr_file_idx),5),...
+                                    detection_result.prediction_viewpoints(curr_file_idx,:),...
+                                    zeros(nnz(curr_file_idx),1),...
+                                    detection_result.prediction_scores(curr_file_idx)];
+                case 'propboxpredviewthres'
+                    prediction_bounding_box = detection_result.proposal_boxes(curr_file_idx,:)/image_scale_factor;
+                    formatted_bounding_box = [ prediction_bounding_box,...
+                                zeros(nnz(curr_file_idx),5),...
+                                zeros(nnz(curr_file_idx),1),...
                                 zeros(nnz(curr_file_idx),1),...
                                 detection_result.proposal_scores(curr_file_idx)];
-                case 'predboxpredview'
-                prediction_bounding_box = detection_result.prediction_boxes(curr_file_idx,:)/image_scale_factor;
-                formatted_bounding_box = [ prediction_bounding_box zeros(nnz(curr_file_idx),5),...
-                                detection_result.prediction_viewpoints(curr_file_idx,:),...
-                                zeros(nnz(curr_file_idx),1),...
-                                detection_result.prediction_scores(curr_file_idx)];
+                    for prediction_idx = 1:numel(curr_file_idx)
+                        prediction_score = detection_result.prediction_scores(curr_file_idx(prediction_idx));
+                        if prediction_score < 75
+                            formatted_bounding_box(prediction_idx, 10) = ...
+                                    prediction_azimuth_rotation_direction * detection_result.proposal_viewpoints(curr_file_idx(prediction_idx),:) - prediction_azimuth_offset;
+                        else
+                            formatted_bounding_box(prediction_idx, 10) = ...
+                                    detection_result.prediction_viewpoints(curr_file_idx(prediction_idx),:);
+                        end
+                    end
             end
 %             prediction_azimuth = formatted_bounding_box(:,10);
         else
@@ -247,7 +269,12 @@ for unique_image_idx=1:n_unique_files
                 dwot_evaluate_prediction(prediction_bounding_box_clip,...
                             ground_truth_bounding_boxes, param.min_overlap, ~ground_truth_obj_idx);
         detScore{unique_image_idx} = formatted_bounding_box(:,end)';
-
+        
+%         if numel(ground_truth_bounding_boxes) > 0
+%             unique_image_idx
+%             tp{unique_image_idx}
+%         end
+        
         if 0
             formatted_bounding_box(:,9) = prediction_iou;
             
@@ -320,7 +347,7 @@ for unique_image_idx=1:n_unique_files
             end
             % ground_truth_azimuth = cellfun(@(x) x.azimuth, {object_annotations.viewpoint});
 
-            if 0
+            if 1
                 [tp_view{unique_image_idx}, fp_view{unique_image_idx}, prediction_view_iou, gt_idx_of_view_prediction] =...
                     dwot_evaluate_prediction_bin_view(prediction_bounding_box_clip,...
                             ground_truth_bounding_boxes,...
@@ -432,8 +459,6 @@ recall = tpSort/npos;
 precision = tpSort./(fpSort + tpSort);
 
 ap = VOCap(recall', precision');
-
-close all
 
 if b_compute_view
     fp_view = cell2mat(cellfun(@(x) double(x), fp_view, 'UniformOutput',false));

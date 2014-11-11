@@ -1,5 +1,5 @@
 function [detectors]= dwot_make_detectors_grid(renderer, azs, els, yaws, fovs, model_indexes, model_class, param, visualize)
-if nargin < 7
+if nargin < 9
   visualize = false;
 end
 

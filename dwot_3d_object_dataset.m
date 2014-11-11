@@ -1,5 +1,8 @@
-function [label, image_path] = dwot_3d_object_dataset(DATA_PATH, CLASS)
+function [label, image_path] = dwot_3d_object_dataset(DATA_PATH, CLASS, visualize)
 % bboxFormat = 'x1 y1 x2 y2'
+if nargin < 3
+    visualize = false;
+end
 
 CLASS_PATH = [DATA_PATH '/' lower(CLASS)];
 
@@ -10,7 +13,7 @@ image_path = {};
 label = {};
 image_index = 1;
 
-if exist([CLASS_PATH '/annotation.mat'],'file')
+if exist([CLASS_PATH '/annotation.mat'],'file') && ~visualize
   load([CLASS_PATH '/annotation.mat']);
   return;
 end
@@ -43,6 +46,18 @@ for dir_idx = 1:numel(sub_dirs)
         % bbox = [min(x_coord), min(y_coord), max(x_coord)-min(x_coord), max(y_coord)-min(y_coord)];
         bbox = [min(x_coord), min(y_coord), max(x_coord), max(y_coord)];
         
+        if visualize
+            subplot(121);
+            im=imread([CLASS_PATH '/' sub_dir.name '/' sub_file.name]);
+            imagesc(im);
+            rectangle('position',dwot_bbox_xy_to_wh(bbox));
+            subplot(122);
+            imagesc(mask)
+            rectangle('position',dwot_bbox_xy_to_wh(bbox));
+            drawnow;
+            waitforbuttonpress
+        end
+         
         label{image_index}.BB = bbox';
         label{image_index}.diff = false;
         label{image_index}.det = false;

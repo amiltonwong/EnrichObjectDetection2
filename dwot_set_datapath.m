@@ -22,9 +22,11 @@ elseif strcmp(DATA_SET,'PASCAL12')
     if isempty(server_id)
         VOC_PATH = '/home/chrischoy/Dataset/PASCAL3D+_release1.1/PASCAL12/VOCdevkit/';
         PASCAL3D_ANNOTATION_PATH = '/home/chrischoy/Dataset/PASCAL3D+_release1.1/Annotations';
+        VOC_DPM_PATH = '/home/chrischoy/Dataset/3DDPM_result/';
     else
         VOC_PATH = '/scratch/chrischoy/Dataset/PASCAL12/VOCdevkit/';
         PASCAL3D_ANNOTATION_PATH = '/scratch/chrischoy/Dataset/PASCAL12/Annotations';
+        VOC_DPM_PATH = '/scratch/chrischoy/Dataset/3DDPM_result/';
     end
     if ismac
         VOC_PATH = '~/dataset/VOCdevkit/';

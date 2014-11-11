@@ -2,12 +2,22 @@
 %     return maximum score that got from the 
 %     instant detector
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [max_score, template, template_size, rendering_image, rendering_depth, image_bbox] = ...
+function [max_score, template, template_size, paddedIm, paddedDepth, image_bbox] = ...
     dwot_detect_using_instant_detector(renderer, hog_pyramid, az, el, yaw, fov, models_idx, param, im_region)
 renderer.setViewpoint(az,el,yaw,0,fov);
 % renderer.setModelIndex(models_idx);
 [rendering_image, rendering_depth] = renderer.renderCrop();
-template = WHOTemplateCG_CUDA( rendering_image, param);
+
+[template, ~, scale ] = WHOTemplateCG_CUDA( rendering_image, param);
+
+padding = round(param.rendering_sbin / scale / 2);
+
+size_rendering = size(rendering_image);
+paddedIm = 255 * ones(size_rendering + [2 * padding, 2 * padding, 0],'uint8');
+paddedIm(padding+1:padding+size_rendering(1), padding+1:padding+size_rendering(2),:) = rendering_image;
+paddedDepth = zeros(size_rendering(1:2) + [2 * padding, 2 * padding]);
+paddedDepth(padding+1:padding+size_rendering(1), padding+1:padding+size_rendering(2)) = rendering_depth;
+
 template_size = size(template);
 n_hog = numel(hog_pyramid.pyramid);
 c = cell(1, n_hog);

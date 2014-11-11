@@ -1,4 +1,4 @@
-function [ WHOTemplate, scale, HOGTemplate ] = WHOTemplateDecomp( im, param)
+function [ WHOTemplate, scale, HOGTemplate ] = WHOTemplateDecompStandard( im, param)
 %WHOTEMPLATEDECOMP Summary of this function goes here
 %   Detailed explanation goes here
 % Nrow = N1
@@ -73,15 +73,13 @@ muSwapDim = zeros(1,1,HOGDim);
 muSwapDim(1,1,:) = Mu;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%
-nonEmptyCells = (sum(HOGTemplate,3) > hog_cell_threshold);
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 
-centeredWs = bsxfun(@times,bsxfun(@minus,HOGTemplate,muSwapDim),nonEmptyCells);
+centeredWs = bsxfun(@minus,HOGTemplate,muSwapDim);
 centeredWs = permute(centeredWs,[3 1 2]); % [HOGDim, Nrow, Ncol] = HOGDim, N1, N2
 
 sigInvCenteredWs = R\(R'\centeredWs(:));
 sigInvCenteredWs = reshape(sigInvCenteredWs,[HOGDim, wHeight, wWidth]);
 WHOTemplate = permute(sigInvCenteredWs,[2,3,1]);
-WHOTemplate = bsxfun(@times,WHOTemplate,nonEmptyCells);
 
 end

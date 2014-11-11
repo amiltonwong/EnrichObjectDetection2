@@ -1,6 +1,11 @@
 function [ ap, avp, mppe ] = dwot_analyze_and_visualize_3D_object_results( detection_result_txt, ...
                             detectors, save_path, param, DATA_PATH, CLASS, color_range, nms_threshold, visualize, prediction_azimuth_rotation_direction, prediction_azimuth_offset)
-
+% It only evaluate the images that is in the prediction file. The user must
+% ensure that all the test/validation images is in the prediction file. For
+% instance, by including dummy prediction such as [-inf 0 0 0 0].
+% 
+% this allow user to use evaluation criteria of seeing 3D chair which uses 
+% subset of PASCAL images. But use with extreme caution.
 if ~exist('nms_threshold','var') || isempty(nms_threshold)
     if ~isfield(param, 'nms_threshold')
       nms_threshold = 0.4;

@@ -16,7 +16,7 @@ dwot_set_datapath;
 %                 = 1, GPU
 %                 = 2, Combined
 COMPUTING_MODE = 1;
-CLASS = 'Bicycle';
+CLASS = 'Car';
 SUB_CLASS = [];     % Sub folders
 LOWER_CASE_CLASS = lower(CLASS);
 TEST_TYPE = 'val';
@@ -31,13 +31,13 @@ if COMPUTING_MODE > 0
   cos(gpuArray(1));
 end
 
-azs = 0:15:345; % azs = [azs , azs - 10, azs + 10];
-els = 0:20:20;
+azs = 0:15:345; 
+els = 0:10:30;
 fovs = [25];
 yaws = 0;
 n_cell_limit = [250];
 lambda = [0.15];
-detection_threshold = 80;
+detection_threshold = 40;
 
 visualize_detection = true;
 visualize_detector = false;
@@ -51,10 +51,10 @@ n_max_proposals = 10;
 % models_name = cellfun(@(x) strrep(x, '/', '_'), models_path, 'UniformOutput', false);
 [ model_names, model_paths ] = dwot_get_cad_models('Mesh', CLASS, [], {'3ds','obj'});
 
-models_to_use = {'bmx_bike',...
-              'fixed_gear_road_bike',...
-              'glx_bike',...
-              'road_bike'};
+% models_to_use = {'bmx_bike',...
+%               'fixed_gear_road_bike',...
+%               'glx_bike',...
+%               'road_bike'};
 
 % models_to_use = {'atx_bike',...
 %               'atx_bike_rot',...
@@ -102,7 +102,7 @@ models_to_use = {'bmx_bike',...
 %             'Maserati-3500GT',...
 %             'Skylark_Cruiser_1971'};
 
-% models_to_use = {'Honda-Accord-3'};
+models_to_use = {'Honda-Accord-3'};
 
 use_idx = ismember(model_names,models_to_use);
 
@@ -265,14 +265,14 @@ end
 % ground truth is required to plot figure.
 % [gtids,t] = textread(sprintf(VOCopts.imgsetpath,[LOWER_CASE_CLASS '_' TEST_TYPE]),'%s %d');
 [gt, image_path] = dwot_3d_object_dataset(DATA_PATH, CLASS);
-N_IMAGE = length(gt);
-N_IMAGE = 20;
+N_IMAGE = length(gt)/4;
+% N_IMAGE = 20;
 
 n_views = 8;
 max_azimuth_difference = 360/n_views/2;
 
 if strcmp(CLASS, 'Bicycle')
-    prediction_azimuth_offset = -90;
+    prediction_azimuth_offset = 90;
     prediction_azimuth_rotation_direction = -1;
 else
     prediction_azimuth_offset = 180;
@@ -282,7 +282,7 @@ end
 detection_time_per_image = zeros(N_IMAGE,1);
 tuning_time_per_image = zeros(N_IMAGE,1);
 
-for image_idx=10:N_IMAGE
+for image_idx=1:N_IMAGE
     fprintf('%d/%d ',image_idx,N_IMAGE);
     % read annotation
     % recs = PASreadrecord(sprintf(VOCopts.annopath,gtids{img_idx}));
@@ -312,15 +312,12 @@ for image_idx=10:N_IMAGE
       [bbsAllLevel, hog, scales] = dwot_detect( im, templates_cpu, param);
     elseif COMPUTING_MODE == 1
       [bbsAllLevel, hog, scales] = dwot_detect_gpu( im, templates_gpu, param);
-    elseif COMPUTING_MODE == 2
-      [bbsAllLevel, hog, scales] = dwot_detect_combined( im, templates_gpu, templates_cpu, param);
-    else
-      error('Computing Mode Undefined');
     end
     detection_time_per_image(image_idx) = toc(imgTic);
     fprintf('convolution time: %0.4f\n', detection_time_per_image(image_idx));
     
     % Automatically sort them according to the score and apply NMS
+    bbsAllLevel = dwot_return_null_padded_box(bbsAllLevel, [], 12)
     proposal_formatted_bounding_boxes = esvm_nms(bbsAllLevel, param.nms_threshold);
     prediction_azimuth = proposal_formatted_bounding_boxes(:,10);
     % [~, img_file_name] = fileparts(recs.imgname);
@@ -360,8 +357,14 @@ for image_idx=10:N_IMAGE
             case 'bfgs'
                 [best_proposals] = dwot_bfgs_proposal_region(renderer, hog_region_pyramids, im_regions,...
                                                 detectors, detector_table, param, im);
+            case 'dwot'
+                if COMPUTING_MODE == 0
+                  [bbsAllLevel, hog, scales] = dwot_detect( im, templates_cpu, param);
+                elseif COMPUTING_MODE == 1
+                  [bbsAllLevel, hog, scales] = dwot_detect_gpu( im, templates_gpu, param);
+                end
             otherwise
-                error('Undefined tuning mode');
+               error('Undefined tuning mode');
         end
         tuning_time_per_image(image_idx) = toc(tuningTic);
         fprintf(' tuning time : %0.4f\n', tuning_time_per_image(image_idx));

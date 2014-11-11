@@ -8,9 +8,26 @@ renderer.setViewpoint(azimuth,elevation,yaw,0,fov);
 if isempty(im)
   error('Rendering error');
 end
-% [ WHOTemplate, HOGTemplate] = WHOTemplateDecompNonEmptyCell( im, Mu, Gamma, n_cell_limit, lambda, 50);
+% TODO replace it
+% 0 NZ-WHO
+% 1 Constant # active cell in NZ-WHO
+% 2 Decorrelate all but center only the non-zero cells
+% 3 NZ-WHO but normalize by # of active cells
+
+% 4 HOG feature
+% 5 Whiten all, WHO-CG
+% 6 Whiten all, WHO-CG-ZZ
+% 7 center non zero, whiten all, zero out empty, NZC-WHO-CG-ZZ
+% 8 Similar to 7 but find bias heuristically
+% 9 Decomposition, NZC-WHO-Chol-ZZ
+% 10 Decomposition WHO-Chol
+% 11 NZ-WHO-Chol
 if param.template_initialization_mode == 4
     [ WHOTemplate, scale] = HOGTemplate(im, param);
+elseif param.template_initialization_mode == 9
+    [ WHOTemplate, scale] = WHOTemplateDecomp(im, param);
+elseif param.template_initialization_mode == 10
+    [ WHOTemplate, scale] = WHOTemplateDecompStandard(im, param);
 else
     [ WHOTemplate, ~, scale] = WHOTemplateCG_CUDA_various_whitening( im, param);
 end

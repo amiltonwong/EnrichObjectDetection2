@@ -53,13 +53,13 @@ param.max_view_difference = 22.5; % degree
 param.detect_pyramid_padding = 15;
 
 % minimum image hog length that we use for convolution
-param.min_hog_length = 10;
+param.min_hog_length = 7;
 
 %The maximum scale to consdider in the feature pyramid
 param.detect_max_scale = 1.0;
 
 %The minimum scale to consider in the feature pyramid
-param.detect_min_scale = .01;
+param.detect_min_scale = .02;
 param.detection_threshold = detection_threshold;
 
 
@@ -141,7 +141,7 @@ param.mcmc_max_iter = 20;
 
 %% Cuda Convolution Params
 % THREAD_PER_BLOCK_H, THREAD_PER_BLOCK_W, THREAD_PER_BLOCK_D, THREAD_PER_BLOCK_2D
-param.cuda_conv_n_threads = [8, 8, 4, 8];
+param.cuda_conv_n_threads = [8, 8, 4, 32];
 
 
 %% Binary Search params

@@ -20,7 +20,7 @@ dwot_set_datapath;
 %                 = 1, GPU
 %                 = 2, Combined
 COMPUTING_MODE = 1;
-CLASS = 'Bicycle';
+CLASS = 'Car';
 SUB_CLASS = [];
 LOWER_CASE_CLASS = lower(CLASS);
 TEST_TYPE = 'val';
@@ -64,10 +64,11 @@ use_idx = ismember(model_names,'Honda-Accord-3');
 %               'road_bike',...
 %               'road_bike_rot'};
 
-use_idx = ismember(model_names,models_to_use);
+% use_idx = ismember(model_names,models_to_use);
           
 model_names = model_names(use_idx);
 model_paths = model_paths(use_idx);
+skip_criteria = {'none'};
 %%%%%%%%%%%%%%% Set Parameters %%%%%%%%%%%%
 
 dwot_get_default_params;
@@ -122,7 +123,7 @@ param.detection_mode = 'dwot';
 
 
 % detector name
-[ detector_model_name ] = dwot_get_detector_name(CLASS, SUB_CLASS, model_names, param);
+[ detector_model_name ] = dwot_get_detector_name( model_names, param);
 
 detector_name = sprintf('%s_%s_lim_%d_lam_%0.3f_a_%d_e_%d_y_%d_f_%d',...
         LOWER_CASE_CLASS, detector_model_name, n_cell_limit, lambda,...
