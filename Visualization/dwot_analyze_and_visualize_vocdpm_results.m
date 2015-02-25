@@ -1,7 +1,7 @@
 function [ ap ] = dwot_analyze_and_visualize_vocdpm_results( detection_result_txt, ...
                         detectors, VOCopts, param, nms_threshold, evaluation_mode, visualize, save_path,...
                         n_views, prediction_azimuth_rotation_direction, prediction_azimuth_offset,...
-                        clip_prediction_bounding_box)
+                        clip_prediction_bounding_box, score_threshold)
 % It only evaluate the images that is in the prediction file. The user must
 % ensure that all the test/validation images is in the prediction file. For
 % instance, by including dummy prediction such as [-inf 0 0 0 0].
@@ -40,7 +40,9 @@ if nargin < 12
     clip_prediction_bounding_box = true;
 end
 
-score_threshold= 100;
+if nargin < 13
+    score_threshold= 50;
+end
 % renderings = cellfun(@(x) x.rendering_image, detectors, 'UniformOutput', false);
 
 % PASCAL_car_val_init_0_Car_each_7_lim_300_lam_0.0150_a_24_e_2_y_1_f_2_scale_2.00_sbin_6_level_10_nms_0.40_skp_e

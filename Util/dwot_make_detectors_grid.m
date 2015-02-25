@@ -15,6 +15,7 @@ end
 colormap hot;
 i = 1;
 
+start_time = tic;
 detectors = cell(1,numel(azs) * numel(els) * numel(fovs));
 generation_time = zeros(numel(azs) * numel(els) * numel(fovs) , 1);
 for model_index = model_indexes
@@ -27,18 +28,17 @@ for model_index = model_indexes
           azGT = azs(azIdx);
           yawGT = yaws(yawIdx);
           fovGT = fovs(fovIdx);
-          
           tic
-          detector = dwot_get_detector(renderer, azGT, elGT, yawGT, fovGT, model_index, 'not_supported_model_class', param);
+            detector = dwot_get_detector(renderer, azGT, elGT, yawGT, fovGT, model_index, 'not_supported_model_class', param);
           generation_time(i) = toc;
-          
+
           detectors{i} = detector;
           % param.detector_table( dwot_detector_key(azGT, elGT, yawGT, fovGT) ) = i;
 
           if visualize || (visualize && toc > 1)
             subplot(221);
             imagesc(detector.rendering_image); axis equal; axis tight; axis off;
-            
+
             subplot(222);
             imagesc(invertHOG(detector.whow)); axis equal; axis tight; axis off;
 
@@ -46,7 +46,7 @@ for model_index = model_indexes
             % imagesc(HOGpicture(HOGTemplate)); axis equal; axis tight;
             subplot(223);
             imagesc(HOGpicture(detector.whow)); axis equal; axis tight; axis off;
-            
+
             subplot(224);
             imagesc(HOGpicture(-detector.whow)); axis equal; axis tight; axis off;
             drawnow;
@@ -54,7 +54,7 @@ for model_index = model_indexes
 %            waitforbuttonpress;
           end
           i = i + 1;
-                    
+
           if mod(i,20)==1
               fprintf('average time : %0.2f sec\n', toc(start_time)/i);
           else

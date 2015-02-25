@@ -1,9 +1,10 @@
 addpath('HoG');
-addpath('HoG/features');
 addpath('Util');
 addpath('DecorrelateFeature/');
-addpath('../MatlabRenderer/');
-addpath('../MatlabRenderer/bin');
+addpath('bin/');
+addpath('Visualization/');
+addpath('../OSGRenderer/');
+addpath('../OSGRenderer/bin');
 addpath('../MatlabCUDAConv/');
 addpath('3rdParty/SpacePlot');
 addpath('3rdParty/MinMaxSelection');
@@ -13,7 +14,7 @@ DATA_SET = 'PASCAL12';
 dwot_set_datapath;
 
 COMPUTING_MODE = 1;
-CLASS = 'Car';
+CLASS = 'Aeroplane';
 SUB_CLASS = [];     % Sub folders
 LOWER_CASE_CLASS = lower(CLASS);
 TEST_TYPE = 'val';
@@ -32,13 +33,13 @@ del = 20;
 dfov = 10;
 dyaw = 10;
 
-azs = 0:15:345; % azs = [azs , azs - 10, azs + 10];
-els = 0:20:20;
-fovs = [25 50];
+azs = 0:7.5:359; % azs = [azs , azs - 10, azs + 10];
+els = -30:7.5:30;
+fovs = [25];
 yaws = 0;
 n_cell_limit = [250];
 lambda = [0.15];
-detection_threshold = 80;
+detection_threshold = 45;
 
 visualize_detection = true;
 visualize_detector = false;
@@ -55,17 +56,17 @@ n_max_tuning = 1;
 %               'glx_bike',...
 %               'road_bike'};
 
-models_to_use = {'atx_bike',...
-              'atx_bike_rot',...
-              'bmx_bike_2',...
-              'bmx_bike_4',...
-              'chopper_bike',...
-              'brooklyn_machine_works_bike',...
-              'downhill_bike',...
-              'glx_bike',...
-              'road_bike',...
-              'uncategorized_bike',...
-              'road_bike_rot'};
+% models_to_use = {'atx_bike',...
+%               'atx_bike_rot',...
+%               'bmx_bike_2',...
+%               'bmx_bike_4',...
+%               'chopper_bike',...
+%               'brooklyn_machine_works_bike',...
+%               'downhill_bike',...
+%               'glx_bike',...
+%               'road_bike',...
+%               'uncategorized_bike',...
+%               'road_bike_rot'};
           
 % models_to_use = {'2012-VW-beetle-turbo',...
 %               'Kia_Spectra5_2006',...
@@ -104,12 +105,15 @@ models_to_use = {'atx_bike',...
 %             'Maserati-3500GT',...
 %             'Skylark_Cruiser_1971'};
 
-models_to_use = {'Honda-Accord-3'};
+% models_to_use = {'Honda-Accord-3'};
+% 
+% use_idx = ismember(model_names,models_to_use);
+% 
+% model_names = model_names(use_idx);
+% model_paths = model_paths(use_idx);
 
-use_idx = ismember(model_names,models_to_use);
-
-model_names = model_names(use_idx);
-model_paths = model_paths(use_idx);
+% model_names = model_names(1:30)
+% model_paths = model_paths(1:30)
 
 % skip_criteria = {'empty', 'truncated','difficult'};
 skip_criteria = {'none'};
@@ -138,6 +142,7 @@ param.proposal_tuning_mode = 'mcmc';
 % Detection mode == 'dwot' ours
 %                == 'cnn'
 %                == 'dpm'
+%                == 'gt' ground truth
 param.detection_mode = 'cnn';
 param.proposal_score_threshold = -0.7;
 
@@ -194,7 +199,7 @@ end
 if ~strcmp(param.proposal_tuning_mode, 'none') || ~exist('renderer','var') || ~exist(detector_file_name,'file')
     % Initialize renderer
     renderer = Renderer();
-    if ~renderer.initialize(model_paths, 700, 700, 0, 0, 0, 0, 25)
+    if ~renderer.initialize(model_paths, 700, 700)
         error('fail to load model');
     end
 end
@@ -256,7 +261,7 @@ end
 
 [gtids,t] = textread(sprintf(VOCopts.imgsetpath,[LOWER_CASE_CLASS '_' TEST_TYPE]),'%s %d');
 
-N_IMAGE = length(gtids);
+N_IMAGE = min(length(gtids), inf);
 
 gt = struct('BB',[],'diff',[],'det',[]);
 
@@ -312,6 +317,8 @@ for img_idx=1:N_IMAGE
         formatted_bounding_box(:,12) =  cell2mat({detection_struct.score})';
       case 'dpm'
         error('NOT SUPPORTED');
+      case 'gt'
+        load()
     end 
    
     % Automatically sort them according to the score and apply NMS
@@ -447,7 +454,7 @@ for img_idx=1:N_IMAGE
 
         tuned_prediction_box(:,1:4) = bsxfun(@plus, ...
                 tuned_prediction_box(:,1:4)/proposal_resize_scale, clip_padded_bbox_offset);
-            
+
         tuned_formatted_bounding_boxes = dwot_predictions_to_formatted_bounding_boxes( tuned_prediction_box,...
                                                tuned_prediction_score, [], [], tuned_prediction_azimuth);
  
@@ -488,15 +495,17 @@ close all;  % space plot casues problem when using different subplot grid
 %     dwot_analyze_and_visualize_cnn_results( fullfile('Result/car_val', 'PASCAL12_car_val_init_0_Car_each_27_lim_250_lam_0.1500_a_24_e_3_y_1_f_1_scale_2.00_sbin_6_level_20_nms_0.30_server_104_cnn_proposal_dwot_tmp_2.txt') , detectors, '/home/chrischoy/DWOT_CNN5', VOCopts, param, skip_criteria, param.color_range, param.nms_threshold, false, n_view, -1, 0);
 %     print('-dpng','-r200',fullfile(SAVE_PATH, ['AP_PASCAL12_car_val_init_0_Car_each_27_lim_250_lam_0.1500_a_24_e_3_y_1_f_1_scale_2.00_sbin_6_level_20_nms_0.30_server_104_cnn_proposal_dwot_tmp_2_nms_' sprintf('%0.2f',param.nms_threshold) '_nview_' num2str(n_view) '.png' ] ));
 % end
-nms_thresholds = 0.3:0.1:0.7;
+nms_thresholds = 0.3:0.1:0.5;
 ap = zeros(numel(nms_thresholds),1);
 ap_dwot_prop = zeros(numel(nms_thresholds),1);
 ap_save_names = cell(numel(nms_thresholds),1);
 ap_tuning_save_name =cell(numel(nms_thresholds),1);
 ap_detection_save_names = cell(numel(nms_thresholds),1);
 fprintf('Detection of proposals\n');
+close all;
 for i = 1:numel(nms_thresholds)
     nms_threshold = nms_thresholds(i);
+    clf;
     ap(i) = dwot_analyze_and_visualize_vocdpm_results(fullfile(SAVE_PATH, detection_result_file), ...
                         detectors, VOCopts, param, nms_threshold, 'predboxpredview', false);
 
@@ -507,21 +516,25 @@ for i = 1:numel(nms_thresholds)
 end
 
 % Detection for regions before tuning
-% n_views = [4, 8, 16, 24];
-n_views = param.n_views;
+n_views = [4, 8, 16, 24];
+score_thresholds = [45];
+% n_views = param.n_views;
 count = 1;
 fprintf('AVP of proposal + ours\n');
-for view_idx = 1:numel(n_views)
-    for i = 1:numel(nms_thresholds)
-        nms_threshold = nms_thresholds(i);
-        ap_dwot_prop(count) = dwot_analyze_and_visualize_vocdpm_results(fullfile(SAVE_PATH,detection_dwot_proposal_result_file), ...
-                            detectors, VOCopts, param, nms_threshold, 'propboxpredviewthres', false, [], n_views(view_idx), -1 ,0);
-
-        ap_detection_save_names{count} = sprintf(['AP_%s_proposal_dwot_nms_%0.2f_nview_%d.png'],...
-                            detection_result_common_name, nms_threshold, n_views(view_idx));
-
-         print('-dpng','-r150',fullfile(SAVE_PATH, ap_detection_save_names{count}));
-         count = count + 1;
+for score_threshold = score_thresholds
+    for view_idx = 1:numel(n_views)
+        for i = 1:numel(nms_thresholds)
+            nms_threshold = nms_thresholds(i);
+            clf;
+            ap_dwot_prop(count) = dwot_analyze_and_visualize_vocdpm_results(fullfile(SAVE_PATH,detection_dwot_proposal_result_file), ...
+                                detectors, VOCopts, param, nms_threshold, 'propboxpredviewthres', false, [], n_views(view_idx), -1 ,0, score_threshold);
+    
+            ap_detection_save_names{count} = sprintf(['AP_%s_proposal_dwot_nms_%0.2f_nview_%d_thres_%d.png'],...
+                                detection_result_common_name, nms_threshold, n_views(view_idx), score_threshold);
+    
+             print('-dpng','-r150',fullfile(SAVE_PATH, ap_detection_save_names{count}));
+             count = count + 1;
+        end
     end
 end
 
@@ -534,17 +547,21 @@ end
 if ~strcmp(param.proposal_tuning_mode,'none')
     fprintf('AVP of proposal + ours + MCMC\n');
     count = 1;
-    for view_idx = 1:numel(n_views)
-        for i = 1:numel(nms_thresholds)
-            nms_threshold = nms_thresholds(i);
-            ap_tuning(count) = dwot_analyze_and_visualize_vocdpm_results(fullfile(SAVE_PATH,detection_tuning_result_file), ...
-                                detectors, VOCopts, param, nms_threshold, 'propboxpredviewthres', false, [], n_views(view_idx), -1 ,0);
+    for score_threshold = score_thresholds
+        for view_idx = 1:numel(n_views)
+            for i = 1:numel(nms_thresholds)
+                nms_threshold = nms_thresholds(i);
+                clf;
+                ap_tuning(count) = dwot_analyze_and_visualize_vocdpm_results(fullfile(SAVE_PATH,detection_tuning_result_file), ...
+                                    detectors, VOCopts, param, nms_threshold, 'propboxpredviewthres', false, [], n_views(view_idx), -1 ,0, detection_threshold);
 
-            ap_tuning_save_name{count} = sprintf(['AP_%s_tuning_%s_nms_%.2f_nview_%d.png'],...
-                                detection_result_common_name, param.proposal_tuning_mode,...
-                                param.nms_threshold);
+                ap_tuning_save_name{count} = sprintf(['AP_%s_tuning_%s_nms_%.2f_nview_%d_thres_%d.png'],...
+                                    detection_result_common_name, param.proposal_tuning_mode,...
+                                    nms_threshold, n_views(view_idx), score_threshold);
 
-             print('-dpng','-r150',fullfile(SAVE_PATH, ap_tuning_save_name{count}));
+                 print('-dpng','-r150',fullfile(SAVE_PATH, ap_tuning_save_name{count}));
+                 count = count + 1;
+            end
         end
     end
 end

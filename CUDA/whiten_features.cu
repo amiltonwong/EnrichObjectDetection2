@@ -2,10 +2,14 @@
 #include <cublas_v2.h>
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
+
+// Matlab libraries
 #include "mex.h"
 #include "gpu/mxGPUArray.h"
-#include "cudaDecorrelateFeature.h"
-#include "cudaDecorrelateFeature.cuh"
+
+// local dependencies
+#include "whiten_features.h"
+#include "whiten_features.cuh"
 
 static bool debug = false;
 

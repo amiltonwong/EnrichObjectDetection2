@@ -120,11 +120,9 @@ param.device_id = DEVICE_ID;
 param.N_THREAD_H = 32;
 param.N_THREAD_W = 32;
 
-param.scramble_gamma_to_sigma_file = './scrambleGammaToSigma';
-if ~exist([param.scramble_gamma_to_sigma_file  '.ptx'],'file')
-    system(['nvcc -ptx ' param.scramble_gamma_to_sigma_file '.cu']);
-end
-scramble_kernel                  = parallel.gpu.CUDAKernel([param.scramble_gamma_to_sigma_file '.ptx'],[param.scramble_gamma_to_sigma_file '.cu']);
+param.scramble_gamma_to_sigma_file = 'scramble_gamma_to_sigma';
+scramble_kernel = parallel.gpu.CUDAKernel(['./bin/', param.scramble_gamma_to_sigma_file '.ptx'],...
+                                          ['./CUDA/', param.scramble_gamma_to_sigma_file '.cu']);
 scramble_kernel.ThreadBlockSize  = [param.N_THREAD_H , param.N_THREAD_W , 1];
 param.scramble_kernel = scramble_kernel;
   

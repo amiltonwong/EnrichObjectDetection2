@@ -1,7 +1,7 @@
 [~, sys_host_name] = system('hostname');
 server_id = regexp(sys_host_name, '^napoli(?<num>\d+).*','names');
 if isempty(server_id)
-  VOC_PATH = '/home/chrischoy/dataset/PASCAL3D+_release1.1/PASCAL/VOCdevkit/';
+  VOC_PATH = '/home/chrischoy/dataset/PASCAL3D+_release1.1/PASCAL12/VOCdevkit/';
 else
   VOC_PATH = '/scratch/chrischoy/Dataset/VOCdevkit/';
 end
@@ -32,7 +32,7 @@ eval(['cd ' curDir]);
 
 DATA_SET = 'PASCAL';
 COMPUTING_MODE = 1;
-CLASS = 'Chair';
+CLASS = 'Boat';
 % CLASS = 'Bicycle';
 SUB_CLASS = [];
 LOWER_CASE_CLASS = lower(CLASS);
@@ -91,7 +91,7 @@ n_proposals = 5;
 skip_criteria = {'empty', 'truncated','difficult','occluded'};
 % skip_criteria = {'empty'};
 skip_name = cellfun(@(x) x(1), skip_criteria);
-
+DEVICE_ID = 2;
 %%%%%%%%%%%%%%% Set Parameters %%%%%%%%%%%%
 dwot_get_default_params;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
